@@ -28,14 +28,38 @@ const CURRENT_YEAR = new Date().getFullYear()
 // con highQuality:true). 0.05 da un look "low-poly" reconociendo las 24
 // jurisdicciones sin que el peso del GeoJSON sea excesivo.
 const SIMPLIFY_TOLERANCE = 0.05
-// Antes de simplificar, se descartan los polígonos sueltos (islas) de una
-// misma jurisdicción cuya área relativa sea menor al 1% del polígono más
-// grande de esa jurisdicción. Esto es necesario porque el GeoJSON de Georef
-// para Tierra del Fuego incluye ~1500 islotes del sector antártico/Atlántico
-// Sur que no aportan nada reconocible a un mapa a escala país y sí un enorme
-// costo de puntos. No se descartan territorios de tamaño significativo (islas
-// grandes, sector antártico, etc.), solo islotes menores.
-const MIN_RELATIVE_PART_AREA = 0.01
+
+// El GeoJSON de Georef para "Tierra del Fuego, Antártida e Islas del
+// Atlántico Sur" incluye, además de la Isla Grande (la parte poblada, con
+// espacios culturales reales), el sector antártico reclamado por Argentina
+// (llega hasta -90° de latitud) y archipiélagos muy alejados en el Atlántico
+// Sur. Ninguno de esos tiene espacios culturales en el dataset de SInCA, y el
+// sector antártico directamente rompe la proyección Mercator para TODO el
+// mapa (una proyección de área finita no puede fitear una geometría que
+// llega al polo). No es una decisión sobre soberanía: para este mapa
+// interactivo de espacios culturales se renderiza solo el cuerpo principal de
+// cada jurisdicción (Isla Grande y los islotes inmediatamente adyacentes),
+// igual que se haría con cualquier archipiélago lejano de otra provincia.
+//
+// Filtro en dos pasos, aplicado a todas las jurisdicciones (no solo Tierra
+// del Fuego): 1) se descartan partes cuyo punto más al norte ya está más al
+// sur de ANTARCTIC_LAT_CUTOFF (elimina el sector antártico); 2) entre las
+// partes restantes se toma la de mayor área como "ancla" (el cuerpo
+// principal) y se descarta cualquier otra parte a más de
+// MAX_DISTANCE_FROM_ANCHOR_DEG grados de esa ancla (elimina archipiélagos
+// lejanos, conserva islotes realmente adyacentes).
+const ANTARCTIC_LAT_CUTOFF = -58
+const MAX_DISTANCE_FROM_ANCHOR_DEG = 5
+// Cualquier parte cuyo lado más largo del bounding box sea menor a esto (en
+// grados) se descarta antes de simplificar. Son islotes de unos pocos cientos
+// de metros que, al pasar por @turf/simplify con tolerancia 0.05, quedan
+// reducidos a un triángulo de 3 puntos casi degenerado. Se confirmó
+// empíricamente que esos triángulos rotos confunden el cálculo de límites
+// esférico de d3-geo (interpreta el anillo como "todo el planeta menos un
+// triángulo" en vez de "un triángulo chiquito"), rompiendo la proyección para
+// toda la feature (reproducido en Buenos Aires y Corrientes). Un islote de
+// este tamaño tampoco se vería como más que un punto en un mapa a escala país.
+const MIN_PART_SPAN_DEG = 0.1
 
 /** Área aproximada de un anillo (shoelace, en unidades de grado²; solo sirve
  * para comparar tamaños relativos entre partes de una misma feature). */
@@ -49,15 +73,51 @@ function ringArea(ring) {
   return Math.abs(sum / 2)
 }
 
-function dropTinyParts(geometry) {
+function ringBounds(ring) {
+  let minLat = 90
+  let maxLat = -90
+  let minLon = 180
+  let maxLon = -180
+  for (const [lon, lat] of ring) {
+    if (lat < minLat) minLat = lat
+    if (lat > maxLat) maxLat = lat
+    if (lon < minLon) minLon = lon
+    if (lon > maxLon) maxLon = lon
+  }
+  return {
+    maxLat,
+    centerLat: (minLat + maxLat) / 2,
+    centerLon: (minLon + maxLon) / 2,
+    span: Math.max(maxLat - minLat, maxLon - minLon),
+  }
+}
+
+function dropRemoteParts(geometry) {
   if (geometry.type !== 'MultiPolygon') return geometry
   const parts = geometry.coordinates
-  const areas = parts.map((p) => ringArea(p[0]))
-  const maxArea = Math.max(...areas)
-  const kept = parts.filter((_, i) => areas[i] >= maxArea * MIN_RELATIVE_PART_AREA)
+  const info = parts.map((p) => ({
+    area: ringArea(p[0]),
+    bounds: ringBounds(p[0]),
+  }))
+
+  const northOfCutoff = info.filter((c) => c.bounds.maxLat > ANTARCTIC_LAT_CUTOFF)
+  const anchorPool = northOfCutoff.length ? northOfCutoff : info
+  const anchor = anchorPool.reduce((a, b) => (b.area > a.area ? b : a))
+
+  const kept = parts.filter((_, i) => {
+    const c = info[i]
+    if (c.bounds.maxLat <= ANTARCTIC_LAT_CUTOFF) return false
+    if (c.bounds.span < MIN_PART_SPAN_DEG) return false
+    const dist = Math.hypot(
+      c.bounds.centerLat - anchor.bounds.centerLat,
+      c.bounds.centerLon - anchor.bounds.centerLon,
+    )
+    return dist <= MAX_DISTANCE_FROM_ANCHOR_DEG
+  })
+
   return {
     type: 'MultiPolygon',
-    coordinates: kept.length ? kept : [parts[areas.indexOf(maxArea)]],
+    coordinates: kept.length ? kept : [parts[info.indexOf(anchor)]],
   }
 }
 
@@ -425,7 +485,7 @@ async function main() {
   }
 
   // --- Geometría simplificada + propiedades ---------------------------------
-  console.log(`Simplificando geometría (tolerancia ${SIMPLIFY_TOLERANCE}, descarte de islotes < ${MIN_RELATIVE_PART_AREA * 100}% de área relativa)...`)
+  console.log(`Simplificando geometría (tolerancia ${SIMPLIFY_TOLERANCE}, descarte de partes antárticas/remotas)...`)
   const features = geojsonRaw.features.map((f) => {
     const id = f.properties.id
     const agg = porProvincia.get(id) ?? { total: 0, porCategoria: new Map() }
@@ -436,7 +496,7 @@ async function main() {
       .map(([categoria]) => categoria)
     const pob = poblacion[id] ?? null
 
-    const geometryFiltered = dropTinyParts(f.geometry)
+    const geometryFiltered = dropRemoteParts(f.geometry)
     const simplifiedFeature = simplify(
       { type: 'Feature', properties: {}, geometry: geometryFiltered },
       { tolerance: SIMPLIFY_TOLERANCE, highQuality: true },
