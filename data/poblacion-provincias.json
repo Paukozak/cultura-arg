@@ -1,0 +1,29 @@
+{
+  "_fuente": "INDEC, Censo Nacional de Población, Hogares y Viviendas 2022, resultados definitivos. Cuadro 1: Total de población, variación absoluta y variación relativa, por jurisdicción, años 2010 y 2022. https://censo.gob.ar/wp-content/uploads/2023/11/c2022_tp_est_c1.xlsx (consultado 2026-09-12). Columna usada: población año 2022.",
+  "poblacion": {
+    "02": 3121707,
+    "06": 17523996,
+    "10": 429562,
+    "14": 3840905,
+    "18": 1212696,
+    "22": 1129606,
+    "26": 592621,
+    "30": 1425578,
+    "34": 607419,
+    "38": 811611,
+    "42": 361859,
+    "46": 383865,
+    "50": 2043540,
+    "54": 1278873,
+    "58": 710814,
+    "62": 750768,
+    "66": 1441351,
+    "70": 822853,
+    "74": 542069,
+    "78": 337226,
+    "82": 3544908,
+    "86": 1060906,
+    "90": 1731820,
+    "94": 185732
+  }
+}
