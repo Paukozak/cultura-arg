@@ -1,4 +1,6 @@
 import { Header } from './components/Header'
+import { Legend } from './features/map/Legend'
+import { LayerToggle } from './features/map/LayerToggle'
 import { NationalMap } from './features/map/NationalMap'
 
 function App() {
@@ -6,7 +8,13 @@ function App() {
     <div className="flex min-h-screen flex-col bg-neutral-950">
       <Header />
       <main className="flex flex-1 items-center justify-center p-6">
-        <div className="w-full max-w-3xl">
+        <div className="relative w-full max-w-3xl">
+          <div className="absolute left-0 top-0 z-10">
+            <LayerToggle />
+          </div>
+          <div className="absolute right-0 top-0 z-10">
+            <Legend />
+          </div>
           <NationalMap />
         </div>
       </main>
