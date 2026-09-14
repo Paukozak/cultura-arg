@@ -2,17 +2,25 @@ import { useMemo, useRef, useState, type MouseEvent } from 'react'
 import { geoMercator, geoPath } from 'd3-geo'
 import { provinciasGeo, type ProvinciaFeature } from '../../data/provincias'
 import { useMapStore, type Capa } from '../../store/mapStore'
-import { buildColorScales, colorForFeature } from './colorScales'
+import { buildColorScales, colorForFeature, highlightStroke } from './colorScales'
 
 const WIDTH = 800
 const HEIGHT = 900
 
 // Provincias cuyo bounding box proyectado sea más chico que esto (en px, en
-// cualquiera de los dos ejes) reciben además un marcador circular en su
-// centroide. Hoy la única que cae acá es CABA: es geométricamente minúscula
-// al lado del resto del país y, sin esto, no se puede ver ni clickear.
-const MIN_MARKER_PX = 12
-const MARKER_RADIUS = 6
+// cualquiera de los dos ejes) no se dibujan como ficha: a esta escala su
+// polígono real es apenas unos pocos px y, simplificado como está en los
+// datos, agrandarlo no se lee como su forma — queda un bloque irregular
+// cualquiera. Se resuelven en cambio como un llamado (globo con etiqueta +
+// línea guía hasta su ubicación real), la forma habitual de marcar un
+// territorio demasiado chico para dibujarse en un mapa a esta escala. Hoy
+// la única que cae acá es CABA.
+const MIN_TILE_PX = 12
+const ETIQUETA_CORTA: Record<string, string> = { '02': 'CABA' }
+const CALLOUT_DX = 95
+const CALLOUT_DY = -10
+const CALLOUT_PILL_W = 52
+const CALLOUT_PILL_H = 22
 
 // Look "relieve isométrico": cada provincia es una ficha extruida. El "lado"
 // (una copia del mismo path, oscurecida y corrida hacia abajo) simula el
@@ -38,6 +46,8 @@ function metricaTooltip(feature: ProvinciaFeature, capa: Capa) {
 
 export function NationalMap() {
   const capaActiva = useMapStore((s) => s.capaActiva)
+  const provinciaSeleccionada = useMapStore((s) => s.provinciaSeleccionada)
+  const seleccionarProvincia = useMapStore((s) => s.seleccionarProvincia)
   const [hover, setHover] = useState<{
     feature: ProvinciaFeature
     x: number
@@ -64,15 +74,23 @@ export function NationalMap() {
     const bounds = path.bounds(feature)
     const w = bounds[1][0] - bounds[0][0]
     const h = bounds[1][1] - bounds[0][1]
+    const isSelected = provinciaSeleccionada === feature.properties.id
     return {
       feature,
       d: path(feature) ?? undefined,
       color: colorForFeature(feature.properties, capaActiva, scales),
-      needsMarker: Math.max(w, h) < MIN_MARKER_PX,
+      necesitaLlamado: Math.max(w, h) < MIN_TILE_PX,
       centroid: path.centroid(feature),
       isHovered: hover?.feature.properties.id === feature.properties.id,
+      isSelected,
+      // Con una provincia seleccionada, el resto del mapa se atenúa para que
+      // la seleccionada se destaque.
+      opacity: provinciaSeleccionada && !isSelected ? 0.35 : 1,
     }
   })
+
+  const fichas = drawn.filter((d) => !d.necesitaLlamado)
+  const llamados = drawn.filter((d) => d.necesitaLlamado)
 
   return (
     <div className="relative">
@@ -103,28 +121,41 @@ export function NationalMap() {
 
         {/* Paso 1: los "lados" de todas las provincias, para que ninguno
             tape la cara de arriba de una provincia vecina. */}
-        {drawn.map(({ feature, d, color }) => (
+        {fichas.map(({ feature, d, color, opacity }) => (
           <path
             key={`side-${feature.properties.id}`}
             d={d}
             transform={`translate(0, ${EXTRUDE_DEPTH})`}
             fill={color}
-            style={{ filter: 'brightness(0.4) saturate(1.05)' }}
+            style={{
+              filter: 'brightness(0.4) saturate(1.05)',
+              opacity,
+              transition: 'opacity 250ms ease',
+            }}
             pointerEvents="none"
           />
         ))}
 
-        {/* Paso 2: las caras de arriba (interactivas) + su bisel + el
-            marcador de CABA, todo por encima de cualquier lado. */}
-        {drawn.map(({ feature, d, color, isHovered, needsMarker, centroid: [cx, cy] }) => {
+        {/* Paso 2: las caras de arriba (interactivas) + su bisel, todo por
+            encima de cualquier lado. */}
+        {fichas.map(({ feature, d, color, isHovered, isSelected, opacity }) => {
           const lift = isHovered ? -HOVER_LIFT : 0
+          const stroke = isHovered || isSelected ? highlightStroke(color) : 'rgba(10, 10, 10, 0.7)'
+          const onClick = () =>
+            seleccionarProvincia(
+              provinciaSeleccionada === feature.properties.id ? null : feature.properties.id,
+            )
           return (
-            <g key={`top-${feature.properties.id}`}>
+            <g
+              key={`top-${feature.properties.id}`}
+              style={{ opacity, transition: 'opacity 250ms ease' }}
+            >
               <path
                 d={d}
+                data-provincia={feature.properties.id}
                 fill={color}
-                stroke={isHovered ? '#f5820d' : 'rgba(10, 10, 10, 0.7)'}
-                strokeWidth={isHovered ? 1.5 : 1}
+                stroke={stroke}
+                strokeWidth={isHovered || isSelected ? 1.5 : 1}
                 strokeLinejoin="round"
                 style={{
                   transform: `translate(0, ${lift}px)`,
@@ -133,9 +164,11 @@ export function NationalMap() {
                   filter: isHovered
                     ? 'brightness(1.15) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5))'
                     : 'none',
+                  cursor: 'pointer',
                 }}
                 onMouseEnter={handleEnter(feature)}
                 onMouseLeave={handleLeave}
+                onClick={onClick}
               />
               <path
                 d={d}
@@ -146,25 +179,86 @@ export function NationalMap() {
                   transition: 'transform 150ms ease',
                 }}
               />
-              {needsMarker && (
+            </g>
+          )
+        })}
+
+        {/* Paso 3: llamados para provincias demasiado chicas para dibujarse
+            (CABA) — línea guía desde su ubicación real hasta una etiqueta
+            legible en el espacio vacío del mapa. El punto (en la ubicación
+            real) y la etiqueta forman un solo target clickeable/hoverable;
+            solo la línea guía es decorativa. */}
+        {llamados.map(({ feature, color, isHovered, isSelected, centroid: [cx, cy], opacity }) => {
+          const stroke = isHovered || isSelected ? highlightStroke(color) : 'rgba(10, 10, 10, 0.7)'
+          const anchorX = cx + CALLOUT_DX
+          const anchorY = cy + CALLOUT_DY
+          const etiqueta = ETIQUETA_CORTA[feature.properties.id] ?? feature.properties.nombre
+          const onClick = () =>
+            seleccionarProvincia(
+              provinciaSeleccionada === feature.properties.id ? null : feature.properties.id,
+            )
+          return (
+            <g
+              key={`llamado-${feature.properties.id}`}
+              style={{ opacity, transition: 'opacity 250ms ease' }}
+            >
+              <line
+                x1={cx}
+                y1={cy}
+                x2={anchorX - CALLOUT_PILL_W / 2}
+                y2={anchorY}
+                stroke="rgba(245, 242, 234, 0.4)"
+                strokeWidth={1}
+                pointerEvents="none"
+              />
+              <g
+                data-provincia={feature.properties.id}
+                onMouseEnter={handleEnter(feature)}
+                onMouseLeave={handleLeave}
+                onClick={onClick}
+                style={{ cursor: 'pointer' }}
+              >
+                {/* Círculo invisible más grande que el punto visual, para
+                    que hoverear/clickear la ubicación real no requiera
+                    apuntar a un punto de 3px exactos. */}
+                <circle cx={cx} cy={cy} r={8} fill="transparent" />
                 <circle
                   cx={cx}
-                  cy={cy + lift}
-                  r={isHovered ? MARKER_RADIUS + 1 : MARKER_RADIUS}
+                  cy={cy}
+                  r={isHovered || isSelected ? 4 : 3}
                   fill={color}
-                  stroke={isHovered ? '#f5820d' : '#f5f2ea'}
-                  strokeWidth={isHovered ? 1.5 : 1.25}
-                  style={{
-                    transition:
-                      'cy 150ms ease, fill 200ms ease, stroke 150ms ease, r 150ms ease, filter 150ms ease',
-                    filter: isHovered
-                      ? 'drop-shadow(0 0 6px rgba(245, 130, 13, 0.55)) brightness(1.15)'
-                      : 'drop-shadow(0 2px 3px rgba(0, 0, 0, 0.7))',
-                  }}
-                  onMouseEnter={handleEnter(feature)}
-                  onMouseLeave={handleLeave}
+                  stroke={stroke}
+                  strokeWidth={1.25}
+                  style={{ transition: 'r 150ms ease, stroke 150ms ease' }}
                 />
-              )}
+                <rect
+                  x={anchorX - CALLOUT_PILL_W / 2}
+                  y={anchorY - CALLOUT_PILL_H / 2}
+                  width={CALLOUT_PILL_W}
+                  height={CALLOUT_PILL_H}
+                  rx={CALLOUT_PILL_H / 2}
+                  fill={color}
+                  stroke={stroke}
+                  strokeWidth={isHovered || isSelected ? 1.5 : 1}
+                  style={{
+                    filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6))',
+                    transition: 'stroke 150ms ease, fill 150ms ease',
+                  }}
+                />
+                <text
+                  x={anchorX}
+                  y={anchorY}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize={10}
+                  fontWeight={700}
+                  fill="#141414"
+                  style={{ fontFamily: 'ui-monospace, monospace', letterSpacing: '0.02em' }}
+                  pointerEvents="none"
+                >
+                  {etiqueta}
+                </text>
+              </g>
             </g>
           )
         })}

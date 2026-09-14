@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Arranca antes la conexión (DNS+TLS) al mapa de Google embebido que
+         se usa al abrir el panel de una provincia — así, cuando el código
+         realmente lo pide, la conexión ya está lista en vez de arrancar de
+         cero. -->
+    <link rel="preconnect" href="https://maps.google.com" />
     <title>Cartografía Cultural Argentina</title>
   </head>
   <body>

@@ -1,0 +1,535 @@
+{
+  "_fuente": "Curaduría editorial manual, acordada con el usuario en conversación, verificada contra src/data/espacios/{provinciaId}.json (cada id referencia un registro real de SInCA; no se inventó ningún lugar). Reemplaza el criterio algorítmico original de la Etapa 4 (categoría con más presencia + año más antiguo).",
+  "porProvincia": {
+    "10": [
+      {
+        "id": "monumentos-y-lugares-historicos-685",
+        "foto": "fotos-destacados/catamarca1.jpg"
+      },
+      {
+        "id": "monumentos-y-lugares-historicos-687",
+        "foto": "fotos-destacados/catamarca2.jpg"
+      },
+      {
+        "id": "museos-170",
+        "foto": "fotos-destacados/catamarca3.jpg"
+      },
+      {
+        "id": "salas-de-teatro-933",
+        "foto": "fotos-destacados/catamarca4.jpg"
+      },
+      {
+        "id": "museos-174",
+        "foto": "fotos-destacados/catamarca5.jpg"
+      }
+    ],
+    "14": [
+      {
+        "id": "sitios-patrimonio-unesco-2",
+        "foto": "fotos-destacados/cordoba1.jpg"
+      },
+      {
+        "id": "monumentos-y-lugares-historicos-778",
+        "foto": "fotos-destacados/cordoba2.jpg"
+      },
+      {
+        "id": "museos-411",
+        "foto": "fotos-destacados/cordoba3.jpg"
+      },
+      {
+        "id": "museos-492",
+        "foto": "fotos-destacados/cordoba4.jpg"
+      },
+      {
+        "id": "salas-de-teatro-941",
+        "foto": "fotos-destacados/cordoba5.jpg"
+      }
+    ],
+    "18": [
+      {
+        "id": "salas-de-teatro-1073",
+        "foto": "fotos-destacados/corrientes1.jpg"
+      },
+      {
+        "id": "museos-525",
+        "foto": "fotos-destacados/corrientes2.jpg"
+      },
+      {
+        "id": "museos-524",
+        "foto": "fotos-destacados/corrientes3.jpg"
+      },
+      {
+        "id": "casas-del-bicentenario-37",
+        "foto": "fotos-destacados/corrientes4.jpg"
+      },
+      {
+        "id": "museos-522",
+        "foto": "fotos-destacados/corrientes5.jpeg"
+      }
+    ],
+    "22": [
+      {
+        "id": "centros-culturales-744",
+        "foto": "fotos-destacados/chaco1.jpg"
+      },
+      {
+        "id": "museos-204",
+        "foto": "fotos-destacados/chaco2.jpg"
+      },
+      {
+        "id": "museos-201",
+        "foto": "fotos-destacados/chaco3.jpeg"
+      },
+      {
+        "id": "centros-culturales-742",
+        "foto": "fotos-destacados/chaco4.jpg"
+      },
+      {
+        "id": "museos-208",
+        "foto": "fotos-destacados/chaco5.jpg"
+      }
+    ],
+    "26": [
+      {
+        "id": "museos-253",
+        "foto": "fotos-destacados/chubut1.jpg"
+      },
+      {
+        "id": "museos-259",
+        "foto": "fotos-destacados/chubut2.jpg"
+      },
+      {
+        "id": "salas-de-teatro-1091",
+        "foto": "fotos-destacados/chubut3.jpg"
+      },
+      {
+        "id": "museos-223",
+        "foto": "fotos-destacados/chubut4.jpg"
+      },
+      {
+        "id": "sitios-patrimonio-unesco-1",
+        "foto": "fotos-destacados/chubut5.jpg"
+      }
+    ],
+    "30": [
+      {
+        "id": "monumentos-y-lugares-historicos-862",
+        "foto": "fotos-destacados/entrerios1.jpg"
+      },
+      {
+        "id": "salas-de-teatro-1106",
+        "foto": "fotos-destacados/entrerios2.jpg"
+      },
+      {
+        "id": "museos-579",
+        "foto": "fotos-destacados/entrerios3.jpg"
+      },
+      {
+        "id": "centros-culturales-776",
+        "foto": "fotos-destacados/entrerios4.jpg"
+      },
+      {
+        "id": "museos-578",
+        "foto": "fotos-destacados/entrerios5.jpg"
+      }
+    ],
+    "34": [
+      {
+        "id": "salas-de-teatro-1115",
+        "foto": "fotos-destacados/formosa1.jpg"
+      },
+      {
+        "id": "museos-594",
+        "foto": "fotos-destacados/formosa2.jpg"
+      },
+      {
+        "id": "centros-culturales-788",
+        "foto": "fotos-destacados/formosa3.jpg"
+      },
+      {
+        "id": "bibliotecas-especializadas-1433",
+        "foto": "fotos-destacados/formosa4.jpg"
+      },
+      {
+        "id": "monumentos-y-lugares-historicos-901",
+        "foto": "fotos-destacados/formosa5.jpg"
+      }
+    ],
+    "38": [
+      {
+        "id": "sitios-patrimonio-unesco-8",
+        "foto": "fotos-destacados/jujuy1.jpg"
+      },
+      {
+        "id": "monumentos-y-lugares-historicos-932",
+        "foto": "fotos-destacados/jujuy2.jpg"
+      },
+      {
+        "id": "salas-de-teatro-1120",
+        "foto": "fotos-destacados/jujuy3.jpg"
+      },
+      {
+        "id": "museos-635",
+        "foto": "fotos-destacados/jujuy4.jpg"
+      },
+      {
+        "id": "monumentos-y-lugares-historicos-919",
+        "foto": "fotos-destacados/jujuy5.jpg"
+      }
+    ],
+    "42": [
+      {
+        "id": "salas-de-teatro-1129",
+        "foto": "fotos-destacados/lapampa1.jpg"
+      },
+      {
+        "id": "monumentos-y-lugares-historicos-944",
+        "foto": "fotos-destacados/lapampa2.jpg"
+      },
+      {
+        "id": "museos-680",
+        "foto": "fotos-destacados/lapampa3.jpg"
+      },
+      {
+        "id": "salas-de-teatro-563",
+        "foto": "fotos-destacados/lapampa4.jpg"
+      },
+      {
+        "id": "museos-685",
+        "foto": "fotos-destacados/lapampa5.jpg"
+      }
+    ],
+    "46": [
+      {
+        "id": "sitios-patrimonio-unesco-9",
+        "foto": "fotos-destacados/larioja1.jpg"
+      },
+      {
+        "id": "museos-698",
+        "foto": "fotos-destacados/larioja2.jpg"
+      },
+      {
+        "id": "salas-de-teatro-1142",
+        "foto": "fotos-destacados/larioja3.jpeg"
+      },
+      {
+        "id": "museos-699",
+        "foto": "fotos-destacados/larioja4.jpg"
+      },
+      {
+        "id": "museos-697",
+        "foto": "fotos-destacados/larioja5.jpg"
+      }
+    ],
+    "50": [
+      {
+        "id": "salas-de-teatro-1150",
+        "foto": "fotos-destacados/mendoza1.jpg"
+      },
+      {
+        "id": "museos-731",
+        "foto": "fotos-destacados/mendoza2.jpg"
+      },
+      {
+        "id": "museos-763",
+        "foto": "fotos-destacados/mendoza3.jpg"
+      },
+      {
+        "id": "museos-740",
+        "foto": "fotos-destacados/mendoza4.jpg"
+      },
+      {
+        "id": "museos-738",
+        "foto": "fotos-destacados/mendoza5.jpg"
+      }
+    ],
+    "54": [
+      {
+        "id": "monumentos-y-lugares-historicos-1053",
+        "foto": "fotos-destacados/misiones1.jpg"
+      },
+      {
+        "id": "salas-de-teatro-1193",
+        "foto": "fotos-destacados/misiones2.jpg"
+      },
+      {
+        "id": "museos-796",
+        "foto": "fotos-destacados/misiones3.jpg"
+      },
+      {
+        "id": "museos-790",
+        "foto": "fotos-destacados/misiones4.jpg"
+      },
+      {
+        "id": "museos-788",
+        "foto": "fotos-destacados/misiones5.jpg"
+      }
+    ],
+    "58": [
+      {
+        "id": "museos-817",
+        "foto": "fotos-destacados/neuquen1.jpg"
+      },
+      {
+        "id": "museos-822",
+        "foto": "fotos-destacados/neuquen2.jpg"
+      },
+      {
+        "id": "cines-246",
+        "foto": "fotos-destacados/neuquen3.jpg"
+      },
+      {
+        "id": "centros-culturales-864",
+        "foto": "fotos-destacados/neuquen4.jpg"
+      },
+      {
+        "id": "museos-832",
+        "foto": "fotos-destacados/neuquen5.jpg"
+      }
+    ],
+    "62": [
+      {
+        "id": "monumentos-y-lugares-historicos-1092",
+        "foto": "fotos-destacados/rionegro1.jpg"
+      },
+      {
+        "id": "salas-de-teatro-1223",
+        "foto": "fotos-destacados/rionegro2.jpg"
+      },
+      {
+        "id": "museos-855",
+        "foto": "fotos-destacados/rionegro3.jpg"
+      },
+      {
+        "id": "salas-de-teatro-439",
+        "foto": "fotos-destacados/rionegro4.jpg"
+      },
+      {
+        "id": "museos-848",
+        "foto": "fotos-destacados/rionegro5.jpg"
+      }
+    ],
+    "66": [
+      {
+        "id": "museos-875",
+        "foto": "fotos-destacados/salta1.JPG"
+      },
+      {
+        "id": "salas-de-teatro-1240",
+        "foto": "fotos-destacados/salta2.jpg"
+      },
+      {
+        "id": "monumentos-y-lugares-historicos-1116",
+        "foto": "fotos-destacados/salta3.jpg"
+      },
+      {
+        "id": "monumentos-y-lugares-historicos-1122",
+        "foto": "fotos-destacados/salta4.jpg"
+      },
+      {
+        "id": "museos-884",
+        "foto": "fotos-destacados/salta5.jpg"
+      }
+    ],
+    "70": [
+      {
+        "id": "sitios-patrimonio-unesco-20",
+        "foto": "fotos-destacados/sanjuan1.jpg"
+      },
+      {
+        "id": "salas-de-teatro-1243",
+        "foto": "fotos-destacados/sanjuan2.jpg"
+      },
+      {
+        "id": "museos-907",
+        "foto": "fotos-destacados/sanjuan3.jpg"
+      },
+      {
+        "id": "museos-908",
+        "foto": "fotos-destacados/sanjuan4.jpg"
+      },
+      {
+        "id": "museos-910",
+        "foto": "fotos-destacados/sanjuan5.jpg"
+      }
+    ],
+    "74": [
+      {
+        "id": "museos-920",
+        "foto": "fotos-destacados/sanluis1.jpg"
+      },
+      {
+        "id": "centros-culturales-929",
+        "foto": "fotos-destacados/sanluis2.jpeg"
+      },
+      {
+        "id": "museos-933",
+        "foto": "fotos-destacados/sanluis3.jpeg"
+      },
+      {
+        "id": "museos-939",
+        "foto": "fotos-destacados/sanluis4.jpg"
+      },
+      {
+        "id": "centros-culturales-930",
+        "foto": "fotos-destacados/sanluis5.jpeg"
+      }
+    ],
+    "78": [
+      {
+        "id": "sitios-patrimonio-unesco-21",
+        "foto": "fotos-destacados/santacruz1.jpg"
+      },
+      {
+        "id": "museos-962",
+        "foto": "fotos-destacados/santacruz2.jpg"
+      },
+      {
+        "id": "centros-culturales-943",
+        "foto": "fotos-destacados/santacruz3.jpg"
+      },
+      {
+        "id": "salas-de-teatro-567",
+        "foto": "fotos-destacados/santacruz4.jpg"
+      },
+      {
+        "id": "museos-958",
+        "foto": "fotos-destacados/santacruz5.jpg"
+      }
+    ],
+    "82": [
+      {
+        "id": "monumentos-y-lugares-historicos-1223",
+        "foto": "fotos-destacados/santafe1.jpg"
+      },
+      {
+        "id": "monumentos-y-lugares-historicos-1227",
+        "foto": "fotos-destacados/santafe2.jpg"
+      },
+      {
+        "id": "museos-1075",
+        "foto": "fotos-destacados/santafe3.jpg"
+      },
+      {
+        "id": "museos-1039",
+        "foto": "fotos-destacados/santafe4.jpg"
+      },
+      {
+        "id": "museos-1038",
+        "foto": "fotos-destacados/santafe5.jpg"
+      }
+    ],
+    "86": [
+      {
+        "id": "centros-culturales-1036",
+        "foto": "fotos-destacados/santiago1.jpg"
+      },
+      {
+        "id": "salas-de-teatro-1345",
+        "foto": "fotos-destacados/santiago2.jpg"
+      },
+      {
+        "id": "monumentos-y-lugares-historicos-1276",
+        "foto": "fotos-destacados/santiago3.jpg"
+      },
+      {
+        "id": "museos-1134",
+        "foto": "fotos-destacados/santiago4.jpg"
+      },
+      {
+        "id": "museos-1133",
+        "foto": "fotos-destacados/santiago5.jpg"
+      }
+    ],
+    "90": [
+      {
+        "id": "museos-1171",
+        "foto": "fotos-destacados/tucuman1.jpg"
+      },
+      {
+        "id": "salas-de-teatro-1354",
+        "foto": "fotos-destacados/tucuman2.jpg"
+      },
+      {
+        "id": "museos-1170",
+        "foto": "fotos-destacados/tucuman3.jpg"
+      },
+      {
+        "id": "salas-de-teatro-1351",
+        "foto": "fotos-destacados/tucuman4.jpg"
+      },
+      {
+        "id": "museos-1164",
+        "foto": "fotos-destacados/tucuman5.jpg"
+      }
+    ],
+    "94": [
+      {
+        "id": "museos-1156",
+        "foto": "fotos-destacados/tierradelfuego1.jpg"
+      },
+      {
+        "id": "salas-de-teatro-1364",
+        "nombreMostrado": "Museo Marítimo y del Presidio",
+        "foto": "fotos-destacados/tierradelfuego2.jpg"
+      },
+      {
+        "id": "centros-culturales-1065",
+        "foto": "fotos-destacados/tierradelfuego3.jpg"
+      },
+      {
+        "id": "museos-1144",
+        "foto": "fotos-destacados/tierradelfuego4.jpg"
+      },
+      {
+        "id": "museos-1150",
+        "nombreMostrado": "Museo Antártico Ushuaia José María Sobral",
+        "foto": "fotos-destacados/tierradelfuego5.jpg"
+      }
+    ],
+    "02": [
+      {
+        "id": "salas-de-teatro-592",
+        "foto": "fotos-destacados/caba1.jpg"
+      },
+      {
+        "id": "museos-273",
+        "foto": "fotos-destacados/caba2.jpg"
+      },
+      {
+        "id": "museos-269",
+        "foto": "fotos-destacados/caba3.jpg"
+      },
+      {
+        "id": "salas-de-teatro-570",
+        "foto": "fotos-destacados/caba4.jpg"
+      },
+      {
+        "id": "museos-354",
+        "foto": "fotos-destacados/caba5.jpg"
+      }
+    ],
+    "06": [
+      {
+        "id": "salas-de-teatro-812",
+        "foto": "fotos-destacados/buenosaires1.jpg"
+      },
+      {
+        "id": "monumentos-y-lugares-historicos-115",
+        "foto": "fotos-destacados/buenosaires2.jpg"
+      },
+      {
+        "id": "salas-de-teatro-773",
+        "foto": "fotos-destacados/buenosaires3.jpg"
+      },
+      {
+        "id": "museos-82",
+        "foto": "fotos-destacados/buenosaires4.jpg"
+      },
+      {
+        "id": "museos-67",
+        "foto": "fotos-destacados/buenosaires5.jpg"
+      }
+    ]
+  }
+}

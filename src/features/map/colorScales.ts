@@ -43,6 +43,32 @@ export function buildColorScales(
   return { densidadScale, totalScale }
 }
 
+function canales(hex: string): [number, number, number] {
+  const num = parseInt(hex.slice(1), 16)
+  return [(num >> 16) & 0xff, (num >> 8) & 0xff, num & 0xff]
+}
+
+function aHex([r, g, b]: [number, number, number]): string {
+  return `#${[r, g, b].map((c) => Math.round(c).toString(16).padStart(2, '0')).join('')}`
+}
+
+function darken(hex: string, cantidad: number): string {
+  const [r, g, b] = canales(hex)
+  const mezclar = (canal: number) => canal * (1 - cantidad)
+  return aHex([mezclar(r), mezclar(g), mezclar(b)])
+}
+
+// Borde de hover/selección derivado del propio color de relleno de la
+// provincia (no un naranja fijo para todas). Siempre oscurece (nunca
+// aclara): aclarar un naranja o un rojo medio-claro un 50-55% lo empuja
+// visualmente a blanco lavado — se ve como si el borde perdiera el color
+// en vez de resaltarlo. Oscurecer, en cambio, da un tinte del mismo color
+// que se lee bien contra el relleno (que además se ilumina con el filtro
+// de brightness en hover) sin importar cuán clara u oscura sea la base.
+export function highlightStroke(hex: string): string {
+  return darken(hex, 0.4)
+}
+
 export function colorForFeature(
   props: ProvinciaProperties,
   capa: Capa,

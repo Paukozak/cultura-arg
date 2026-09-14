@@ -2,6 +2,8 @@ import { Header } from './components/Header'
 import { Legend } from './features/map/Legend'
 import { LayerToggle } from './features/map/LayerToggle'
 import { NationalMap } from './features/map/NationalMap'
+import { ProvinceFullView } from './features/province-panel/ProvinceFullView'
+import { ProvincePanel } from './features/province-panel/ProvincePanel'
 
 function App() {
   return (
@@ -18,6 +20,8 @@ function App() {
           <NationalMap />
         </div>
       </main>
+      <ProvincePanel />
+      <ProvinceFullView />
     </div>
   )
 }

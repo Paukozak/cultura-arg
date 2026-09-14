@@ -121,6 +121,221 @@ function dropRemoteParts(geometry) {
   }
 }
 
+// --- Unificación de localidades ----------------------------------------------
+// El campo `localidad` viene de tipeo manual en los CSV fuente y trae varias
+// variantes del mismo lugar por acentos faltantes o mayúsculas inconsistentes
+// en conectores ("De" vs "de"): "Vicente López" / "Vicente Lopez", "9 de
+// Julio" / "9 De julio", "Ciudad Autónoma de Buenos Aires" / "...Autonoma...",
+// etc. (confirmado: 126 grupos de variantes duplicadas en 265 valores
+// distintos, en 24 provincias). Sin unificar, el filtro por localidad de la
+// app mostraba la misma ciudad repetida varias veces.
+//
+// Se agrupan (por provincia) por una clave sin acentos/mayúsculas/espacios
+// dobles y, dentro de cada grupo, se elige como forma canónica la de mejor
+// "calidad" ortográfica (con acentos, con los conectores en minúscula) — NO
+// la más frecuente: en varios casos la variante mal tipeada es mayoría (p.
+// ej. "Vicente Lopez" aparece más veces que "Vicente López" en los datos
+// fuente) y la frecuencia no es un criterio de corrección ortográfica. La
+// cantidad de ocurrencias solo se usa como desempate entre formas de igual
+// calidad.
+const CONECTORES_TOPONIMOS = new Set(['de', 'del', 'la', 'las', 'los', 'y', 'en'])
+
+function normalizeKeyLocalidad(s) {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function calidadLocalidad(s) {
+  let score = 0
+  if (/[áéíóúñÁÉÍÓÚÑ]/.test(s)) score += 100
+  const palabras = s.split(/\s+/)
+  const casingOk = palabras.every((p) => {
+    if (/^\d/.test(p)) return true // "9" y "25" de "9 de Julio"/"25 de Mayo"
+    if (CONECTORES_TOPONIMOS.has(p.toLowerCase())) return p === p.toLowerCase()
+    return p[0] === p[0].toUpperCase() && p.slice(1) === p.slice(1).toLowerCase()
+  })
+  if (casingOk) score += 50
+  if (s.length > 1 && s === s.toUpperCase()) score -= 50
+  return score
+}
+
+function unifyLocalidades(espacios) {
+  const variantesPorProvincia = new Map() // provinciaId -> normKey -> Map<variante, count>
+  for (const e of espacios) {
+    if (!e.localidad || !e.provinciaId) continue
+    const limpio = e.localidad.replace(/\s+/g, ' ').trim()
+    const key = normalizeKeyLocalidad(limpio)
+    if (!variantesPorProvincia.has(e.provinciaId)) variantesPorProvincia.set(e.provinciaId, new Map())
+    const grupos = variantesPorProvincia.get(e.provinciaId)
+    if (!grupos.has(key)) grupos.set(key, new Map())
+    const variantes = grupos.get(key)
+    variantes.set(limpio, (variantes.get(limpio) ?? 0) + 1)
+  }
+
+  const canonicoPorProvincia = new Map() // provinciaId -> normKey -> forma elegida
+  for (const [provinciaId, grupos] of variantesPorProvincia) {
+    const canonico = new Map()
+    for (const [key, variantes] of grupos) {
+      const [mejorForma] = [...variantes.entries()].sort(([formaA, countA], [formaB, countB]) => {
+        const diffCalidad = calidadLocalidad(formaB) - calidadLocalidad(formaA)
+        if (diffCalidad !== 0) return diffCalidad
+        if (countB !== countA) return countB - countA
+        return formaA.localeCompare(formaB, 'es')
+      })[0]
+      canonico.set(key, mejorForma)
+    }
+    canonicoPorProvincia.set(provinciaId, canonico)
+  }
+
+  for (const e of espacios) {
+    if (!e.localidad || !e.provinciaId) continue
+    const limpio = e.localidad.replace(/\s+/g, ' ').trim()
+    const key = normalizeKeyLocalidad(limpio)
+    e.localidad = canonicoPorProvincia.get(e.provinciaId)?.get(key) ?? limpio
+  }
+}
+
+// --- Correcciones puntuales ---------------------------------------------------
+// Casos individuales, verificados a mano, donde la fila fuente tiene un dato
+// objetivamente erróneo (no es una variante de tipeo — es la provincia
+// equivocada). Se corrigen acá, por nombre exacto, para que sobrevivan a un
+// re-run del pipeline.
+function aplicarCorreccionesPuntuales(espacios) {
+  for (const e of espacios) {
+    // La fila fuente (bibliotecas-especializadas.csv) trae
+    // Provincia/Departamento = "Ciudad Autónoma de Buenos Aires" pero su
+    // propio campo Localidad ya decía "San Martín" — contradicción interna
+    // que delata el error. La dirección real ("Av. General Paz 5445, e/ Av.
+    // Albarellos y Av. de los Constituyentes") y las coordenadas
+    // (-34.5759413, -58.5130596) son el Parque Tecnológico Miguelete del
+    // INTI, que está del lado de la provincia de Buenos Aires: Av. General
+    // Paz es justamente la avenida límite con CABA.
+    if (e.nombre === 'INTI - Tecnologías de Gestión, Biblioteca' && e.provinciaId === '02') {
+      e.provinciaId = '06'
+      e.departamento = 'General San Martín'
+      e.localidad = 'General San Martín' // mismo partido que las otras 24 entradas ya cargadas como "General San Martín"
+    }
+
+    // Único registro de todo el dataset sin localidad (bibliotecas-populares.csv,
+    // columna vacía en la fuente). Sus coordenadas (-36.879523, -60.304617)
+    // caen a menos de 3km del resto de las ~20 bibliotecas ya cargadas con
+    // localidad "Olavarría" en el mismo departamento ("Olavarria"), un radio
+    // muy por debajo de la distancia a cualquier otra localidad del partido.
+    if (e.nombre === 'BP Del Otro Lado del Arbol' && e.localidad === null) {
+      e.localidad = 'Olavarría'
+    }
+  }
+}
+
+// --- Localidad faltante en "Monumentos y Lugares Históricos" -----------------
+// Las 148 filas de esta categoría con localidad="s/d" en la fuente son en su
+// mayoría monumentos aislados (faros, sitios arqueológicos, tramos de rutas
+// históricas) sin un pueblo asociado — no es un dato que falte por descuido,
+// es que el monumento realmente no está "en" una localidad puntual. Antes de
+// resolver por proximidad geográfica (más abajo, genérico y con radio
+// acotado), dos fuentes de información ya presentes en el propio registro
+// resuelven la mayoría de los casos con precisión real, sin inventar nada:
+//
+// 1) Las estaciones de "La Trochita" (el histórico ferrocarril de trocha
+//    angosta de Chubut/Río Negro) llevan el nombre del paraje en su propio
+//    `nombre` ("Traza del Ferrocarril La Trochita - Estación <paraje>") — se
+//    extrae de ahí.
+// 2) Un puñado de faros/monumentos en Buenos Aires y Chubut traen en
+//    `direccion` directamente el nombre de una localidad real y sin
+//    ambigüedad (verificado a mano, uno por uno — no todos los `direccion`
+//    de esta categoría sirven: varios son descripciones de ruta o de una
+//    zona/departamento, no el nombre de un pueblo, y esos quedan afuera a
+//    propósito para no asignar una localidad puntual que la fuente no da).
+const LOCALIDAD_DESDE_DIRECCION_MONUMENTOS = {
+  'monumentos-y-lugares-historicos-264': 'Carmen de Patagones', // Faro Segunda Barranca
+  'monumentos-y-lugares-historicos-265': 'Monte Hermoso', // Faro Recalada a Bahía Blanca
+  'monumentos-y-lugares-historicos-266': 'Mar del Plata', // Faro Punta Mogotes
+  'monumentos-y-lugares-historicos-267': 'Villa Gesell', // Faro Querandí
+  'monumentos-y-lugares-historicos-735': 'Punta Delgada', // Faro Punta Delgada
+}
+
+function inferirLocalidadesMonumentos(espacios) {
+  for (const e of espacios) {
+    if (e.categoria !== 'Monumentos y Lugares Históricos' || e.localidad !== null) continue
+
+    const mapeada = LOCALIDAD_DESDE_DIRECCION_MONUMENTOS[e.id]
+    if (mapeada) {
+      e.localidad = mapeada
+      continue
+    }
+
+    const estacion = e.nombre.match(/Estaci[oó]n\s*[-–]?\s*(.+)$/i)
+    if (estacion) e.localidad = estacion[1].trim()
+  }
+}
+
+// --- Localidad faltante, último recurso: proximidad geográfica --------------
+// Para lo que sigue sin localidad después de lo anterior (mayormente sitios
+// realmente aislados: faros en islas, cumbres, yacimientos en despoblado):
+// se busca, dentro de la misma provincia, el espacio más cercano que sí tiene
+// localidad confirmada. Solo se adopta si queda a MAX_RADIO_KM o menos —
+// bastante por debajo de la distancia típica entre pueblos rurales — porque
+// más allá de eso adivinar la localidad por cercanía deja de ser confiable y
+// es preferible dejarlo como "sin dato" real antes que inventar precisión.
+const MAX_RADIO_INFERENCIA_KM = 5
+
+function distanciaKm(lat1, lon1, lat2, lon2) {
+  const R = 6371
+  const rad = Math.PI / 180
+  const dLat = (lat2 - lat1) * rad
+  const dLon = (lon2 - lon1) * rad
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(a))
+}
+
+function inferirLocalidadPorProximidad(espacios) {
+  const referenciasPorProvincia = new Map()
+  for (const e of espacios) {
+    if (!e.provinciaId || !e.localidad || e.lat === null || e.lon === null) continue
+    if (!referenciasPorProvincia.has(e.provinciaId)) referenciasPorProvincia.set(e.provinciaId, [])
+    referenciasPorProvincia.get(e.provinciaId).push({ lat: e.lat, lon: e.lon, localidad: e.localidad })
+  }
+
+  let inferidos = 0
+  for (const e of espacios) {
+    if (e.localidad !== null || !e.provinciaId || e.lat === null || e.lon === null) continue
+    const referencias = referenciasPorProvincia.get(e.provinciaId)
+    if (!referencias) continue
+    let mejor = null
+    let mejorDistancia = Infinity
+    for (const r of referencias) {
+      const d = distanciaKm(e.lat, e.lon, r.lat, r.lon)
+      if (d < mejorDistancia) {
+        mejorDistancia = d
+        mejor = r
+      }
+    }
+    if (mejor && mejorDistancia <= MAX_RADIO_INFERENCIA_KM) {
+      e.localidad = mejor.localidad
+      inferidos++
+    }
+  }
+  return inferidos
+}
+
+// CABA es una ciudad, no un conjunto de localidades: a diferencia del resto
+// de las provincias, no tiene sentido un filtro por "localidad" ahí. Un
+// puñado de filas del CSV fuente traen en cambio el barrio (p. ej. "San
+// Nicolás", el microcentro) en ese campo. Se fuerza a un valor único para
+// que el filtro de localidad de la app no muestre barrios sueltos como si
+// fueran la única alternativa a la ciudad entera.
+function forzarLocalidadCaba(espacios) {
+  for (const e of espacios) {
+    if (e.provinciaId === '02') e.localidad = 'Ciudad Autónoma de Buenos Aires'
+  }
+}
+
 // --- Normalización de gestión -----------------------------------------------
 function normalizeGestion(raw) {
   if (!raw) return null
@@ -154,10 +369,22 @@ function parseYear(raw, format) {
   return year
 }
 
+// "s/d" (y variantes de mayúscula/espaciado: "S/D", "S/d", "s.d.") es el
+// placeholder que usa la fuente para "sin dato" en varias columnas
+// (localidad, dirección, teléfono, mail, web — no solo gestión, que ya lo
+// manejaba en normalizeGestion). Sin este filtro quedaba colado como si
+// fuera un valor real: se veía literalmente "☎ s/d" o un link a "s/d" en la
+// ficha. Se trata como campo vacío en cualquier columna, no como un dato.
+function esMarcadorSinDato(v) {
+  return /^s\.?\s*\/?\s*d\.?$/i.test(v)
+}
+
 function field(row, key) {
   if (!key) return null
   const v = row[key]
-  return v && v.trim() ? v.trim() : null
+  if (!v || !v.trim()) return null
+  const limpio = v.trim()
+  return esMarcadorSinDato(limpio) ? null : limpio
 }
 
 function parseCoord(raw) {
@@ -468,6 +695,23 @@ async function main() {
 
   console.log('Leyendo y normalizando CSV de SInCA...')
   const { espacios, completitud } = await loadEspacios()
+
+  console.log('Aplicando correcciones puntuales...')
+  aplicarCorreccionesPuntuales(espacios)
+
+  console.log('Infiriendo localidad faltante en Monumentos y Lugares Históricos...')
+  inferirLocalidadesMonumentos(espacios)
+
+  console.log('CABA: unificando a una sola localidad (es una ciudad, no un conjunto de localidades)...')
+  forzarLocalidadCaba(espacios)
+
+  console.log('Unificando variantes de localidad (acentos, mayúsculas)...')
+  unifyLocalidades(espacios)
+
+  const inferidosPorProximidad = inferirLocalidadPorProximidad(espacios)
+  console.log(`Localidad inferida por proximidad geográfica (radio ${MAX_RADIO_INFERENCIA_KM}km): ${inferidosPorProximidad} registros`)
+  const sinLocalidad = espacios.filter((e) => e.localidad === null).length
+  console.log(`Quedan sin localidad (genuinamente sin dato en la fuente y sin ubicación cercana confiable): ${sinLocalidad}`)
 
   const totalEspacios = espacios.length
   const totalConAnio = espacios.filter((e) => e.anioInauguracion !== null).length
