@@ -102,6 +102,10 @@ function ProvincePanelContent({
   const { nombre, totalEspacios, densidadPor100k } = provincia.properties
   const destacados = espacios ? getDestacados(provinciaId, espacios) : []
 
+  // `top-16 bottom-0` en vez de `inset-y-0`: el panel no debe taparse por
+  // encima del header (ahí vive el buscador global — con `inset-y-0` el
+  // panel cubría también esa franja y, aunque visualmente no se notaba,
+  // interceptaba los clics del buscador mientras un panel estaba abierto).
   return (
     <motion.div
       ref={panelRef}
@@ -109,7 +113,7 @@ function ProvincePanelContent({
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: '100%' }}
       transition={{ duration: 0.28, ease: 'easeOut' }}
-      className="pointer-events-auto fixed inset-y-0 right-0 z-30 flex w-full max-w-md flex-col border-l border-neutral-800 bg-neutral-950/98 shadow-2xl backdrop-blur"
+      className="pointer-events-auto fixed bottom-0 right-0 top-16 z-30 flex w-full max-w-md flex-col border-l border-neutral-800 bg-neutral-950/98 shadow-2xl backdrop-blur"
     >
       <div className="flex items-start gap-3 border-b border-neutral-800 p-5">
         <button

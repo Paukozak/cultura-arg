@@ -13,6 +13,13 @@ interface MapState {
    * (p. ej. al hacer clic en la foto o el título de un destacado). */
   espacioFocoId: string | null
   abrirVistaCompleta: (espacioId?: string | null) => void
+  /** Localidad por la que arranca filtrada la vista completa (buscador
+   * global). Se limpia sola: `abrirVistaCompleta` y
+   * `abrirVistaCompletaPorLocalidad` se pisan mutuamente el foco del otro,
+   * así no queda un filtro de una búsqueda anterior colgado en una
+   * apertura sin relación (p. ej. "ver todos los espacios" del panel). */
+  localidadFocoId: string | null
+  abrirVistaCompletaPorLocalidad: (localidad: string) => void
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -25,5 +32,8 @@ export const useMapStore = create<MapState>((set) => ({
   setVistaCompleta: (valor) => set({ vistaCompleta: valor }),
   espacioFocoId: null,
   abrirVistaCompleta: (espacioId = null) =>
-    set({ vistaCompleta: true, espacioFocoId: espacioId }),
+    set({ vistaCompleta: true, espacioFocoId: espacioId, localidadFocoId: null }),
+  localidadFocoId: null,
+  abrirVistaCompletaPorLocalidad: (localidad) =>
+    set({ vistaCompleta: true, espacioFocoId: null, localidadFocoId: localidad }),
 }))

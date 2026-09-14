@@ -824,6 +824,57 @@ async function main() {
   }
   console.log(`Escritos src/data/espacios/*.json (${porProvinciaEspacios.size} archivos)`)
 
+  // Índice liviano para el buscador global (Etapa 7): buscar sobre nombre de
+  // espacio requeriría, si no, bajar los 24 JSON de /espacios (4+MB) enteros
+  // con cada tipeo. Este índice solo lleva los campos que el buscador
+  // necesita para mostrar resultados y navegar — el resto de la ficha se
+  // carga recién al seleccionar uno, con el mecanismo que ya existe
+  // (cargarEspacios por provincia).
+  const indiceBusqueda = espacios
+    .filter((e) => e.provinciaId && (e.nombre || e.categoria))
+    .map((e) => ({
+      id: e.id,
+      nombre: e.nombre ?? e.categoria,
+      categoria: e.categoria,
+      localidad: e.localidad,
+      provinciaId: e.provinciaId,
+    }))
+  await writeFile(
+    path.join(DATA_DIR, 'indice-busqueda.json'),
+    JSON.stringify(indiceBusqueda),
+  )
+  console.log(`Escrito src/data/indice-busqueda.json (${indiceBusqueda.length} espacios)`)
+
+  // Índice de localidades para el buscador global: buscar "Villa Carlos Paz"
+  // debe encontrar la localidad como resultado propio (no solo aparecer
+  // salpicada como subtítulo de espacios sueltos), y llevar a la vista
+  // completa de su provincia ya filtrada por esa localidad. Misma localidad
+  // en dos provincias distintas son dos entradas separadas — el filtro de la
+  // vista completa es por provincia, así que la ambigüedad se resuelve ahí.
+  // Map anidado (no una clave de texto combinada) porque una localidad
+  // puede tener espacios en el nombre ("Villa Carlos Paz") — partir un
+  // string combinado por un separador se presta a cortar justo esos
+  // nombres compuestos.
+  const conteoLocalidades = new Map()
+  for (const e of espacios) {
+    if (!e.provinciaId || !e.localidad) continue
+    if (!conteoLocalidades.has(e.provinciaId)) conteoLocalidades.set(e.provinciaId, new Map())
+    const porLocalidad = conteoLocalidades.get(e.provinciaId)
+    porLocalidad.set(e.localidad, (porLocalidad.get(e.localidad) ?? 0) + 1)
+  }
+  const indiceLocalidades = [...conteoLocalidades.entries()].flatMap(([provinciaId, porLocalidad]) =>
+    [...porLocalidad.entries()].map(([localidad, cantidadEspacios]) => ({
+      localidad,
+      provinciaId,
+      cantidadEspacios,
+    })),
+  )
+  await writeFile(
+    path.join(DATA_DIR, 'indice-localidades.json'),
+    JSON.stringify(indiceLocalidades),
+  )
+  console.log(`Escrito src/data/indice-localidades.json (${indiceLocalidades.length} localidades)`)
+
   const report = buildDataQualityReport(completitud, totalEspacios, totalConAnio)
   await writeFile(path.join(DOCS_DIR, 'data-quality-report.md'), report)
   console.log('Escrito docs/data-quality-report.md')

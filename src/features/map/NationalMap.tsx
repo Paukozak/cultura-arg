@@ -46,6 +46,15 @@ const ZOOM_MS = 450
 const ZOOM_EASING = 'cubic-bezier(0.16, 1, 0.3, 1)'
 const ZOOM_FILL_RATIO = 0.7
 const MIN_ZOOM_BBOX_PX = 40
+
+// `main` (App.tsx) ocupa el alto del viewport menos el header (`h-16` =
+// 64px) y centra el mapa dentro de ESE espacio, no del viewport completo:
+// el centro del mapa queda 32px (la mitad del header) más abajo del centro
+// real de la pantalla. A escala país, con la silueta de Argentina rodeada
+// de sobra de espacio vacío, esos 32px son invisibles; zoomeado a una sola
+// provincia que llena el cuadro, se nota — se corrige corriendo el mapa
+// hacia arriba ese mismo valor, pero solo mientras hay zoom.
+const CORRECCION_ZOOM_VERTICAL_PX = 32
 const MAX_ZOOM_SCALE = 400
 const CLUSTER_ZOOM_BOOST = 4
 
@@ -224,7 +233,13 @@ export function NationalMap() {
   const llamados = drawn.filter((d) => d.necesitaLlamado)
 
   return (
-    <div className="relative">
+    <div
+      className="relative h-full"
+      style={{
+        transform: zoom ? `translateY(-${CORRECCION_ZOOM_VERTICAL_PX}px)` : 'translateY(0px)',
+        transition: `transform ${ZOOM_MS}ms ${ZOOM_EASING}`,
+      }}
+    >
       <svg
         ref={svgRef}
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}

@@ -4,6 +4,7 @@ import { List, type RowComponentProps } from 'react-window'
 import { cargarEspacios, type Espacio } from '../../data/espacios'
 import { provinciasGeo } from '../../data/provincias'
 import { useMapStore } from '../../store/mapStore'
+import { normalizar } from '../../utils/texto'
 import { ICONOS_POR_CATEGORIA, ICONO_POR_DEFECTO } from './categoriaIcons'
 import { nombreMostradoPara } from './curaduriaDestacados'
 import { EspacioFoto } from './EspacioFoto'
@@ -24,13 +25,6 @@ const ORDEN_LABEL: Record<Orden, string> = {
   'anio-asc': 'Año (más antiguo)',
   'anio-desc': 'Año (más reciente)',
   categoria: 'Categoría',
-}
-
-function normalizar(s: string) {
-  return s
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
 }
 
 function ordenar(espacios: Espacio[], orden: Orden): Espacio[] {
@@ -167,10 +161,12 @@ function Ficha({ espacio }: { espacio: Espacio }) {
 function ProvinceFullViewContent({
   provinciaId,
   espacioInicialId,
+  localidadInicial,
   onCerrar,
 }: {
   provinciaId: string
   espacioInicialId: string | null
+  localidadInicial: string | null
   onCerrar: () => void
 }) {
   const [espacios, setEspacios] = useState<Espacio[] | null>(null)
@@ -178,7 +174,7 @@ function ProvinceFullViewContent({
   const [orden, setOrden] = useState<Orden>('alfabetico')
   const [categoriasActivas, setCategoriasActivas] = useState<Set<string> | null>(null)
   const [gestionesActivas, setGestionesActivas] = useState<Set<string> | null>(null)
-  const [localidadActiva, setLocalidadActiva] = useState<string | null>(null)
+  const [localidadActiva, setLocalidadActiva] = useState<string | null>(localidadInicial)
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(espacioInicialId)
 
   useEffect(() => {
@@ -475,6 +471,7 @@ export function ProvinceFullView() {
   const provinciaId = useMapStore((s) => s.provinciaSeleccionada)
   const vistaCompleta = useMapStore((s) => s.vistaCompleta)
   const espacioFocoId = useMapStore((s) => s.espacioFocoId)
+  const localidadFocoId = useMapStore((s) => s.localidadFocoId)
   const setVistaCompleta = useMapStore((s) => s.setVistaCompleta)
 
   return (
@@ -484,6 +481,7 @@ export function ProvinceFullView() {
           key={provinciaId}
           provinciaId={provinciaId}
           espacioInicialId={espacioFocoId}
+          localidadInicial={localidadFocoId}
           onCerrar={() => setVistaCompleta(false)}
         />
       )}
