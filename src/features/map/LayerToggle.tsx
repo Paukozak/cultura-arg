@@ -13,7 +13,7 @@ export function LayerToggle() {
     <div
       role="group"
       aria-label="Capa del mapa"
-      className="flex gap-1 rounded-full border border-neutral-800 bg-neutral-950/90 p-1 backdrop-blur"
+      className="flex gap-1 rounded-full border border-neutral-800 bg-neutral-950/90 p-1 shadow-lg shadow-black/50 backdrop-blur"
     >
       {OPCIONES.map((opcion) => {
         const activo = opcion.value === capaActiva

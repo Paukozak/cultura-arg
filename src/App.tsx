@@ -4,17 +4,36 @@ import { LayerToggle } from './features/map/LayerToggle'
 import { NationalMap } from './features/map/NationalMap'
 import { ProvinceFullView } from './features/province-panel/ProvinceFullView'
 import { ProvincePanel } from './features/province-panel/ProvincePanel'
+import { useMapStore } from './store/mapStore'
+
+// Ancho del panel lateral (ProvincePanel: `max-w-md`) — con una provincia
+// seleccionada, el mapa se corre este mismo ancho hacia la izquierda para
+// que el panel (fixed, fuera del flujo) no le tape una porción a la derecha.
+const ANCHO_PANEL_PX = 448
 
 function App() {
+  const provinciaSeleccionada = useMapStore((s) => s.provinciaSeleccionada)
+
   return (
     <div className="flex min-h-screen flex-col bg-neutral-950">
       <Header />
-      <main className="flex flex-1 items-center justify-center p-6">
+      <main
+        className="flex flex-1 items-center justify-center p-6"
+        style={{
+          paddingRight: provinciaSeleccionada ? ANCHO_PANEL_PX + 24 : undefined,
+          transition: 'padding-right 300ms ease',
+        }}
+      >
         <div className="relative w-full max-w-3xl">
-          <div className="absolute left-0 top-0 z-10">
+          {/* Corridos un poco por afuera del borde del mapa (no pegados a
+              la esquina): con una provincia grande zoomeada, su forma llega
+              hasta casi los bordes del SVG y, pegados a la esquina, estos
+              controles se leían como parte del mapa en vez de como su
+              propio elemento de interfaz flotando por encima. */}
+          <div className="absolute -left-2 -top-3 z-10 sm:-left-3 sm:-top-4">
             <LayerToggle />
           </div>
-          <div className="absolute right-0 top-0 z-10">
+          <div className="absolute -right-2 -top-3 z-10 sm:-right-3 sm:-top-4">
             <Legend />
           </div>
           <NationalMap />

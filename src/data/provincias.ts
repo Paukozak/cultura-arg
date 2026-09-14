@@ -1,5 +1,6 @@
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
 import raw from './provincias-resumen.json'
+import rawDetalle from './provincias-detalle.json'
 
 export interface ProvinciaProperties {
   id: string
@@ -18,3 +19,17 @@ export const provinciasGeo = raw as unknown as FeatureCollection<
   Geometry,
   ProvinciaProperties
 >
+
+// Geometría con mucho más detalle que la del mapa nacional (ver
+// scripts/process-data.mjs) — la nacional usa un trazo "low-poly" a
+// propósito, que a escala país es invisible pero queda groseramente
+// desalineado de la frontera real al hacer zoom a una sola provincia
+// (Etapa 6). Se usa únicamente para la provincia zoomeada.
+const detalleGeo = rawDetalle as unknown as FeatureCollection<Geometry, { id: string }>
+const GEOMETRIA_DETALLE_POR_ID = new Map(
+  detalleGeo.features.map((f) => [f.properties.id, f.geometry]),
+)
+
+export function geometriaDetalle(provinciaId: string): Geometry | null {
+  return GEOMETRIA_DETALLE_POR_ID.get(provinciaId) ?? null
+}

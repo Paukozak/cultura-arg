@@ -1,8 +1,9 @@
-import { useMemo, useRef, useState, type MouseEvent } from 'react'
-import { geoMercator, geoPath } from 'd3-geo'
-import { provinciasGeo, type ProvinciaFeature } from '../../data/provincias'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
+import { geoMercator, geoPath, type GeoPermissibleObjects } from 'd3-geo'
+import { geometriaDetalle, provinciasGeo, type ProvinciaFeature } from '../../data/provincias'
 import { useMapStore, type Capa } from '../../store/mapStore'
 import { buildColorScales, colorForFeature, highlightStroke } from './colorScales'
+import { ProvincePins, type ZoomState } from './ProvincePins'
 
 const WIDTH = 800
 const HEIGHT = 900
@@ -30,6 +31,34 @@ const CALLOUT_PILL_H = 22
 const EXTRUDE_DEPTH = 6
 const HOVER_LIFT = 4
 
+// Zoom animado hacia la provincia clickeada (Etapa 6): al seleccionar una
+// provincia, todo el mapa (fichas + llamados) se escala/traslada como una
+// sola unidad hacia el área real de esa provincia, y ahí aparecen los pines
+// por espacio. Un clic en un cluster de pines profundiza el zoom (multiplica
+// la escala) en vez de abrir una vista de zoom completamente nueva — mismo
+// mecanismo, un nivel más.
+const ZOOM_TARGET: [number, number] = [WIDTH / 2, HEIGHT / 2]
+const ZOOM_MS = 450
+// Curva "ease-out" pronunciada: arranca rápido y llega a destino con una
+// desaceleración larga y suave, en vez de la deceleración más brusca de un
+// "ease" genérico — se nota sobre todo en el zoom-out, que es el tramo más
+// largo (vuelve de golpe a escala 1).
+const ZOOM_EASING = 'cubic-bezier(0.16, 1, 0.3, 1)'
+const ZOOM_FILL_RATIO = 0.7
+const MIN_ZOOM_BBOX_PX = 40
+const MAX_ZOOM_SCALE = 400
+const CLUSTER_ZOOM_BOOST = 4
+
+function bboxZoom(geometria: GeoPermissibleObjects, path: ReturnType<typeof geoPath>): ZoomState {
+  const bounds = path.bounds(geometria)
+  const w = Math.max(bounds[1][0] - bounds[0][0], MIN_ZOOM_BBOX_PX)
+  const h = Math.max(bounds[1][1] - bounds[0][1], MIN_ZOOM_BBOX_PX)
+  const cx = (bounds[0][0] + bounds[1][0]) / 2
+  const cy = (bounds[0][1] + bounds[1][1]) / 2
+  const scale = Math.min((WIDTH * ZOOM_FILL_RATIO) / w, (HEIGHT * ZOOM_FILL_RATIO) / h, MAX_ZOOM_SCALE)
+  return { cx, cy, scale }
+}
+
 function formatNumero(n: number) {
   return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 }).format(n)
 }
@@ -53,17 +82,105 @@ export function NationalMap() {
     x: number
     y: number
   } | null>(null)
+  const [pinHover, setPinHover] = useState<{ etiqueta: string; x: number; y: number } | null>(
+    null,
+  )
 
-  const path = useMemo(() => {
-    const projection = geoMercator().fitSize([WIDTH, HEIGHT], provinciasGeo)
-    return geoPath(projection)
-  }, [])
+  const projection = useMemo(() => geoMercator().fitSize([WIDTH, HEIGHT], provinciasGeo), [])
+  const path = useMemo(() => geoPath(projection), [projection])
 
   const scales = useMemo(() => buildColorScales(provinciasGeo.features), [])
 
   const svgRef = useRef<SVGSVGElement>(null)
 
+  // El nivel base de zoom (ajuste a la provincia entera) es una función pura
+  // de la provincia seleccionada — no hace falta un efecto para calcularlo.
+  const baseZoom = useMemo(() => {
+    if (!provinciaSeleccionada) return null
+    const feature = provinciasGeo.features.find((f) => f.properties.id === provinciaSeleccionada)
+    if (!feature) return null
+    // La geometría de detalle (si existe para esta provincia) da un
+    // bounding box más fiel a la frontera real que el low-poly del mapa
+    // nacional — importante para que el zoom encuadre bien la provincia.
+    return bboxZoom(geometriaDetalle(provinciaSeleccionada) ?? feature, path)
+  }, [provinciaSeleccionada, path])
+
+  // Niveles extra de zoom por encima del base, uno por cada clic en un
+  // cluster de pines. Se resetean al cambiar de provincia ajustando el
+  // estado durante el render (patrón "adjust state during rendering" de
+  // React) en vez de con un efecto, para no disparar un setState síncrono
+  // dentro de un efecto.
+  const [extraNiveles, setExtraNiveles] = useState<ZoomState[]>([])
+  const [provinciaDelZoom, setProvinciaDelZoom] = useState(provinciaSeleccionada)
+  if (provinciaSeleccionada !== provinciaDelZoom) {
+    setProvinciaDelZoom(provinciaSeleccionada)
+    setExtraNiveles([])
+    // El tooltip de hover queda con datos de la provincia que estaba bajo
+    // el cursor ANTES del zoom: como el mouse no se mueve al zoomear, no
+    // se dispara un mouseenter/mouseleave nuevo y el tooltip viejo queda
+    // colgado apuntando a una provincia que ya no está ahí.
+    setHover(null)
+    setPinHover(null)
+  }
+
+  const zoomStack = baseZoom ? [baseZoom, ...extraNiveles] : []
+  const zoom = zoomStack[zoomStack.length - 1] ?? null
+  const zoomKey = zoom ? `${zoom.cx}:${zoom.cy}:${zoom.scale}` : null
+
+  // Los pines solo se muestran (con un fade) una vez que la animación de
+  // zoom llegó a destino: si aparecieran de entrada, su contra-escala (ver
+  // ProvincePins) no coincidiría con la escala real durante la transición y
+  // se los vería con el tamaño equivocado por un instante.
+  const [pinesVisibles, setPinesVisibles] = useState(false)
+  const [zoomKeyAnterior, setZoomKeyAnterior] = useState(zoomKey)
+  if (zoomKey !== zoomKeyAnterior) {
+    setZoomKeyAnterior(zoomKey)
+    setPinesVisibles(false)
+    setPinHover(null)
+  }
+  useEffect(() => {
+    if (!zoomKey) return
+    const t = setTimeout(() => setPinesVisibles(true), ZOOM_MS)
+    return () => clearTimeout(t)
+  }, [zoomKey])
+
+  const onCluster = (cx: number, cy: number) => {
+    setExtraNiveles((niveles) => {
+      const top = niveles[niveles.length - 1] ?? baseZoom
+      if (!top) return niveles
+      const nuevaEscala = Math.min(top.scale * CLUSTER_ZOOM_BOOST, MAX_ZOOM_SCALE)
+      if (nuevaEscala === top.scale) return niveles
+      return [...niveles, { cx, cy, scale: nuevaEscala }]
+    })
+  }
+  const alejarUnNivel = () => setExtraNiveles((niveles) => niveles.slice(0, -1))
+
+  // Ojo: a propósito NO se usa `transform-origin` para anclar el zoom al
+  // punto (cx, cy). Si el origen cambiara entre el estado zoomeado y el
+  // identidad (o entre dos niveles de zoom), la transición interpola
+  // `transform` pero el origen salta de golpe al primer frame — la
+  // animación se ve entrecortada en vez de una sola curva continua. En
+  // cambio, el traslado necesario para anclar (cx, cy) al punto de destino
+  // se resuelve a mano (translate = destino - escala·centro), así el
+  // origen siempre es (0,0) y nunca hay una discontinuidad que rompa la
+  // interpolación.
+  const zoomGroupStyle: CSSProperties = zoom
+    ? {
+        transform: `translate(${ZOOM_TARGET[0] - zoom.scale * zoom.cx}px, ${ZOOM_TARGET[1] - zoom.scale * zoom.cy}px) scale(${zoom.scale})`,
+        transition: `transform ${ZOOM_MS}ms ${ZOOM_EASING}`,
+      }
+    : {
+        transform: 'translate(0px, 0px) scale(1)',
+        transition: `transform ${ZOOM_MS}ms ${ZOOM_EASING}`,
+      }
+
   const handleEnter = (feature: ProvinciaFeature) => (e: MouseEvent) => {
+    // Con una provincia seleccionada (zoomeada), Chromium puede re-disparar
+    // un mouseenter real sobre lo que quede bajo el cursor a mitad de la
+    // animación de zoom (el contenido se mueve bajo un mouse quieto, y el
+    // navegador re-evalúa qué elemento está debajo). Sin este freno, eso
+    // deja un tooltip de una provincia vecina colgado mientras se mira otra.
+    if (provinciaSeleccionada) return
     const rect = svgRef.current?.getBoundingClientRect()
     if (!rect) return
     setHover({ feature, x: e.clientX - rect.left, y: e.clientY - rect.top })
@@ -71,16 +188,30 @@ export function NationalMap() {
   const handleLeave = () => setHover(null)
 
   const drawn = provinciasGeo.features.map((feature) => {
+    // La clasificación ficha/llamado y las opacidades siempre se calculan
+    // sobre la geometría low-poly (nacional) — es una decisión de layout de
+    // la vista sin zoom y no debe cambiar solo porque, al zoomear, el
+    // bounding box más fiel de la geometría de detalle sea distinto.
     const bounds = path.bounds(feature)
     const w = bounds[1][0] - bounds[0][0]
     const h = bounds[1][1] - bounds[0][1]
     const isSelected = provinciaSeleccionada === feature.properties.id
+
+    // Con cualquier zoom activo se dibuja con la geometría de detalle (ver
+    // src/data/provincias.ts), no solo en la provincia seleccionada: la
+    // low-poly está pensada para leerse a escala país, y una vecina
+    // (atenuada pero visible) queda con su propio borde groseramente
+    // desalineado una vez que TODO el mapa se amplía 10-400x — se nota
+    // como si invadiera el territorio de la provincia zoomeada.
+    const hayZoom = zoom !== null
+    const geomParaRender = (hayZoom && geometriaDetalle(feature.properties.id)) || feature
+
     return {
       feature,
-      d: path(feature) ?? undefined,
+      d: path(geomParaRender) ?? undefined,
       color: colorForFeature(feature.properties, capaActiva, scales),
       necesitaLlamado: Math.max(w, h) < MIN_TILE_PX,
-      centroid: path.centroid(feature),
+      centroid: path.centroid(geomParaRender),
       isHovered: hover?.feature.properties.id === feature.properties.id,
       isSelected,
       // Con una provincia seleccionada, el resto del mapa se atenúa para que
@@ -119,6 +250,11 @@ export function NationalMap() {
           </linearGradient>
         </defs>
 
+        {/* Grupo con zoom: envuelve fichas + llamados + pines para que todo
+            se escale/traslade como una sola unidad al entrar a una
+            provincia (Etapa 6). `vectorEffect="non-scaling-stroke"` en los
+            trazos evita que se vean gigantes una vez escalados. */}
+        <g style={zoomGroupStyle}>
         {/* Paso 1: los "lados" de todas las provincias, para que ninguno
             tape la cara de arriba de una provincia vecina. */}
         {fichas.map(({ feature, d, color, opacity }) => (
@@ -157,6 +293,7 @@ export function NationalMap() {
                 stroke={stroke}
                 strokeWidth={isHovered || isSelected ? 1.5 : 1}
                 strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
                 style={{
                   transform: `translate(0, ${lift}px)`,
                   transition:
@@ -193,6 +330,10 @@ export function NationalMap() {
           const anchorX = cx + CALLOUT_DX
           const anchorY = cy + CALLOUT_DY
           const etiqueta = ETIQUETA_CORTA[feature.properties.id] ?? feature.properties.nombre
+          // Una vez zoomeada esta provincia, el llamado (línea guía + globo
+          // con etiqueta) deja de tener sentido: a esta escala ya se ve su
+          // ubicación real con pines. Solo queda el punto como referencia.
+          const zoomeada = isSelected && zoom !== null
           const onClick = () =>
             seleccionarProvincia(
               provinciaSeleccionada === feature.properties.id ? null : feature.properties.id,
@@ -202,15 +343,18 @@ export function NationalMap() {
               key={`llamado-${feature.properties.id}`}
               style={{ opacity, transition: 'opacity 250ms ease' }}
             >
-              <line
-                x1={cx}
-                y1={cy}
-                x2={anchorX - CALLOUT_PILL_W / 2}
-                y2={anchorY}
-                stroke="rgba(245, 242, 234, 0.4)"
-                strokeWidth={1}
-                pointerEvents="none"
-              />
+              {!zoomeada && (
+                <line
+                  x1={cx}
+                  y1={cy}
+                  x2={anchorX - CALLOUT_PILL_W / 2}
+                  y2={anchorY}
+                  stroke="rgba(245, 242, 234, 0.4)"
+                  strokeWidth={1}
+                  vectorEffect="non-scaling-stroke"
+                  pointerEvents="none"
+                />
+              )}
               <g
                 data-provincia={feature.properties.id}
                 onMouseEnter={handleEnter(feature)}
@@ -229,39 +373,64 @@ export function NationalMap() {
                   fill={color}
                   stroke={stroke}
                   strokeWidth={1.25}
+                  vectorEffect="non-scaling-stroke"
                   style={{ transition: 'r 150ms ease, stroke 150ms ease' }}
                 />
-                <rect
-                  x={anchorX - CALLOUT_PILL_W / 2}
-                  y={anchorY - CALLOUT_PILL_H / 2}
-                  width={CALLOUT_PILL_W}
-                  height={CALLOUT_PILL_H}
-                  rx={CALLOUT_PILL_H / 2}
-                  fill={color}
-                  stroke={stroke}
-                  strokeWidth={isHovered || isSelected ? 1.5 : 1}
-                  style={{
-                    filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6))',
-                    transition: 'stroke 150ms ease, fill 150ms ease',
-                  }}
-                />
-                <text
-                  x={anchorX}
-                  y={anchorY}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  fontSize={10}
-                  fontWeight={700}
-                  fill="#141414"
-                  style={{ fontFamily: 'ui-monospace, monospace', letterSpacing: '0.02em' }}
-                  pointerEvents="none"
-                >
-                  {etiqueta}
-                </text>
+                {!zoomeada && (
+                  <>
+                    <rect
+                      x={anchorX - CALLOUT_PILL_W / 2}
+                      y={anchorY - CALLOUT_PILL_H / 2}
+                      width={CALLOUT_PILL_W}
+                      height={CALLOUT_PILL_H}
+                      rx={CALLOUT_PILL_H / 2}
+                      fill={color}
+                      stroke={stroke}
+                      strokeWidth={isHovered || isSelected ? 1.5 : 1}
+                      vectorEffect="non-scaling-stroke"
+                      style={{
+                        filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6))',
+                        transition: 'stroke 150ms ease, fill 150ms ease',
+                      }}
+                    />
+                    <text
+                      x={anchorX}
+                      y={anchorY}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fontSize={10}
+                      fontWeight={700}
+                      fill="#141414"
+                      style={{ fontFamily: 'ui-monospace, monospace', letterSpacing: '0.02em' }}
+                      pointerEvents="none"
+                    >
+                      {etiqueta}
+                    </text>
+                  </>
+                )}
               </g>
             </g>
           )
         })}
+
+        {/* Paso 4: pines por espacio cultural, uno por provincia
+            seleccionada — solo una vez que el zoom llegó a destino. */}
+        {provinciaSeleccionada && zoom && (
+          <ProvincePins
+            provinciaId={provinciaSeleccionada}
+            projection={projection}
+            zoom={zoom}
+            visible={pinesVisibles}
+            onCluster={onCluster}
+            onHoverPin={(etiqueta, clientX, clientY) => {
+              const rect = svgRef.current?.getBoundingClientRect()
+              if (!rect) return
+              setPinHover({ etiqueta, x: clientX - rect.left, y: clientY - rect.top })
+            }}
+            onLeavePin={() => setPinHover(null)}
+          />
+        )}
+        </g>
       </svg>
 
       {hover && (
@@ -274,6 +443,25 @@ export function NationalMap() {
             {metricaTooltip(hover.feature, capaActiva)}
           </div>
         </div>
+      )}
+
+      {pinHover && (
+        <div
+          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg border border-neutral-800 bg-neutral-950/95 px-3 py-2 text-sm shadow-lg"
+          style={{ left: pinHover.x, top: pinHover.y - 10 }}
+        >
+          <div className="font-medium text-neutral-100">{pinHover.etiqueta}</div>
+        </div>
+      )}
+
+      {extraNiveles.length > 0 && (
+        <button
+          type="button"
+          onClick={alejarUnNivel}
+          className="absolute bottom-4 left-4 z-10 rounded-full border border-neutral-800 bg-neutral-950/95 px-3 py-1.5 font-mono text-xs text-neutral-300 shadow-lg transition-colors hover:text-neutral-100"
+        >
+          ← alejar
+        </button>
       )}
     </div>
   )

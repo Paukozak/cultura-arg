@@ -28,6 +28,12 @@ const CURRENT_YEAR = new Date().getFullYear()
 // con highQuality:true). 0.05 da un look "low-poly" reconociendo las 24
 // jurisdicciones sin que el peso del GeoJSON sea excesivo.
 const SIMPLIFY_TOLERANCE = 0.05
+// Esta tolerancia da un borde varios km más ancho que la frontera real:
+// imperceptible a escala país, pero al hacer zoom a una sola provincia
+// (Etapa 6) un pin con su lat/lon real termina visualmente "afuera" de un
+// borde que en realidad está mal dibujado, no porque el dato esté mal. Por
+// eso el zoom por provincia usa una geometría de detalle sin simplificar
+// (más abajo, `detalleFeature`) — el mapa nacional sigue usando esta.
 
 // El GeoJSON de Georef para "Tierra del Fuego, Antártida e Islas del
 // Atlántico Sur" incluye, además de la Isla Grande (la parte poblada, con
@@ -745,6 +751,14 @@ async function main() {
       { type: 'Feature', properties: {}, geometry: geometryFiltered },
       { tolerance: SIMPLIFY_TOLERANCE, highQuality: true },
     )
+    // Sin simplificar: se probó con tolerancia 0.005 y, aunque mucho mejor
+    // que la del mapa nacional, seguía dejando pines (con lat/lon real,
+    // confirmados dentro del límite real por point-in-polygon) del lado
+    // "de afuera" de un borde con recovecos que la simplificación seguía
+    // recortando. El peso (~600KB en total para las 24 provincias) es
+    // aceptable para algo que se carga una sola vez y solo importa cuando
+    // se zoomea a una provincia.
+    const detalleFeature = { geometry: geometryFiltered }
 
     return {
       type: 'Feature',
@@ -759,10 +773,25 @@ async function main() {
         densidadPor100k: pob ? Number(((agg.total / pob) * 100000).toFixed(2)) : null,
       },
       geometry: simplifiedFeature.geometry,
+      geometryDetalle: detalleFeature.geometry,
     }
   })
 
-  const provinciasResumen = { type: 'FeatureCollection', features }
+  const provinciasResumen = {
+    type: 'FeatureCollection',
+    features: features.map(({ geometryDetalle, ...f }) => f),
+  }
+  // Geometría de detalle aparte (no la necesita el mapa nacional, solo el
+  // zoom por provincia): id -> geometry, para no duplicar el resto de las
+  // propiedades que ya están en provincias-resumen.json.
+  const provinciasDetalle = {
+    type: 'FeatureCollection',
+    features: features.map((f) => ({
+      type: 'Feature',
+      properties: { id: f.properties.id },
+      geometry: f.geometryDetalle,
+    })),
+  }
 
   // --- Escritura de salidas --------------------------------------------------
   await mkdir(DATA_DIR, { recursive: true })
@@ -774,6 +803,12 @@ async function main() {
     JSON.stringify(provinciasResumen),
   )
   console.log(`Escrito src/data/provincias-resumen.json (${features.length} provincias)`)
+
+  await writeFile(
+    path.join(DATA_DIR, 'provincias-detalle.json'),
+    JSON.stringify(provinciasDetalle),
+  )
+  console.log(`Escrito src/data/provincias-detalle.json (${features.length} provincias)`)
 
   const porProvinciaEspacios = new Map()
   for (const e of espacios) {

@@ -23,7 +23,7 @@ export function Legend() {
   const max = valores[valores.length - 1]
 
   return (
-    <div className="rounded-2xl border border-neutral-800 bg-neutral-950/90 px-4 py-3 text-sm backdrop-blur">
+    <div className="rounded-2xl border border-neutral-800 bg-neutral-950/90 px-4 py-3 text-sm shadow-lg shadow-black/50 backdrop-blur">
       <div className="flex flex-col gap-1.5">
         <span className="font-mono text-xs uppercase tracking-wide text-neutral-500">
           {UNIDAD[capaActiva]}

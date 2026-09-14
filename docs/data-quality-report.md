@@ -1,6 +1,6 @@
 # Reporte de calidad de datos
 
-Generado el 2026-09-13 a partir de los CSV de SInCA descargados de datos.cultura.gob.ar.
+Generado el 2026-09-14 a partir de los CSV de SInCA descargados de datos.cultura.gob.ar.
 
 ## Completitud de `anioInauguracion`
 

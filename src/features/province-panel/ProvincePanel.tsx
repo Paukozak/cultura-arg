@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useRef, useState } from 'react'
-import { cargarEspacios, type Espacio } from '../../data/espacios'
+import { useEffect, useRef } from 'react'
+import type { Espacio } from '../../data/espacios'
 import { provinciasGeo } from '../../data/provincias'
+import { useEspacios } from '../../data/useEspacios'
 import { useMapStore } from '../../store/mapStore'
 import { ICONOS_POR_CATEGORIA, ICONO_POR_DEFECTO } from './categoriaIcons'
 import { EspacioFoto } from './EspacioFoto'
@@ -67,20 +68,10 @@ function ProvincePanelContent({
   provinciaId: string
   onCerrar: () => void
 }) {
-  const [espacios, setEspacios] = useState<Espacio[] | null>(null)
+  const espacios = useEspacios(provinciaId)
   const abrirVistaCompleta = useMapStore((s) => s.abrirVistaCompleta)
   const vistaCompleta = useMapStore((s) => s.vistaCompleta)
   const panelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    let cancelado = false
-    cargarEspacios(provinciaId).then((data) => {
-      if (!cancelado) setEspacios(data)
-    })
-    return () => {
-      cancelado = true
-    }
-  }, [provinciaId])
 
   // Clic afuera del panel cierra — pero no cuenta como "afuera" un clic en
   // una provincia del mapa (ahí un clic ya tiene su propio significado:
