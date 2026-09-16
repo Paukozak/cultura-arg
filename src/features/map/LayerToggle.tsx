@@ -1,3 +1,4 @@
+import { motion } from 'motion/react'
 import { useMapStore, type Capa } from '../../store/mapStore'
 
 const OPCIONES: { value: Capa; label: string }[] = [
@@ -23,13 +24,29 @@ export function LayerToggle() {
             type="button"
             onClick={() => setCapaActiva(opcion.value)}
             aria-pressed={activo}
-            className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-              activo
-                ? 'bg-[#f5820d] text-neutral-950'
-                : 'text-neutral-400 hover:text-neutral-100'
-            }`}
+            className="relative rounded-full px-3 py-1.5 text-sm font-medium"
           >
-            {opcion.label}
+            {/* Fondo compartido entre los dos botones: al cambiar cuál está
+                activo, Framer Motion anima ESTE elemento de una posición a
+                la otra (layoutId) en vez de que cada botón prenda/apague su
+                propio fondo — la pastilla de acento "se desliza" hacia el
+                nuevo activo en vez de saltar. */}
+            {activo && (
+              <motion.span
+                layoutId="capa-activa-fondo"
+                className="absolute inset-0 rounded-full bg-accent"
+                transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+              />
+            )}
+            <span
+              className={`relative transition-colors duration-150 ${
+                activo
+                  ? 'text-accent-ink'
+                  : 'text-neutral-400 hover:text-neutral-100'
+              }`}
+            >
+              {opcion.label}
+            </span>
           </button>
         )
       })}

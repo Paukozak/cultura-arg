@@ -20,6 +20,19 @@ interface MapState {
    * apertura sin relación (p. ej. "ver todos los espacios" del panel). */
   localidadFocoId: string | null
   abrirVistaCompletaPorLocalidad: (localidad: string) => void
+  /** Rampa de color del mapa (Legend/NationalMap): violeta por defecto,
+   * azul de ColorBrewer si está activado. Se guarda en localStorage —
+   * mismo patrón que el tema — para que la elección persista entre
+   * visitas. */
+  modoDaltonico: boolean
+  toggleModoDaltonico: () => void
+}
+
+const MODO_DALTONICO_KEY = 'cca-daltonico'
+
+function modoDaltonicoInicial(): boolean {
+  if (typeof localStorage === 'undefined') return false
+  return localStorage.getItem(MODO_DALTONICO_KEY) === '1'
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -36,4 +49,11 @@ export const useMapStore = create<MapState>((set) => ({
   localidadFocoId: null,
   abrirVistaCompletaPorLocalidad: (localidad) =>
     set({ vistaCompleta: true, espacioFocoId: null, localidadFocoId: localidad }),
+  modoDaltonico: modoDaltonicoInicial(),
+  toggleModoDaltonico: () =>
+    set((state) => {
+      const siguiente = !state.modoDaltonico
+      localStorage.setItem(MODO_DALTONICO_KEY, siguiente ? '1' : '0')
+      return { modoDaltonico: siguiente }
+    }),
 }))

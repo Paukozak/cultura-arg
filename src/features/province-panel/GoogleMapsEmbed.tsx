@@ -73,7 +73,7 @@ export function GoogleMapsEmbed(props: Props) {
         href={linkHref}
         target="_blank"
         rel="noreferrer"
-        className="text-xs font-medium text-[#f5820d] hover:underline"
+        className="text-xs font-medium text-accent hover:underline"
       >
         Ver en Google Maps →
       </a>

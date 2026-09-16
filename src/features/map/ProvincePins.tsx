@@ -54,21 +54,39 @@ export function ProvincePins({
   const abrirVistaCompleta = useMapStore((s) => s.abrirVistaCompleta)
 
   const puntos = useMemo(() => {
-    if (!espacios) return []
+    // `visible` se pone en `true` recién cuando la animación de zoom del
+    // mapa nacional ya asentó (ver NationalMap.tsx). Calcular esto (filtro
+    // punto-en-polígono + proyección de cada espacio, hasta miles en CABA o
+    // Buenos Aires) DURANTE la transición competía por el mismo frame que la
+    // animación del `transform` y se sentía como un tranco extra en el
+    // medio del zoom — total, mientras no está visible no hace falta tener
+    // los puntos listos.
+    if (!espacios || !visible) return []
     const geometria = geometriaDetalle(provinciaId)
     return espacios.flatMap((e) => {
       if (e.lat === null || e.lon === null) return []
       // Descartar (no dibujar) coordenadas que no coinciden con la
       // provincia que el propio registro dice tener — ver el comentario
       // de MARGEN_FUERA_DE_PROVINCIA_DEG.
-      if (geometria && distanciaAGeometria(e.lon, e.lat, geometria) > MARGEN_FUERA_DE_PROVINCIA_DEG) {
+      if (
+        geometria &&
+        distanciaAGeometria(e.lon, e.lat, geometria) >
+          MARGEN_FUERA_DE_PROVINCIA_DEG
+      ) {
         return []
       }
       const proyectado = projection([e.lon, e.lat])
       if (!proyectado) return []
-      return [{ id: e.id, nombre: e.nombre ?? e.categoria, x: proyectado[0], y: proyectado[1] }]
+      return [
+        {
+          id: e.id,
+          nombre: e.nombre ?? e.categoria,
+          x: proyectado[0],
+          y: proyectado[1],
+        },
+      ]
     })
-  }, [espacios, projection, provinciaId])
+  }, [espacios, projection, provinciaId, visible])
 
   // Grilla simple: el tamaño de celda se calcula en coordenadas "de mapa"
   // (sin zoom) a partir de la separación deseada en pantalla dividida por
@@ -76,7 +94,10 @@ export function ProvincePins({
   // nivel de zoom (clic en cluster), no en cada frame de la animación.
   const grupos = useMemo(() => {
     const celda = CLUSTER_CELL_PX / zoom.scale
-    const buckets = new Map<string, { ix: number; iy: number; items: typeof puntos }>()
+    const buckets = new Map<
+      string,
+      { ix: number; iy: number; items: typeof puntos }
+    >()
     for (const p of puntos) {
       const ix = Math.floor(p.x / celda)
       const iy = Math.floor(p.y / celda)
@@ -110,7 +131,9 @@ export function ProvincePins({
     >
       {grupos.map((grupo) => {
         const esCluster = grupo.items.length > 1
-        const etiqueta = esCluster ? `${grupo.items.length} espacios` : grupo.items[0].nombre
+        const etiqueta = esCluster
+          ? `${grupo.items.length} espacios`
+          : grupo.items[0].nombre
         return (
           <g
             key={`${grupo.items[0].id}-${grupo.items.length}`}
@@ -123,11 +146,22 @@ export function ProvincePins({
             onMouseEnter={(e) => onHoverPin(etiqueta, e.clientX, e.clientY)}
             onMouseLeave={onLeavePin}
           >
+            {/* Individual: un punto del color de fondo de la página con un
+                aro de acento — más "marcador discreto" que un círculo de
+                acento sólido repetido cientos de veces. Cluster: badge de
+                acento lleno con aro del color de fondo, como un recorte
+                por encima del mapa. */}
             <circle
+              className="pin-marker"
               r={esCluster ? CLUSTER_RADIO : PIN_RADIO}
-              fill={esCluster ? '#f5820d' : '#f5f2ea'}
-              stroke="#141414"
-              strokeWidth={1.25}
+              fill={
+                esCluster ? 'var(--color-accent)' : 'var(--color-neutral-950)'
+              }
+              stroke={
+                esCluster ? 'var(--color-neutral-950)' : 'var(--color-accent)'
+              }
+              strokeWidth={esCluster ? 2 : 1.5}
+              style={{ filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5))' }}
             />
             {esCluster && (
               <text
@@ -135,8 +169,8 @@ export function ProvincePins({
                 dominantBaseline="central"
                 fontSize={9}
                 fontWeight={700}
-                fill="#141414"
-                style={{ fontFamily: 'ui-monospace, monospace' }}
+                fill="var(--color-accent-ink)"
+                style={{ fontFamily: 'var(--font-mono)' }}
                 pointerEvents="none"
               >
                 {grupo.items.length}

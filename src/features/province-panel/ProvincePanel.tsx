@@ -22,19 +22,19 @@ function DestacadoCard({
 }) {
   const Icono = ICONOS_POR_CATEGORIA[espacio.categoria] ?? ICONO_POR_DEFECTO
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-neutral-800 bg-neutral-900/60 p-4">
+    <div className="flex flex-col gap-3 rounded-xl border border-neutral-800 bg-neutral-900/60 p-4 transition-all duration-200 hover:-translate-y-1 hover:border-accent/60 hover:shadow-lg hover:shadow-accent/10">
       <EspacioFoto
         espacio={espacio}
         className="h-36 w-full"
         onClick={() => onAbrirFicha(espacio)}
       />
       <div className="flex items-start gap-3">
-        <Icono className="h-5 w-5 shrink-0 text-[#f5820d]" aria-hidden="true" />
+        <Icono className="h-5 w-5 shrink-0 text-accent" aria-hidden="true" />
         <div className="min-w-0">
           <button
             type="button"
             onClick={() => onAbrirFicha(espacio)}
-            className="text-left text-sm font-medium leading-tight text-neutral-100 hover:text-[#f5820d] hover:underline"
+            className="text-left text-sm font-medium leading-tight text-neutral-100 hover:text-accent hover:underline"
           >
             {espacio.nombre}
           </button>
@@ -169,7 +169,7 @@ function ProvincePanelContent({
           type="button"
           onClick={() => abrirVistaCompleta()}
           disabled={!espacios}
-          className="w-full rounded-full bg-[#f5820d] px-4 py-2.5 text-sm font-medium text-neutral-950 transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="w-full rounded-full bg-accent px-4 py-2.5 text-sm font-medium text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           Ver todos los espacios ({espacios ? formatNumero(totalEspacios) : '…'})
         </button>

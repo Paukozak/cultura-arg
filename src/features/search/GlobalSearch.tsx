@@ -73,7 +73,7 @@ export function GlobalSearch() {
   }
 
   return (
-    <div ref={contenedorRef} className="relative w-full max-w-sm">
+    <div ref={contenedorRef} className="relative w-full max-w-md">
       <input
         ref={inputRef}
         type="search"
@@ -85,7 +85,7 @@ export function GlobalSearch() {
         onFocus={() => setAbierto(true)}
         onKeyDown={onKeyDown}
         placeholder="Buscar provincia, localidad o espacio…"
-        className="w-full rounded-full border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm text-neutral-200 placeholder:text-neutral-600 focus:border-[#f5820d] focus:outline-none"
+        className="w-full rounded-full border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm text-neutral-200 placeholder:text-neutral-600 focus:border-accent focus:outline-none"
         role="combobox"
         aria-autocomplete="list"
         aria-expanded={abierto && hayQuery}
@@ -127,7 +127,7 @@ export function GlobalSearch() {
                     i === indiceActivo ? 'bg-neutral-900' : ''
                   }`}
                 >
-                  <Icono className="h-4 w-4 shrink-0 text-[#f5820d]" aria-hidden="true" />
+                  <Icono className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm text-neutral-100">{r.nombre}</div>
                     <div className="truncate font-mono text-xs text-neutral-500">{subtitulo}</div>

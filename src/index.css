@@ -1,11 +1,57 @@
 @import 'tailwindcss';
 
+/* Tokens de diseño (Etapa 8): un único lugar para color de marca y
+   tipografía, para no volver a hardcodear hex sueltos por los componentes.
+   `--color-*` en `@theme` genera automáticamente las utilidades Tailwind
+   correspondientes (bg-accent, text-accent-ink, etc.). */
+@theme {
+  --color-accent: #8b5cf6;
+  /* Texto/ícono sobre una superficie de acento (botón activo, pill de
+     marca, badge de cluster de pines) — casi negro en oscuro, casi blanco
+     en claro (ver override más abajo): siempre el extremo opuesto al de la
+     escala `neutral` activa, nunca un valor fijo. */
+  --color-accent-ink: #141414;
+
+  --font-sans: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  /* Reservada para datos precisos (coordenadas, años, "ESPACIOS/100K") — no
+     para texto corrido, ver nota de diseño en PLAN.md. */
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
 :root {
   color-scheme: dark;
 }
 
+/* Modo claro: reasigna la escala `neutral` de Tailwind entera (no se
+   introduce un set de tokens semánticos nuevo) — como toda la app ya usa
+   consistentemente esa escala para fondo/texto/bordes (bg-neutral-950,
+   text-neutral-100, border-neutral-800, etc.), invertir cada paso alcanza
+   para que TODA la interfaz cambie de tema sin tocar un solo className. Se
+   usan los valores de `stone` (gris cálido) en vez de un gris frío: con el
+   acento violeta de marca, un gris azulado compite en vez de acompañar. El
+   acento se oscurece porque el violeta vivo del modo oscuro (#8b5cf6)
+   pierde casi todo el contraste como texto sobre un fondo claro. */
+[data-theme='light'] {
+  color-scheme: light;
+  --color-neutral-50: #0c0a09;
+  --color-neutral-100: #1c1917;
+  --color-neutral-200: #292524;
+  --color-neutral-300: #44403c;
+  --color-neutral-400: #57534e;
+  --color-neutral-500: #78716c;
+  --color-neutral-600: #a8a29e;
+  --color-neutral-700: #d6d3d1;
+  --color-neutral-800: #e7e5e4;
+  --color-neutral-900: #f5f5f4;
+  --color-neutral-950: #fafaf9;
+
+  --color-accent: #6d28d9;
+  --color-accent-ink: #fffaf3;
+}
+
 body {
   margin: 0;
+  font-family: var(--font-sans);
 }
 
 button:not(:disabled),
@@ -14,4 +60,38 @@ a,
 select,
 input[type='checkbox'] {
   cursor: pointer;
+}
+
+/* Pin individual del mapa (ProvincePins): un punto sutil que combina con el
+   fondo de la página en vez de un círculo de acento sólido, con un aro fino
+   del color de acento. El hover (cursor real, no touch) lo agranda un
+   poco — feedback directo de "esto es clickeable" sin gastar un re-render
+   de React por cada uno de los miles de pines que puede haber. */
+.pin-marker {
+  transition:
+    transform 150ms ease,
+    filter 150ms ease;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@media (hover: hover) {
+  .pin-marker:hover {
+    transform: scale(1.35);
+    filter: brightness(1.15);
+  }
+}
+
+/* Con reducción de movimiento activada en el sistema, todas las
+   transiciones/animaciones CSS (zoom del mapa, hover, etc.) pasan a ser
+   instantáneas en vez de animadas. Las animaciones de Framer Motion
+   (paneles) se manejan aparte con `MotionConfig reducedMotion="user"`. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -23,6 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 
+# Skills locales de Claude Code (no son del proyecto)
+.agents/
+skills-lock.json
+
 # Env
 .env
 

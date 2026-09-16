@@ -43,17 +43,18 @@ function App() {
         }}
       >
         <div className="relative h-full w-full max-w-3xl">
-          {/* Corridos un poco por afuera del borde del mapa (no pegados a
-              la esquina): con una provincia grande zoomeada, su forma llega
-              hasta casi los bordes del SVG y, pegados a la esquina, estos
-              controles se leían como parte del mapa en vez de como su
-              propio elemento de interfaz flotando por encima. Quedan fijos
-              en su lugar sin importar el zoom (ver NationalMap.tsx para la
-              corrección de centrado vertical, que solo mueve el mapa). */}
-          <div className="absolute -left-2 -top-3 z-10 sm:-left-3 sm:-top-4">
+          {/* Corridos un poco hacia adentro desde la esquina del wrapper
+              (no pegados a top-0 puro): con una provincia grande zoomeada,
+              su forma llega hasta casi los bordes del SVG y, pegados a la
+              esquina, estos controles se leían como parte del mapa en vez
+              de como su propio elemento de interfaz flotando por encima.
+              Quedan fijos en su lugar sin importar el zoom (ver
+              NationalMap.tsx para la corrección de centrado vertical, que
+              solo mueve el mapa). */}
+          <div className="absolute -left-2 top-2 z-10 sm:-left-3 sm:top-3">
             <LayerToggle />
           </div>
-          <div className="absolute -right-2 -top-3 z-10 sm:-right-3 sm:-top-4">
+          <div className="absolute -right-2 top-2 z-10 sm:-right-3 sm:top-3">
             <Legend />
           </div>
           <NationalMap />

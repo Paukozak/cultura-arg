@@ -1,8 +1,24 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
+import {
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+  type TransitionEvent,
+} from 'react'
 import { geoMercator, geoPath, type GeoPermissibleObjects } from 'd3-geo'
-import { geometriaDetalle, provinciasGeo, type ProvinciaFeature } from '../../data/provincias'
+import {
+  geometriaDetalle,
+  provinciasGeo,
+  type ProvinciaFeature,
+} from '../../data/provincias'
 import { useMapStore, type Capa } from '../../store/mapStore'
-import { buildColorScales, colorForFeature, highlightStroke } from './colorScales'
+import {
+  buildColorScales,
+  colorForFeature,
+  darken,
+  highlightStroke,
+} from './colorScales'
 import { ProvincePins, type ZoomState } from './ProvincePins'
 
 const WIDTH = 800
@@ -58,13 +74,20 @@ const CORRECCION_ZOOM_VERTICAL_PX = 32
 const MAX_ZOOM_SCALE = 400
 const CLUSTER_ZOOM_BOOST = 4
 
-function bboxZoom(geometria: GeoPermissibleObjects, path: ReturnType<typeof geoPath>): ZoomState {
+function bboxZoom(
+  geometria: GeoPermissibleObjects,
+  path: ReturnType<typeof geoPath>,
+): ZoomState {
   const bounds = path.bounds(geometria)
   const w = Math.max(bounds[1][0] - bounds[0][0], MIN_ZOOM_BBOX_PX)
   const h = Math.max(bounds[1][1] - bounds[0][1], MIN_ZOOM_BBOX_PX)
   const cx = (bounds[0][0] + bounds[1][0]) / 2
   const cy = (bounds[0][1] + bounds[1][1]) / 2
-  const scale = Math.min((WIDTH * ZOOM_FILL_RATIO) / w, (HEIGHT * ZOOM_FILL_RATIO) / h, MAX_ZOOM_SCALE)
+  const scale = Math.min(
+    (WIDTH * ZOOM_FILL_RATIO) / w,
+    (HEIGHT * ZOOM_FILL_RATIO) / h,
+    MAX_ZOOM_SCALE,
+  )
   return { cx, cy, scale }
 }
 
@@ -84,6 +107,7 @@ function metricaTooltip(feature: ProvinciaFeature, capa: Capa) {
 
 export function NationalMap() {
   const capaActiva = useMapStore((s) => s.capaActiva)
+  const modoDaltonico = useMapStore((s) => s.modoDaltonico)
   const provinciaSeleccionada = useMapStore((s) => s.provinciaSeleccionada)
   const seleccionarProvincia = useMapStore((s) => s.seleccionarProvincia)
   const [hover, setHover] = useState<{
@@ -91,14 +115,22 @@ export function NationalMap() {
     x: number
     y: number
   } | null>(null)
-  const [pinHover, setPinHover] = useState<{ etiqueta: string; x: number; y: number } | null>(
-    null,
-  )
+  const [pinHover, setPinHover] = useState<{
+    etiqueta: string
+    x: number
+    y: number
+  } | null>(null)
 
-  const projection = useMemo(() => geoMercator().fitSize([WIDTH, HEIGHT], provinciasGeo), [])
+  const projection = useMemo(
+    () => geoMercator().fitSize([WIDTH, HEIGHT], provinciasGeo),
+    [],
+  )
   const path = useMemo(() => geoPath(projection), [projection])
 
-  const scales = useMemo(() => buildColorScales(provinciasGeo.features), [])
+  const scales = useMemo(
+    () => buildColorScales(provinciasGeo.features, modoDaltonico),
+    [modoDaltonico],
+  )
 
   const svgRef = useRef<SVGSVGElement>(null)
 
@@ -106,7 +138,9 @@ export function NationalMap() {
   // de la provincia seleccionada — no hace falta un efecto para calcularlo.
   const baseZoom = useMemo(() => {
     if (!provinciaSeleccionada) return null
-    const feature = provinciasGeo.features.find((f) => f.properties.id === provinciaSeleccionada)
+    const feature = provinciasGeo.features.find(
+      (f) => f.properties.id === provinciaSeleccionada,
+    )
     if (!feature) return null
     // La geometría de detalle (si existe para esta provincia) da un
     // bounding box más fiel a la frontera real que el low-poly del mapa
@@ -120,7 +154,9 @@ export function NationalMap() {
   // React) en vez de con un efecto, para no disparar un setState síncrono
   // dentro de un efecto.
   const [extraNiveles, setExtraNiveles] = useState<ZoomState[]>([])
-  const [provinciaDelZoom, setProvinciaDelZoom] = useState(provinciaSeleccionada)
+  const [provinciaDelZoom, setProvinciaDelZoom] = useState(
+    provinciaSeleccionada,
+  )
   if (provinciaSeleccionada !== provinciaDelZoom) {
     setProvinciaDelZoom(provinciaSeleccionada)
     setExtraNiveles([])
@@ -136,28 +172,59 @@ export function NationalMap() {
   const zoom = zoomStack[zoomStack.length - 1] ?? null
   const zoomKey = zoom ? `${zoom.cx}:${zoom.cy}:${zoom.scale}` : null
 
-  // Los pines solo se muestran (con un fade) una vez que la animación de
-  // zoom llegó a destino: si aparecieran de entrada, su contra-escala (ver
-  // ProvincePins) no coincidiría con la escala real durante la transición y
-  // se los vería con el tamaño equivocado por un instante.
-  const [pinesVisibles, setPinesVisibles] = useState(false)
+  // Marca cuándo el zoom está quieto (nada animando en este momento): parte
+  // en `true` (nada se está moviendo al cargar la página) y se apaga apenas
+  // cambia de nivel — entrar, profundizar en un cluster o volver al mapa
+  // nacional —, hasta que el propio evento `transitionend` del `transform`
+  // (ver `onTransitionEnd` en el `<g>` de más abajo) avisa que la animación
+  // realmente terminó. Se usa el evento real en vez de un `setTimeout` de
+  // ZOOM_MS: un timer puede llegar a disparar en un momento distinto al que
+  // el `transform` realmente termina de animar (el navegador reprograma la
+  // transición si `zoomKey` cambia de nuevo antes de que venza, o el timer
+  // de una transición vieja puede quedar pendiente y disparar de más justo
+  // cuando arranca una nueva) — con el evento nativo no hay que adivinar.
+  // Mientras está en `false` (transición en curso) se apagan a propósito
+  // varios efectos costosos que el navegador no puede acelerar por GPU
+  // junto con la animación del `transform` — cada uno obliga a
+  // re-rasterizar contenido complejo en cada frame en vez de solo
+  // recomponer una capa ya rasterizada:
+  // 1. Pines por espacio (ver ProvincePins): aparecen recién acá, con un
+  //    fade — si aparecieran de entrada, su contra-escala no coincidiría
+  //    con la escala real durante la transición y además el cálculo de
+  //    miles de puntos (CABA, Buenos Aires) competía por el mismo frame que
+  //    la animación.
+  // 2. Geometría de detalle sin simplificar (ver `geomParaRender` más
+  //    abajo): tiene ~5.5x más puntos que la low-poly, sumados en las 24
+  //    provincias a la vez (todas cambian, no solo la seleccionada).
+  // 3. La sombra del SVG completo y el halo de la provincia seleccionada
+  //    (ambos con `filter: drop-shadow`, más abajo): un filtro CSS sobre
+  //    contenido que se está escalando fuerza al navegador a recalcularlo
+  //    en software en cada frame — medido con Playwright, sacar estos tres
+  //    filtros durante la transición bajó el promedio de ~37ms a ~19ms por
+  //    frame (de ~27fps a ~53fps) en Buenos Aires y Córdoba.
+  const [zoomAsentado, setZoomAsentado] = useState(true)
   const [zoomKeyAnterior, setZoomKeyAnterior] = useState(zoomKey)
   if (zoomKey !== zoomKeyAnterior) {
     setZoomKeyAnterior(zoomKey)
-    setPinesVisibles(false)
+    setZoomAsentado(false)
     setPinHover(null)
   }
-  useEffect(() => {
-    if (!zoomKey) return
-    const t = setTimeout(() => setPinesVisibles(true), ZOOM_MS)
-    return () => clearTimeout(t)
-  }, [zoomKey])
+  const onZoomTransitionEnd = (e: TransitionEvent<SVGGElement>) => {
+    // El `<g>` no anima ninguna otra propiedad por transición, pero el
+    // chequeo es gratis y documenta la intención igual.
+    if (e.target === e.currentTarget && e.propertyName === 'transform') {
+      setZoomAsentado(true)
+    }
+  }
 
   const onCluster = (cx: number, cy: number) => {
     setExtraNiveles((niveles) => {
       const top = niveles[niveles.length - 1] ?? baseZoom
       if (!top) return niveles
-      const nuevaEscala = Math.min(top.scale * CLUSTER_ZOOM_BOOST, MAX_ZOOM_SCALE)
+      const nuevaEscala = Math.min(
+        top.scale * CLUSTER_ZOOM_BOOST,
+        MAX_ZOOM_SCALE,
+      )
       if (nuevaEscala === top.scale) return niveles
       return [...niveles, { cx, cy, scale: nuevaEscala }]
     })
@@ -177,6 +244,10 @@ export function NationalMap() {
     ? {
         transform: `translate(${ZOOM_TARGET[0] - zoom.scale * zoom.cx}px, ${ZOOM_TARGET[1] - zoom.scale * zoom.cy}px) scale(${zoom.scale})`,
         transition: `transform ${ZOOM_MS}ms ${ZOOM_EASING}`,
+        // Adelanta la promoción a su propia capa de composición antes de
+        // que arranque la transición, en vez de que el navegador la arme
+        // recién al primer frame animado (evita un pequeño salto al inicio).
+        willChange: 'transform',
       }
     : {
         transform: 'translate(0px, 0px) scale(1)',
@@ -206,19 +277,30 @@ export function NationalMap() {
     const h = bounds[1][1] - bounds[0][1]
     const isSelected = provinciaSeleccionada === feature.properties.id
 
-    // Con cualquier zoom activo se dibuja con la geometría de detalle (ver
+    // Con el zoom ya asentado se dibuja con la geometría de detalle (ver
     // src/data/provincias.ts), no solo en la provincia seleccionada: la
     // low-poly está pensada para leerse a escala país, y una vecina
     // (atenuada pero visible) queda con su propio borde groseramente
     // desalineado una vez que TODO el mapa se amplía 10-400x — se nota
-    // como si invadiera el territorio de la provincia zoomeada.
+    // como si invadiera el territorio de la provincia zoomeada. Mientras la
+    // transición todavía está corriendo (`!zoomAsentado`) se sigue usando
+    // la low-poly a propósito — ver el comentario junto a `zoomAsentado`.
     const hayZoom = zoom !== null
-    const geomParaRender = (hayZoom && geometriaDetalle(feature.properties.id)) || feature
+    const geomParaRender =
+      (hayZoom && zoomAsentado && geometriaDetalle(feature.properties.id)) ||
+      feature
+
+    const color = colorForFeature(feature.properties, capaActiva, scales)
 
     return {
       feature,
       d: path(geomParaRender) ?? undefined,
-      color: colorForFeature(feature.properties, capaActiva, scales),
+      color,
+      // Precalculado en vez de un filtro CSS (`brightness(0.4)`) sobre el
+      // path del lado: un filtro ahí obliga al navegador a re-rasterizarlo
+      // en cada frame mientras el zoom anima — un color ya oscurecido es
+      // gratis de escalar/trasladar (parte del mismo cálculo del `color`).
+      colorLado: darken(color, 0.6),
       necesitaLlamado: Math.max(w, h) < MIN_TILE_PX,
       centroid: path.centroid(geomParaRender),
       isHovered: hover?.feature.properties.id === feature.properties.id,
@@ -236,7 +318,9 @@ export function NationalMap() {
     <div
       className="relative h-full"
       style={{
-        transform: zoom ? `translateY(-${CORRECCION_ZOOM_VERTICAL_PX}px)` : 'translateY(0px)',
+        transform: zoom
+          ? `translateY(-${CORRECCION_ZOOM_VERTICAL_PX}px)`
+          : 'translateY(0px)',
         transition: `transform ${ZOOM_MS}ms ${ZOOM_EASING}`,
       }}
     >
@@ -244,7 +328,13 @@ export function NationalMap() {
         ref={svgRef}
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="h-full w-full"
-        style={{ filter: 'drop-shadow(0 18px 32px rgba(0, 0, 0, 0.65))' }}
+        style={{
+          // Apagada mientras el zoom está en transición — ver el
+          // comentario junto a `zoomAsentado`.
+          filter: zoomAsentado
+            ? 'drop-shadow(0 18px 32px rgba(0, 0, 0, 0.65))'
+            : 'none',
+        }}
         role="img"
         aria-label="Mapa de la Argentina por provincia"
         onMouseMove={(e) => {
@@ -269,182 +359,218 @@ export function NationalMap() {
             se escale/traslade como una sola unidad al entrar a una
             provincia (Etapa 6). `vectorEffect="non-scaling-stroke"` en los
             trazos evita que se vean gigantes una vez escalados. */}
-        <g style={zoomGroupStyle}>
-        {/* Paso 1: los "lados" de todas las provincias, para que ninguno
+        <g style={zoomGroupStyle} onTransitionEnd={onZoomTransitionEnd}>
+          {/* Paso 1: los "lados" de todas las provincias, para que ninguno
             tape la cara de arriba de una provincia vecina. */}
-        {fichas.map(({ feature, d, color, opacity }) => (
-          <path
-            key={`side-${feature.properties.id}`}
-            d={d}
-            transform={`translate(0, ${EXTRUDE_DEPTH})`}
-            fill={color}
-            style={{
-              filter: 'brightness(0.4) saturate(1.05)',
-              opacity,
-              transition: 'opacity 250ms ease',
-            }}
-            pointerEvents="none"
-          />
-        ))}
+          {fichas.map(({ feature, d, colorLado, opacity }) => (
+            <path
+              key={`side-${feature.properties.id}`}
+              d={d}
+              transform={`translate(0, ${EXTRUDE_DEPTH})`}
+              fill={colorLado}
+              style={{
+                opacity,
+                transition: 'opacity 250ms ease',
+              }}
+              pointerEvents="none"
+            />
+          ))}
 
-        {/* Paso 2: las caras de arriba (interactivas) + su bisel, todo por
+          {/* Paso 2: las caras de arriba (interactivas) + su bisel, todo por
             encima de cualquier lado. */}
-        {fichas.map(({ feature, d, color, isHovered, isSelected, opacity }) => {
-          const lift = isHovered ? -HOVER_LIFT : 0
-          const stroke = isHovered || isSelected ? highlightStroke(color) : 'rgba(10, 10, 10, 0.7)'
-          const onClick = () =>
-            seleccionarProvincia(
-              provinciaSeleccionada === feature.properties.id ? null : feature.properties.id,
-            )
-          return (
-            <g
-              key={`top-${feature.properties.id}`}
-              style={{ opacity, transition: 'opacity 250ms ease' }}
-            >
-              <path
-                d={d}
-                data-provincia={feature.properties.id}
-                fill={color}
-                stroke={stroke}
-                strokeWidth={isHovered || isSelected ? 1.5 : 1}
-                strokeLinejoin="round"
-                vectorEffect="non-scaling-stroke"
-                style={{
-                  transform: `translate(0, ${lift}px)`,
-                  transition:
-                    'transform 150ms ease, fill 200ms ease, stroke 150ms ease, filter 150ms ease',
-                  filter: isHovered
-                    ? 'brightness(1.15) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5))'
-                    : 'none',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={handleEnter(feature)}
-                onMouseLeave={handleLeave}
-                onClick={onClick}
-              />
-              <path
-                d={d}
-                fill="url(#bevel)"
-                pointerEvents="none"
-                style={{
-                  transform: `translate(0, ${lift}px)`,
-                  transition: 'transform 150ms ease',
-                }}
-              />
-            </g>
-          )
-        })}
+          {fichas.map(
+            ({ feature, d, color, isHovered, isSelected, opacity }) => {
+              const lift = isHovered ? -HOVER_LIFT : 0
+              const stroke =
+                isHovered || isSelected
+                  ? highlightStroke(color)
+                  : 'rgba(10, 10, 10, 0.7)'
+              const onClick = () =>
+                seleccionarProvincia(
+                  provinciaSeleccionada === feature.properties.id
+                    ? null
+                    : feature.properties.id,
+                )
+              return (
+                <g
+                  key={`top-${feature.properties.id}`}
+                  style={{ opacity, transition: 'opacity 250ms ease' }}
+                >
+                  <path
+                    d={d}
+                    data-provincia={feature.properties.id}
+                    fill={color}
+                    stroke={stroke}
+                    strokeWidth={isHovered || isSelected ? 1.5 : 1}
+                    strokeLinejoin="round"
+                    vectorEffect="non-scaling-stroke"
+                    style={{
+                      transform: `translate(0, ${lift}px)`,
+                      transition:
+                        'transform 150ms ease, fill 200ms ease, stroke 150ms ease, filter 200ms ease',
+                      // El halo en la seleccionada es feedback directo del click
+                      // (qué provincia está activa), no decoración: usa el mismo
+                      // violeta de marca en vez de un glow genérico. Apagado
+                      // mientras el zoom está en transición — ver el comentario
+                      // junto a `zoomAsentado`.
+                      filter: isHovered
+                        ? 'brightness(1.15) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5))'
+                        : isSelected && zoomAsentado
+                          ? 'drop-shadow(0 0 10px var(--color-accent)) drop-shadow(0 6px 14px rgba(0, 0, 0, 0.55))'
+                          : 'none',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={handleEnter(feature)}
+                    onMouseLeave={handleLeave}
+                    onClick={onClick}
+                  />
+                  <path
+                    d={d}
+                    fill="url(#bevel)"
+                    pointerEvents="none"
+                    style={{
+                      transform: `translate(0, ${lift}px)`,
+                      transition: 'transform 150ms ease',
+                    }}
+                  />
+                </g>
+              )
+            },
+          )}
 
-        {/* Paso 3: llamados para provincias demasiado chicas para dibujarse
+          {/* Paso 3: llamados para provincias demasiado chicas para dibujarse
             (CABA) — línea guía desde su ubicación real hasta una etiqueta
             legible en el espacio vacío del mapa. El punto (en la ubicación
             real) y la etiqueta forman un solo target clickeable/hoverable;
             solo la línea guía es decorativa. */}
-        {llamados.map(({ feature, color, isHovered, isSelected, centroid: [cx, cy], opacity }) => {
-          const stroke = isHovered || isSelected ? highlightStroke(color) : 'rgba(10, 10, 10, 0.7)'
-          const anchorX = cx + CALLOUT_DX
-          const anchorY = cy + CALLOUT_DY
-          const etiqueta = ETIQUETA_CORTA[feature.properties.id] ?? feature.properties.nombre
-          // Una vez zoomeada esta provincia, el llamado (línea guía + globo
-          // con etiqueta) deja de tener sentido: a esta escala ya se ve su
-          // ubicación real con pines. Solo queda el punto como referencia.
-          const zoomeada = isSelected && zoom !== null
-          const onClick = () =>
-            seleccionarProvincia(
-              provinciaSeleccionada === feature.properties.id ? null : feature.properties.id,
-            )
-          return (
-            <g
-              key={`llamado-${feature.properties.id}`}
-              style={{ opacity, transition: 'opacity 250ms ease' }}
-            >
-              {!zoomeada && (
-                <line
-                  x1={cx}
-                  y1={cy}
-                  x2={anchorX - CALLOUT_PILL_W / 2}
-                  y2={anchorY}
-                  stroke="rgba(245, 242, 234, 0.4)"
-                  strokeWidth={1}
-                  vectorEffect="non-scaling-stroke"
-                  pointerEvents="none"
-                />
-              )}
-              <g
-                data-provincia={feature.properties.id}
-                onMouseEnter={handleEnter(feature)}
-                onMouseLeave={handleLeave}
-                onClick={onClick}
-                style={{ cursor: 'pointer' }}
-              >
-                {/* Círculo invisible más grande que el punto visual, para
+          {llamados.map(
+            ({
+              feature,
+              color,
+              isHovered,
+              isSelected,
+              centroid: [cx, cy],
+              opacity,
+            }) => {
+              const stroke =
+                isHovered || isSelected
+                  ? highlightStroke(color)
+                  : 'rgba(10, 10, 10, 0.7)'
+              const anchorX = cx + CALLOUT_DX
+              const anchorY = cy + CALLOUT_DY
+              const etiqueta =
+                ETIQUETA_CORTA[feature.properties.id] ??
+                feature.properties.nombre
+              // Una vez zoomeada esta provincia, el llamado (línea guía + globo
+              // con etiqueta) deja de tener sentido: a esta escala ya se ve su
+              // ubicación real con pines. Solo queda el punto como referencia.
+              const zoomeada = isSelected && zoom !== null
+              const onClick = () =>
+                seleccionarProvincia(
+                  provinciaSeleccionada === feature.properties.id
+                    ? null
+                    : feature.properties.id,
+                )
+              return (
+                <g
+                  key={`llamado-${feature.properties.id}`}
+                  style={{ opacity, transition: 'opacity 250ms ease' }}
+                >
+                  {!zoomeada && (
+                    <line
+                      x1={cx}
+                      y1={cy}
+                      x2={anchorX - CALLOUT_PILL_W / 2}
+                      y2={anchorY}
+                      stroke="rgba(245, 242, 234, 0.4)"
+                      strokeWidth={1}
+                      vectorEffect="non-scaling-stroke"
+                      pointerEvents="none"
+                    />
+                  )}
+                  <g
+                    data-provincia={feature.properties.id}
+                    onMouseEnter={handleEnter(feature)}
+                    onMouseLeave={handleLeave}
+                    onClick={onClick}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {/* Círculo invisible más grande que el punto visual, para
                     que hoverear/clickear la ubicación real no requiera
                     apuntar a un punto de 3px exactos. */}
-                <circle cx={cx} cy={cy} r={8} fill="transparent" />
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={isHovered || isSelected ? 4 : 3}
-                  fill={color}
-                  stroke={stroke}
-                  strokeWidth={1.25}
-                  vectorEffect="non-scaling-stroke"
-                  style={{ transition: 'r 150ms ease, stroke 150ms ease' }}
-                />
-                {!zoomeada && (
-                  <>
-                    <rect
-                      x={anchorX - CALLOUT_PILL_W / 2}
-                      y={anchorY - CALLOUT_PILL_H / 2}
-                      width={CALLOUT_PILL_W}
-                      height={CALLOUT_PILL_H}
-                      rx={CALLOUT_PILL_H / 2}
+                    <circle cx={cx} cy={cy} r={8} fill="transparent" />
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r={isHovered || isSelected ? 4 : 3}
                       fill={color}
                       stroke={stroke}
-                      strokeWidth={isHovered || isSelected ? 1.5 : 1}
+                      strokeWidth={1.25}
                       vectorEffect="non-scaling-stroke"
-                      style={{
-                        filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6))',
-                        transition: 'stroke 150ms ease, fill 150ms ease',
-                      }}
+                      style={{ transition: 'r 150ms ease, stroke 150ms ease' }}
                     />
-                    <text
-                      x={anchorX}
-                      y={anchorY}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      fontSize={10}
-                      fontWeight={700}
-                      fill="#141414"
-                      style={{ fontFamily: 'ui-monospace, monospace', letterSpacing: '0.02em' }}
-                      pointerEvents="none"
-                    >
-                      {etiqueta}
-                    </text>
-                  </>
-                )}
-              </g>
-            </g>
-          )
-        })}
+                    {!zoomeada && (
+                      <>
+                        <rect
+                          x={anchorX - CALLOUT_PILL_W / 2}
+                          y={anchorY - CALLOUT_PILL_H / 2}
+                          width={CALLOUT_PILL_W}
+                          height={CALLOUT_PILL_H}
+                          rx={CALLOUT_PILL_H / 2}
+                          fill={color}
+                          stroke={stroke}
+                          strokeWidth={isHovered || isSelected ? 1.5 : 1}
+                          vectorEffect="non-scaling-stroke"
+                          style={{
+                            filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6))',
+                            transition: 'stroke 150ms ease, fill 150ms ease',
+                          }}
+                        />
+                        <text
+                          x={anchorX}
+                          y={anchorY}
+                          textAnchor="middle"
+                          dominantBaseline="central"
+                          fontSize={10}
+                          fontWeight={700}
+                          fill="var(--color-accent-ink)"
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            letterSpacing: '0.02em',
+                          }}
+                          pointerEvents="none"
+                        >
+                          {etiqueta}
+                        </text>
+                      </>
+                    )}
+                  </g>
+                </g>
+              )
+            },
+          )}
 
-        {/* Paso 4: pines por espacio cultural, uno por provincia
+          {/* Paso 4: pines por espacio cultural, uno por provincia
             seleccionada — solo una vez que el zoom llegó a destino. */}
-        {provinciaSeleccionada && zoom && (
-          <ProvincePins
-            provinciaId={provinciaSeleccionada}
-            projection={projection}
-            zoom={zoom}
-            visible={pinesVisibles}
-            onCluster={onCluster}
-            onHoverPin={(etiqueta, clientX, clientY) => {
-              const rect = svgRef.current?.getBoundingClientRect()
-              if (!rect) return
-              setPinHover({ etiqueta, x: clientX - rect.left, y: clientY - rect.top })
-            }}
-            onLeavePin={() => setPinHover(null)}
-          />
-        )}
+          {provinciaSeleccionada && zoom && (
+            <ProvincePins
+              provinciaId={provinciaSeleccionada}
+              projection={projection}
+              zoom={zoom}
+              visible={zoomAsentado}
+              onCluster={onCluster}
+              onHoverPin={(etiqueta, clientX, clientY) => {
+                const rect = svgRef.current?.getBoundingClientRect()
+                if (!rect) return
+                setPinHover({
+                  etiqueta,
+                  x: clientX - rect.left,
+                  y: clientY - rect.top,
+                })
+              }}
+              onLeavePin={() => setPinHover(null)}
+            />
+          )}
         </g>
       </svg>
 
@@ -453,7 +579,9 @@ export function NationalMap() {
           className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg border border-neutral-800 bg-neutral-950/95 px-3 py-2 text-sm shadow-lg"
           style={{ left: hover.x, top: hover.y - 10 }}
         >
-          <div className="font-medium text-neutral-100">{hover.feature.properties.nombre}</div>
+          <div className="font-medium text-neutral-100">
+            {hover.feature.properties.nombre}
+          </div>
           <div className="font-mono text-xs text-neutral-400">
             {metricaTooltip(hover.feature, capaActiva)}
           </div>
@@ -465,7 +593,9 @@ export function NationalMap() {
           className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg border border-neutral-800 bg-neutral-950/95 px-3 py-2 text-sm shadow-lg"
           style={{ left: pinHover.x, top: pinHover.y - 10 }}
         >
-          <div className="font-medium text-neutral-100">{pinHover.etiqueta}</div>
+          <div className="font-medium text-neutral-100">
+            {pinHover.etiqueta}
+          </div>
         </div>
       )}
 
