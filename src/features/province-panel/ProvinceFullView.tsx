@@ -224,6 +224,16 @@ function ProvinceFullViewContent({
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(
     espacioInicialId,
   )
+  // Mobile: lista y ficha no entran apiladas en una sola pantalla (los
+  // chips de categoría solos pueden ocupar varias líneas), así que se
+  // muestra una u otra — nunca las dos — y se navega entre ellas como dos
+  // pantallas separadas. En desktop (`md:` en las clases de abajo) esta
+  // variable se ignora y ambas conviven lado a lado como siempre. Arranca
+  // en la ficha si se entró con un espacio puntual ya elegido (buscador
+  // global): ahí lo que se quiere ver es esa ficha, no la lista.
+  const [vistaMobil, setVistaMobil] = useState<'lista' | 'ficha'>(
+    espacioInicialId ? 'ficha' : 'lista',
+  )
 
   useEffect(() => {
     let cancelado = false
@@ -387,7 +397,11 @@ function ProvinceFullViewContent({
         </div>
       ) : (
         <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
-          <div className="flex w-full min-w-0 min-h-0 flex-col border-b border-neutral-800 md:w-[380px] md:flex-shrink-0 md:border-b-0 md:border-r">
+          <div
+            className={`w-full min-w-0 min-h-0 flex-col border-b border-neutral-800 md:flex md:w-[380px] md:flex-shrink-0 md:border-b-0 md:border-r ${
+              vistaMobil === 'lista' ? 'flex' : 'hidden'
+            }`}
+          >
             {/* Los filtros (buscador hasta Gestión) scrollean en su propio
                 bloque, con techo propio: sin este límite, una provincia con
                 muchas categorías (chips que se envuelven en varias líneas)
@@ -547,7 +561,10 @@ function ProvinceFullViewContent({
                   rowProps={{
                     items: filtrados,
                     seleccionadoId: seleccionado?.id ?? null,
-                    onSelect: (espacio) => setSeleccionadoId(espacio.id),
+                    onSelect: (espacio) => {
+                      setSeleccionadoId(espacio.id)
+                      setVistaMobil('ficha')
+                    },
                   }}
                   style={{ height: '100%' } as CSSProperties}
                 />
@@ -555,7 +572,21 @@ function ProvinceFullViewContent({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6">
+          <div
+            className={`flex-1 flex-col overflow-y-auto p-6 md:flex ${
+              vistaMobil === 'ficha' ? 'flex' : 'hidden'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => setVistaMobil('lista')}
+              className="mb-4 flex items-center gap-1.5 self-start text-sm text-neutral-400 transition-colors hover:text-neutral-100 md:hidden"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Volver a la lista
+            </button>
             {seleccionado ? (
               <Ficha key={seleccionado.id} espacio={seleccionado} />
             ) : (

@@ -1,9 +1,12 @@
+import { Info } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 
-// Cifras de docs/data-quality-report.md (generado 2026-09-14, ver ahí el
-// desglose por categoría) — se hardcodean acá porque son un hecho puntual
-// sobre el corte de datos usado, no algo que la app recalcule en runtime.
+// Cifras de docs/data-quality-report.md y de los comentarios de
+// scripts/process-data.mjs (generado 2026-09-14, ver ahí el desglose por
+// categoría) — se hardcodean acá porque son un hecho puntual sobre el corte
+// de datos usado, no algo que la app recalcule en runtime.
+const TOTAL_ESPACIOS = 11234
 const PCT_SIN_ANIO = 58.4
 const PCT_SIN_LOCALIDAD = 0.8
 const FECHA_CORTE = '14 de septiembre de 2026'
@@ -90,23 +93,37 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
           </button>
         </div>
 
-        <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-5 text-sm leading-relaxed text-neutral-300">
+        <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-5 text-sm leading-relaxed text-neutral-300 text-justify">
+          <section className="flex flex-col gap-2">
+            <h3 className="text-xs uppercase tracking-wide text-neutral-500">Para qué es este mapa</h3>
+            <p>
+              Argentina tiene {TOTAL_ESPACIOS.toLocaleString('es-AR')} espacios culturales
+              documentados por el Estado en 11 categorías: museos, bibliotecas populares y
+              especializadas, salas de teatro, centros culturales, cines, galerías, librerías,
+              monumentos, sitios Patrimonio UNESCO y Casas del Bicentenario, repartidos en
+              las 24 jurisdicciones de primer orden. Este mapa junta esos datos, hoy
+              dispersos en planillas separadas por categoría, en un solo lugar navegable por
+              provincia: la idea es que se pueda ver y comparar de un vistazo la oferta cultural
+              de cada rincón del país.
+            </p>
+          </section>
+
           <section className="flex flex-col gap-2">
             <h3 className="text-xs uppercase tracking-wide text-neutral-500">Fuentes de datos</h3>
             <ul className="flex flex-col gap-3">
               <Fuente
                 nombre="SInCA · Espacios Culturales de la Argentina"
-                descripcion="Ministerio de Cultura de la Nación. Museos, bibliotecas, salas de teatro, centros culturales, cines, galerías, librerías, monumentos, sitios Patrimonio UNESCO y Casas del Bicentenario."
+                descripcion="Ministerio de Cultura de la Nación. Museos, bibliotecas populares, bibliotecas especializadas, salas de teatro, centros culturales, cines, galerías, librerías, monumentos, sitios Patrimonio UNESCO y Casas del Bicentenario."
                 href="https://datos.cultura.gob.ar/"
               />
               <Fuente
                 nombre="API Georef Argentina"
                 descripcion="Geometría de provincias, usada para el mapa y para descartar pines con coordenadas fuera de su provincia."
-                href="https://datos.gob.ar/dataset/modernizacion-mapa-servicios-georef"
+                href="https://datosgobar.github.io/georef-ar-api/"
               />
               <Fuente
                 nombre="INDEC · Censo Nacional 2022"
-                descripcion="Población por provincia, resultados definitivos, usada para calcular la densidad de espacios cada 100 mil habitantes."
+                descripcion="Población por provincia, usada para calcular la densidad de espacios cada 100 mil habitantes."
                 href="https://censo.gob.ar/"
               />
             </ul>
@@ -117,10 +134,67 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
           </section>
 
           <section className="flex flex-col gap-2">
+            <h3 className="text-xs uppercase tracking-wide text-neutral-500">Normalización</h3>
+            <p>
+              SInCA distribuye los espacios culturales en 11 planillas separadas, una por
+              categoría, y cada una nombra y da formato a los mismos datos de manera distinta.
+              El primer paso fue traducir las 11 planillas a un mismo esquema, los mismos
+              campos, con el mismo formato, para que cualquier registro se pueda tratar igual sin
+              importar de qué categoría vino. 
+            </p>
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <h3 className="text-xs uppercase tracking-wide text-neutral-500">Limpieza</h3>
+            <p>
+              Con los datos ya en un esquema común, la limpieza fue el paso en el que se corrigieron y completaron
+              los valores en sí. Se siguió un mismo criterio en todo el proceso, usar siempre el dato
+              más confiable disponible, y no completar nada que no se pueda sostener con otro dato
+              ya presente en el registro.
+            </p>
+            <p>
+              En la práctica, esto significó calcular la provincia de cada espacio a partir de un
+              código de localidad numérico en vez de la columna de texto libre (mucho más
+              propensa a errores de tipeo); tratar los marcadores de "sin dato" que trae la fuente
+              (como "s/d") como campo vacío en vez de mostrarlos como si fueran un valor real;
+              unificar variantes de un mismo nombre de localidad, por acentos o mayúsculas
+              inconsistentes, eligiendo la forma mejor escrita, no la más repetida; completar
+              campos vacíos solo cuando otro dato confiable del mismo registro o de un vecino
+              geográfico muy cercano lo resuelve sin ambigüedad, dejándolo como faltante si no hay
+              esa certeza; y aplicar a mano un puñado de correcciones puntuales para errores de
+              origen que no siguen ningún patrón general, verificadas cruzando otras columnas del
+              mismo registro.
+            </p>
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <h3 className="text-xs uppercase tracking-wide text-neutral-500">
+              Criterio de elección de visualización
+            </h3>
+            <p>
+              Se eligió un mapa coroplético, permitiendo comparar
+              la oferta cultural entre provincias de un vistazo.
+            </p>
+            <p>
+              Además, hay dos formas de ver ese color (Densidad y Total, alternables con el
+              selector arriba del mapa) porque cada una responde una pregunta distinta. El Total
+              muestra la cantidad bruta de espacios culturales de cada provincia. La Densidad
+              divide ese total por cada 100 mil habitantes, para que una provincia chica no quede
+              siempre opacada por una grande solo por tener menos población. Ninguna reemplaza a la
+              otra, por eso conviven como dos vistas del mismo mapa en vez de mezclarse en una sola
+              métrica.
+            </p>
+          </section>
+
+          <section className="flex flex-col gap-2">
             <h3 className="text-xs uppercase tracking-wide text-neutral-500">
               Completitud de los datos
             </h3>
             <div className="grid grid-cols-2 gap-3">
+              <Metrica
+                valor={TOTAL_ESPACIOS.toLocaleString('es-AR')}
+                etiqueta="espacios culturales relevados en las 24 jurisdicciones"
+              />
               <Metrica valor={`${PCT_SIN_ANIO}%`} etiqueta="de los espacios no tiene año de inauguración documentado" />
               <Metrica
                 valor={`${PCT_SIN_LOCALIDAD}%`}
@@ -131,6 +205,11 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
               El año varía mucho por categoría: cuatro categorías (bibliotecas especializadas,
               cines, galerías de arte y librerías) directamente no traen ese campo en la fuente.
             </p>
+            <p className="text-xs text-neutral-500">
+              Año y localidad no son los únicos con faltantes: web, mail, teléfono, gestión,
+              subcategoría y departamento también tienen huecos, algunos grandes, en distinta
+              medida por categoría.
+            </p>
           </section>
 
           <section className="flex flex-col gap-2">
@@ -138,8 +217,7 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
               Destacados de cada provincia
             </h3>
             <p>
-              Se eligen a mano, provincia por provincia: es una curaduría editorial, no un
-              criterio automático. No reflejan un ranking de importancia, sino una selección que
+              Se eligieron a mano, provincia por provincia. No reflejan un ranking de importancia, sino una selección que
               intenta mostrar variedad de categorías y de partes del territorio.
             </p>
           </section>
@@ -169,9 +247,11 @@ export function ComoSeHizo() {
       <button
         type="button"
         onClick={() => setAbierto(true)}
-        className="shrink-0 rounded-full border border-neutral-800 px-3 py-1.5 text-sm text-neutral-400 transition-colors hover:text-neutral-100"
+        aria-label="¿Cómo se hizo?"
+        className="flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-800 px-3 py-2 text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-100 sm:py-1.5 sm:text-sm"
       >
-        ¿Cómo se hizo?
+        <Info className="h-4 w-4 sm:hidden" aria-hidden="true" />
+        <span className="hidden sm:inline">¿Cómo se hizo?</span>
       </button>
       <AnimatePresence>
         {abierto && <ComoSeHizoContent onCerrar={() => setAbierto(false)} />}

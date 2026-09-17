@@ -1,13 +1,16 @@
-import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useRef } from 'react'
+import { AnimatePresence, motion, useDragControls, type PanInfo } from 'motion/react'
+import { useEffect, useRef, useState } from 'react'
 import type { Espacio } from '../../data/espacios'
 import { provinciasGeo } from '../../data/provincias'
 import { useEspacios } from '../../data/useEspacios'
 import { useMapStore } from '../../store/mapStore'
+import { useMediaQuery } from '../../utils/useMediaQuery'
+import { useWindowHeight } from '../../utils/useWindowHeight'
 import { ICONOS_POR_CATEGORIA, ICONO_POR_DEFECTO } from './categoriaIcons'
 import { EspacioFoto } from './EspacioFoto'
 import { getDestacados } from './getDestacados'
 import { GoogleMapsEmbed } from './GoogleMapsEmbed'
+import { alturaHojaPx as calcularAlturaHojaPx, altoPeekPx } from './hojaLayout'
 
 function formatNumero(n: number) {
   return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 }).format(n)
@@ -71,7 +74,24 @@ function ProvincePanelContent({
   const espacios = useEspacios(provinciaId)
   const abrirVistaCompleta = useMapStore((s) => s.abrirVistaCompleta)
   const vistaCompleta = useMapStore((s) => s.vistaCompleta)
+  const headerHeight = useMapStore((s) => s.headerHeight)
+  const esMobil = useMediaQuery('(max-width: 767px)')
   const panelRef = useRef<HTMLDivElement>(null)
+  const [expandida, setExpandida] = useState(false)
+  const dragControls = useDragControls()
+  const alturaVentana = useWindowHeight()
+
+  // Píxeles reales, no `calc()`: Framer Motion anima `y` interpolando
+  // cuadro a cuadro entre el valor de `initial`/`animate` — con un plano
+  // número (o un simple "N%") sabe hacerlo, pero con un string `calc(100% -
+  // 48vh)` no tiene una unidad clara para interpolar y lo que se veía era
+  // un salto directo al final en vez de un deslizamiento, por más resorte
+  // que se le configure. Resolviendo la cuenta acá (en JS, con el alto real
+  // de la ventana) el resorte anima un número de punta a punta y sí se
+  // desliza suave. `alturaHojaPx`/`altoPeekPx` viven en hojaLayout.ts para
+  // que App.tsx reserve exactamente el mismo espacio (ver el comentario ahí).
+  const alturaHojaPx = calcularAlturaHojaPx(alturaVentana, headerHeight)
+  const offsetPeekPx = alturaHojaPx - altoPeekPx(alturaVentana, headerHeight)
 
   // Clic afuera del panel cierra — pero no cuenta como "afuera" un clic en
   // una provincia del mapa (ahí un clic ya tiene su propio significado:
@@ -80,7 +100,11 @@ function ProvincePanelContent({
   // (`[data-provincia]`, los path/circle interactivos), no por todo el
   // contenedor del mapa — el SVG tiene mucho espacio "vacío" alrededor de
   // la silueta del país que visualmente es fondo negro y debe cerrar el
-  // panel igual que cualquier otro click afuera.
+  // panel igual que cualquier otro click afuera. Tampoco cuenta un control
+  // propio del mapa (`[data-mapa-ui]`, hoy el botón "← alejar" del zoom por
+  // cluster): sin esta exclusión, clickearlo retrocedía un nivel de zoom Y
+  // deseleccionaba la provincia a la vez, así que "alejar un nivel" se
+  // sentía como "volver de golpe al mapa nacional".
   // Se desactiva mientras la vista completa está abierta: esa vista cubre
   // toda la pantalla y cualquier clic dentro de ella también caería
   // "afuera" de este panel.
@@ -91,6 +115,7 @@ function ProvincePanelContent({
       if (!target) return
       if (panelRef.current?.contains(target)) return
       if (target.closest('[data-provincia]')) return
+      if (target.closest('[data-mapa-ui]')) return
       onCerrar()
     }
     document.addEventListener('pointerdown', onPointerDown)
@@ -102,19 +127,80 @@ function ProvincePanelContent({
   const { nombre, totalEspacios, densidadPor100k } = provincia.properties
   const destacados = espacios ? getDestacados(provinciaId, espacios) : []
 
-  // `top-16 bottom-0` en vez de `inset-y-0`: el panel no debe taparse por
-  // encima del header (ahí vive el buscador global — con `inset-y-0` el
-  // panel cubría también esa franja y, aunque visualmente no se notaba,
-  // interceptaba los clics del buscador mientras un panel estaba abierto).
+  // Deslizar hacia arriba/abajo decide si se expande o vuelve al peek — se
+  // ignora la distancia exacta arrastrada (no hay `dragConstraints` en
+  // píxeles: la hoja usa unidades `vh`/`calc`, no hay un pixel fijo contra
+  // el cual limitarla) y se usa el offset + la velocidad del gesto al
+  // soltar como señal de dirección. Un arrastre chico/ambiguo no cambia
+  // nada: `animate.y` vuelve solo al target del estado actual.
+  const onDragEnd = (_e: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
+    if (info.offset.y < -40 || info.velocity.y < -300) setExpandida(true)
+    else if (info.offset.y > 40 || info.velocity.y > 300) setExpandida(false)
+  }
+
   return (
     <motion.div
       ref={panelRef}
-      initial={{ opacity: 0, x: '100%' }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: '100%' }}
-      transition={{ duration: 0.28, ease: 'easeOut' }}
-      className="pointer-events-auto fixed bottom-0 right-0 top-16 z-30 flex w-full max-w-md flex-col border-l border-neutral-800 bg-neutral-950/98 shadow-2xl backdrop-blur"
+      drag={esMobil ? 'y' : false}
+      dragListener={false}
+      dragControls={dragControls}
+      dragElastic={0.2}
+      dragMomentum={false}
+      onDragEnd={onDragEnd}
+      initial={esMobil ? { opacity: 0, y: '100%' } : { opacity: 0, x: '100%' }}
+      animate={
+        esMobil
+          ? { opacity: 1, y: expandida ? 0 : offsetPeekPx }
+          : { opacity: 1, x: 0 }
+      }
+      exit={esMobil ? { opacity: 0, y: '100%' } : { opacity: 0, x: '100%' }}
+      // En mobile un resorte en vez de una curva de duración fija: entrar,
+      // expandir y colapsar la hoja se sienten como el mismo gesto físico
+      // continuo (así se mueven las hojas nativas de iOS/Android), en vez
+      // de una animación mecánica de tiempo fijo. `damping` cerca del
+      // crítico para esta `stiffness` (crítico ≈ 2·√stiffness): llega
+      // rápido pero sin rebotar de más.
+      transition={
+        esMobil
+          ? { type: 'spring', stiffness: 380, damping: 38, mass: 0.9 }
+          : { duration: 0.28, ease: 'easeOut' }
+      }
+      // Desktop: panel angosto acoplado a la derecha, de la altura completa
+      // por debajo del header (`top: headerHeight` en vez de `inset-y-0`:
+      // no debe taparse por encima, ahí vive el buscador global — con
+      // `inset-y-0` interceptaba sus clics mientras un panel estaba
+      // abierto). Mobile: taparlo TODO dejaría el mapa recién zoomeado con
+      // sus pines completamente inalcanzable (la Etapa 6 entera), así que
+      // pasa a ser una hoja siempre de la misma altura (casi toda la
+      // pantalla) pero corrida hacia abajo con `translateY` para que en
+      // reposo solo asome `PEEK_VH` — deslizar hacia arriba la lleva a
+      // `translateY(0)` sin que la altura real cambie (ver el comentario
+      // junto a `PEEK_VH`).
+      style={esMobil ? { height: alturaHojaPx } : { top: headerHeight }}
+      className={
+        esMobil
+          ? 'pointer-events-auto fixed inset-x-0 bottom-0 z-30 flex flex-col rounded-t-2xl border-t border-neutral-800 bg-neutral-950/98 shadow-2xl backdrop-blur'
+          : 'pointer-events-auto fixed bottom-0 right-0 z-30 flex w-full max-w-md flex-col border-l border-neutral-800 bg-neutral-950/98 shadow-2xl backdrop-blur'
+      }
     >
+      {esMobil && (
+        // Agarradera: el único punto desde donde arranca el arrastre
+        // (`dragListener={false}` + `dragControls` arriba) — así scrollear
+        // la lista de destacados o tocar sus botones no se confunde con un
+        // gesto de arrastrar la hoja. También responde a un toque simple
+        // (`onClick`, sin arrastrar nada): no todos van a animarse a hacer
+        // el gesto de deslizar, un tap directo alcanza para expandir o
+        // volver a achicar.
+        <button
+          type="button"
+          onPointerDown={(e) => dragControls.start(e)}
+          onClick={() => setExpandida((valor) => !valor)}
+          aria-label={expandida ? 'Achicar el panel' : 'Expandir el panel'}
+          className="flex shrink-0 cursor-grab touch-none justify-center py-2.5 active:cursor-grabbing"
+        >
+          <div className="h-1.5 w-10 rounded-full bg-neutral-700" />
+        </button>
+      )}
       <div className="flex items-start gap-3 border-b border-neutral-800 p-5">
         <button
           type="button"

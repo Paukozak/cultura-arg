@@ -1,5 +1,5 @@
 import type { GeoProjection } from 'd3-geo'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { distanciaAGeometria } from '../../data/geometriaProvincia'
 import { geometriaDetalle } from '../../data/provincias'
 import { useEspacios } from '../../data/useEspacios'
@@ -26,8 +26,15 @@ interface Props {
 // nivel de zoom inicial esto colapsa la nube entera en unos pocos clusters
 // — necesario para que el SVG no tenga que dibujar miles de pines a la vez.
 const CLUSTER_CELL_PX = 26
-const PIN_RADIO = 5
-const CLUSTER_RADIO = 9
+const PIN_RADIO = 6.5
+const CLUSTER_RADIO = 11
+// El círculo visible es mucho más chico que un dedo — mismo criterio que el
+// llamado de CABA en NationalMap.tsx (círculo invisible más grande solo
+// para hover/click/tap), acá todavía más necesario: en mobile, con el mapa
+// zoomeado ocupando una porción chica de la pantalla (la hoja del panel se
+// queda con la otra mitad), el punto visual termina midiendo unos pocos px
+// reales.
+const HIT_RADIO_MULT = 3
 
 // Margen (grados de lon/lat, ~3km) que se tolera fuera del polígono real de
 // la provincia antes de descartar un pin. El dataset de SInCA tiene, para
@@ -53,15 +60,26 @@ export function ProvincePins({
   const espacios = useEspacios(provinciaId)
   const abrirVistaCompleta = useMapStore((s) => s.abrirVistaCompleta)
 
+  // `visible` pasa a `true` y a `false` en cada nivel de zoom (entrar,
+  // profundizar en un cluster, alejar un nivel — ver `zoomAsentado` en
+  // NationalMap.tsx), pero los puntos de una provincia no cambian entre
+  // esos niveles: son siempre los mismos espacios. `permitirCalculo` se
+  // prende UNA vez que `visible` se puso en `true` por primera vez para
+  // esta provincia, y ya no se apaga con los niveles de zoom siguientes —
+  // sin esto, el filtro punto-en-polígono sobre miles de espacios (CABA,
+  // Buenos Aires) se repetía en cada click a un cluster, y profundizar el
+  // zoom varias veces seguidas se sentía cada vez más pesado.
+  const [provinciaAnterior, setProvinciaAnterior] = useState(provinciaId)
+  const [permitirCalculo, setPermitirCalculo] = useState(visible)
+  if (provinciaId !== provinciaAnterior) {
+    setProvinciaAnterior(provinciaId)
+    setPermitirCalculo(visible)
+  } else if (visible && !permitirCalculo) {
+    setPermitirCalculo(true)
+  }
+
   const puntos = useMemo(() => {
-    // `visible` se pone en `true` recién cuando la animación de zoom del
-    // mapa nacional ya asentó (ver NationalMap.tsx). Calcular esto (filtro
-    // punto-en-polígono + proyección de cada espacio, hasta miles en CABA o
-    // Buenos Aires) DURANTE la transición competía por el mismo frame que la
-    // animación del `transform` y se sentía como un tranco extra en el
-    // medio del zoom — total, mientras no está visible no hace falta tener
-    // los puntos listos.
-    if (!espacios || !visible) return []
+    if (!espacios || !permitirCalculo) return []
     const geometria = geometriaDetalle(provinciaId)
     return espacios.flatMap((e) => {
       if (e.lat === null || e.lon === null) return []
@@ -86,7 +104,7 @@ export function ProvincePins({
         },
       ]
     })
-  }, [espacios, projection, provinciaId, visible])
+  }, [espacios, projection, provinciaId, permitirCalculo])
 
   // Grilla simple: el tamaño de celda se calcula en coordenadas "de mapa"
   // (sin zoom) a partir de la separación deseada en pantalla dividida por
@@ -146,6 +164,9 @@ export function ProvincePins({
             onMouseEnter={(e) => onHoverPin(etiqueta, e.clientX, e.clientY)}
             onMouseLeave={onLeavePin}
           >
+            {/* Área de toque/hover invisible, más grande que el punto
+                visual — ver HIT_RADIO_MULT. */}
+            <circle r={(esCluster ? CLUSTER_RADIO : PIN_RADIO) * HIT_RADIO_MULT} fill="transparent" />
             {/* Individual: un punto del color de fondo de la página con un
                 aro de acento — más "marcador discreto" que un círculo de
                 acento sólido repetido cientos de veces. Cluster: badge de
@@ -167,7 +188,7 @@ export function ProvincePins({
               <text
                 textAnchor="middle"
                 dominantBaseline="central"
-                fontSize={9}
+                fontSize={10}
                 fontWeight={700}
                 fill="var(--color-accent-ink)"
                 style={{ fontFamily: 'var(--font-mono)' }}

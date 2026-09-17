@@ -49,6 +49,19 @@
   --color-accent-ink: #fffaf3;
 }
 
+/* Modo daltónico: el mapa ya cambia su rampa de color a azul (ver
+   colorScales.ts) porque el violeta de marca no es una rampa secuencial
+   segura para daltonismo rojo-verde — pero dejar el resto de la interfaz
+   (botones activos, focos de teclado, links) en violeta se leía como dos
+   paletas sueltas en vez de un solo modo coherente. Mismo criterio que el
+   tema: se reasigna el token, no cada className suelto. */
+[data-daltonico='true'] {
+  --color-accent: #3b82f6;
+}
+[data-theme='light'][data-daltonico='true'] {
+  --color-accent: #1d4ed8;
+}
+
 body {
   margin: 0;
   font-family: var(--font-sans);
@@ -60,6 +73,17 @@ a,
 select,
 input[type='checkbox'] {
   cursor: pointer;
+}
+
+/* Foco de teclado (Etapa 9): el outline nativo del navegador ("auto") casi
+   no se ve sobre el fondo oscuro de la app — el color que resuelve el
+   navegador para ese outline queda muy cerca del propio fondo, así que en
+   los hechos el foco era invisible tabulando. `:focus-visible` (no
+   `:focus`) para que el anillo aparezca solo navegando con teclado, no en
+   cada click de mouse. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 /* Pin individual del mapa (ProvincePins): un punto sutil que combina con el

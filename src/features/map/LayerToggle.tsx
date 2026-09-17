@@ -14,7 +14,7 @@ export function LayerToggle() {
     <div
       role="group"
       aria-label="Capa del mapa"
-      className="flex gap-1 rounded-full border border-neutral-800 bg-neutral-950/90 p-1 shadow-lg shadow-black/50 backdrop-blur"
+      className="flex gap-0.5 rounded-full border border-neutral-800 bg-neutral-950/90 p-0.5 shadow-lg shadow-black/50 backdrop-blur sm:gap-1 sm:p-1"
     >
       {OPCIONES.map((opcion) => {
         const activo = opcion.value === capaActiva
@@ -24,7 +24,7 @@ export function LayerToggle() {
             type="button"
             onClick={() => setCapaActiva(opcion.value)}
             aria-pressed={activo}
-            className="relative rounded-full px-3 py-1.5 text-sm font-medium"
+            className="relative rounded-full px-2 py-1 text-xs font-medium sm:px-3 sm:py-1.5 sm:text-sm"
           >
             {/* Fondo compartido entre los dos botones: al cambiar cuál está
                 activo, Framer Motion anima ESTE elemento de una posición a

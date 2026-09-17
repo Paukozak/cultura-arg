@@ -23,16 +23,44 @@ interface MapState {
   /** Rampa de color del mapa (Legend/NationalMap): violeta por defecto,
    * azul de ColorBrewer si está activado. Se guarda en localStorage —
    * mismo patrón que el tema — para que la elección persista entre
-   * visitas. */
+   * visitas. También se refleja en `data-daltonico` sobre `<html>` (ver
+   * `index.css`) para que el color de acento de TODA la interfaz —no solo
+   * el mapa— pase a azul: un acento violeta al lado de un mapa azul se leía
+   * como dos paletas sueltas en vez de un solo modo coherente. */
   modoDaltonico: boolean
   toggleModoDaltonico: () => void
+  /** Alto real del header en px, medido por el propio `Header` con
+   * `ResizeObserver`. En desktop son siempre 64px, pero en mobile pasa a
+   * dos filas (título+botones arriba, buscador abajo) y mide más — el
+   * centrado vertical del zoom en NationalMap.tsx depende de este valor en
+   * vez de una constante fija para no descentrarse en esa combinación. */
+  headerHeight: number
+  setHeaderHeight: (px: number) => void
+  /** Tema visual actual — lo aplica de entrada el script bloqueante de
+   * index.html (evita el flash del tema equivocado) escribiendo
+   * `document.documentElement.dataset.theme`; esto solo lee ese valor para
+   * que el resto de la app (p. ej. la sombra del mapa en NationalMap.tsx,
+   * pensada para fondo oscuro) pueda reaccionar sin tener que leer el DOM
+   * directamente. `SettingsMenu` es quien lo cambia. */
+  tema: 'dark' | 'light'
+  toggleTema: () => void
 }
 
 const MODO_DALTONICO_KEY = 'cca-daltonico'
+const TEMA_KEY = 'cca-tema'
 
 function modoDaltonicoInicial(): boolean {
   if (typeof localStorage === 'undefined') return false
-  return localStorage.getItem(MODO_DALTONICO_KEY) === '1'
+  const activo = localStorage.getItem(MODO_DALTONICO_KEY) === '1'
+  if (typeof document !== 'undefined') {
+    document.documentElement.dataset.daltonico = activo ? 'true' : 'false'
+  }
+  return activo
+}
+
+function temaInicial(): 'dark' | 'light' {
+  if (typeof document === 'undefined') return 'dark'
+  return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -53,7 +81,18 @@ export const useMapStore = create<MapState>((set) => ({
   toggleModoDaltonico: () =>
     set((state) => {
       const siguiente = !state.modoDaltonico
+      document.documentElement.dataset.daltonico = siguiente ? 'true' : 'false'
       localStorage.setItem(MODO_DALTONICO_KEY, siguiente ? '1' : '0')
       return { modoDaltonico: siguiente }
+    }),
+  headerHeight: 64,
+  setHeaderHeight: (px) => set({ headerHeight: px }),
+  tema: temaInicial(),
+  toggleTema: () =>
+    set((state) => {
+      const siguiente = state.tema === 'dark' ? 'light' : 'dark'
+      document.documentElement.dataset.theme = siguiente
+      localStorage.setItem(TEMA_KEY, siguiente)
+      return { tema: siguiente }
     }),
 }))

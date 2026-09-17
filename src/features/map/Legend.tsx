@@ -169,18 +169,22 @@ export function Legend() {
         type="button"
         onClick={() => setAbierto(true)}
         aria-label="Ver el panorama completo de la escala de color"
-        className="rounded-2xl border border-neutral-800 bg-neutral-950/90 px-4 py-3 text-left text-sm shadow-lg shadow-black/50 backdrop-blur transition-colors hover:border-neutral-700"
+        className="rounded-2xl border border-neutral-800 bg-neutral-950/90 px-2.5 py-2 text-left text-sm shadow-lg shadow-black/50 backdrop-blur transition-colors hover:border-neutral-700 sm:px-4 sm:py-3"
       >
-        <div className="flex flex-col gap-1.5">
-          <span className="font-mono text-xs uppercase tracking-wide text-neutral-500">
+        <div className="flex flex-col gap-1 sm:gap-1.5">
+          <span className="font-mono text-[10px] uppercase tracking-wide text-neutral-500 sm:text-xs">
             {UNIDAD[capaActiva]}
           </span>
           <div className="flex overflow-hidden rounded">
             {pasos.map((color) => (
-              <span key={color} className="h-2.5 w-6" style={{ backgroundColor: color }} />
+              <span
+                key={color}
+                className="h-2 w-4 sm:h-2.5 sm:w-6"
+                style={{ backgroundColor: color }}
+              />
             ))}
           </div>
-          <div className="flex justify-between font-mono text-xs text-neutral-500">
+          <div className="flex justify-between font-mono text-[10px] text-neutral-500 sm:text-xs">
             <span>{formatNumero(min)}</span>
             <span>{formatNumero(max)}</span>
           </div>

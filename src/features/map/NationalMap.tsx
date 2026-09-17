@@ -13,6 +13,7 @@ import {
   type ProvinciaFeature,
 } from '../../data/provincias'
 import { useMapStore, type Capa } from '../../store/mapStore'
+import { useMediaQuery } from '../../utils/useMediaQuery'
 import {
   buildColorScales,
   colorForFeature,
@@ -22,7 +23,9 @@ import {
 import { ProvincePins, type ZoomState } from './ProvincePins'
 
 const WIDTH = 800
-const HEIGHT = 900
+// Alto del viewBox: NO es una constante fija, se calcula dentro del
+// componente (ver `HEIGHT` ahí) porque depende del viewport — ver el
+// comentario junto a esa variable.
 
 // Provincias cuyo bounding box proyectado sea más chico que esto (en px, en
 // cualquiera de los dos ejes) no se dibujan como ficha: a esta escala su
@@ -53,7 +56,6 @@ const HOVER_LIFT = 4
 // por espacio. Un clic en un cluster de pines profundiza el zoom (multiplica
 // la escala) en vez de abrir una vista de zoom completamente nueva — mismo
 // mecanismo, un nivel más.
-const ZOOM_TARGET: [number, number] = [WIDTH / 2, HEIGHT / 2]
 const ZOOM_MS = 450
 // Curva "ease-out" pronunciada: arranca rápido y llega a destino con una
 // desaceleración larga y suave, en vez de la deceleración más brusca de un
@@ -63,20 +65,23 @@ const ZOOM_EASING = 'cubic-bezier(0.16, 1, 0.3, 1)'
 const ZOOM_FILL_RATIO = 0.7
 const MIN_ZOOM_BBOX_PX = 40
 
-// `main` (App.tsx) ocupa el alto del viewport menos el header (`h-16` =
-// 64px) y centra el mapa dentro de ESE espacio, no del viewport completo:
-// el centro del mapa queda 32px (la mitad del header) más abajo del centro
-// real de la pantalla. A escala país, con la silueta de Argentina rodeada
-// de sobra de espacio vacío, esos 32px son invisibles; zoomeado a una sola
-// provincia que llena el cuadro, se nota — se corrige corriendo el mapa
-// hacia arriba ese mismo valor, pero solo mientras hay zoom.
-const CORRECCION_ZOOM_VERTICAL_PX = 32
+// `main` (App.tsx) ocupa el alto del viewport menos el header y centra el
+// mapa dentro de ESE espacio, no del viewport completo: el centro del mapa
+// queda (alto del header)/2 más abajo del centro real de la pantalla. A
+// escala país, con la silueta de Argentina rodeada de sobra de espacio
+// vacío, ese corrimiento es invisible; zoomeado a una sola provincia que
+// llena el cuadro, se nota — se corrige corriendo el mapa hacia arriba ese
+// mismo valor, pero solo mientras hay zoom. El alto del header ya NO es
+// una constante fija (`headerHeight` del store, medido con ResizeObserver
+// en Header.tsx): en mobile pasa a dos filas y mide más que en desktop.
 const MAX_ZOOM_SCALE = 400
 const CLUSTER_ZOOM_BOOST = 4
 
 function bboxZoom(
   geometria: GeoPermissibleObjects,
   path: ReturnType<typeof geoPath>,
+  width: number,
+  height: number,
 ): ZoomState {
   const bounds = path.bounds(geometria)
   const w = Math.max(bounds[1][0] - bounds[0][0], MIN_ZOOM_BBOX_PX)
@@ -84,8 +89,8 @@ function bboxZoom(
   const cx = (bounds[0][0] + bounds[1][0]) / 2
   const cy = (bounds[0][1] + bounds[1][1]) / 2
   const scale = Math.min(
-    (WIDTH * ZOOM_FILL_RATIO) / w,
-    (HEIGHT * ZOOM_FILL_RATIO) / h,
+    (width * ZOOM_FILL_RATIO) / w,
+    (height * ZOOM_FILL_RATIO) / h,
     MAX_ZOOM_SCALE,
   )
   return { cx, cy, scale }
@@ -108,8 +113,11 @@ function metricaTooltip(feature: ProvinciaFeature, capa: Capa) {
 export function NationalMap() {
   const capaActiva = useMapStore((s) => s.capaActiva)
   const modoDaltonico = useMapStore((s) => s.modoDaltonico)
+  const tema = useMapStore((s) => s.tema)
+  const headerHeight = useMapStore((s) => s.headerHeight)
   const provinciaSeleccionada = useMapStore((s) => s.provinciaSeleccionada)
   const seleccionarProvincia = useMapStore((s) => s.seleccionarProvincia)
+  const esMobil = useMediaQuery('(max-width: 767px)')
   const [hover, setHover] = useState<{
     feature: ProvinciaFeature
     x: number
@@ -121,9 +129,24 @@ export function NationalMap() {
     y: number
   } | null>(null)
 
+  // Argentina, proyectada, mide (en las unidades del viewBox) mucho más de
+  // alto que de ancho — su bounding box real dentro de un viewBox de
+  // 800x900 ocupa el 100% del alto pero apenas el 51% del ancho. Con el
+  // viewBox 800x900 (casi cuadrado) eso ya deja bastante espacio vacío a
+  // los costados, pero en mobile el problema se duplica: el recuadro
+  // disponible (bien angosto y alto, a diferencia del de escritorio, más
+  // parecido a un cuadrado) tampoco se parece al viewBox, así que
+  // `preserveAspectRatio` todavía deja franjas vacías arriba/abajo por
+  // encima de eso. Subir el alto del viewBox en mobile (dejando el ancho
+  // fijo, así no se mueve nada que dependa de él — `CALLOUT_DX`, el centro
+  // del zoom, etc.) hace que el viewBox se parezca mucho más al recuadro
+  // real del celular y el mapa termine usando casi toda esa altura en vez
+  // de sobrar como espacio muerto.
+  const HEIGHT = esMobil ? 1300 : 900
+
   const projection = useMemo(
     () => geoMercator().fitSize([WIDTH, HEIGHT], provinciasGeo),
-    [],
+    [HEIGHT],
   )
   const path = useMemo(() => geoPath(projection), [projection])
 
@@ -131,6 +154,46 @@ export function NationalMap() {
     () => buildColorScales(provinciasGeo.features, modoDaltonico),
     [modoDaltonico],
   )
+
+  // Path SVG (`d`) y centroide de cada provincia, precalculados UNA SOLA
+  // VEZ por variante de geometría (no en cada render de `drawn` más abajo).
+  // Generar el string `d` de un path recorre cada punto de la geometría —
+  // con la de detalle (~5.5x más puntos que la low-poly, ver el comentario
+  // de más abajo) para las 24 provincias, y `drawn` sin memoizar antes
+  // recalculaba esto en CADA click de un cluster (`zoomAsentado` prende y
+  // apaga en cada nivel de zoom) además de en cada movimiento de mouse
+  // sobre el mapa (`hover` cambia) — de ahí que profundizar el zoom varias
+  // veces seguidas se sintiera cada vez más pesado. Estos dos mapas se
+  // calculan una sola vez (dependen solo de `path`, estable) y `drawn` pasa
+  // a ser una simple lectura + cálculo de color, barato de rehacer en cada
+  // hover/selección.
+  const geomLowPoly = useMemo(() => {
+    const m = new Map<
+      string,
+      { d?: string; centroid: [number, number]; necesitaLlamado: boolean }
+    >()
+    for (const f of provinciasGeo.features) {
+      const bounds = path.bounds(f)
+      const w = bounds[1][0] - bounds[0][0]
+      const h = bounds[1][1] - bounds[0][1]
+      m.set(f.properties.id, {
+        d: path(f) ?? undefined,
+        centroid: path.centroid(f),
+        necesitaLlamado: Math.max(w, h) < MIN_TILE_PX,
+      })
+    }
+    return m
+  }, [path])
+
+  const geomDetalle = useMemo(() => {
+    const m = new Map<string, { d?: string; centroid: [number, number] }>()
+    for (const f of provinciasGeo.features) {
+      const detalle = geometriaDetalle(f.properties.id)
+      const g = detalle ?? f
+      m.set(f.properties.id, { d: path(g) ?? undefined, centroid: path.centroid(g) })
+    }
+    return m
+  }, [path])
 
   const svgRef = useRef<SVGSVGElement>(null)
 
@@ -145,8 +208,13 @@ export function NationalMap() {
     // La geometría de detalle (si existe para esta provincia) da un
     // bounding box más fiel a la frontera real que el low-poly del mapa
     // nacional — importante para que el zoom encuadre bien la provincia.
-    return bboxZoom(geometriaDetalle(provinciaSeleccionada) ?? feature, path)
-  }, [provinciaSeleccionada, path])
+    return bboxZoom(
+      geometriaDetalle(provinciaSeleccionada) ?? feature,
+      path,
+      WIDTH,
+      HEIGHT,
+    )
+  }, [provinciaSeleccionada, path, HEIGHT])
 
   // Niveles extra de zoom por encima del base, uno por cada clic en un
   // cluster de pines. Se resetean al cambiar de provincia ajustando el
@@ -242,7 +310,7 @@ export function NationalMap() {
   // interpolación.
   const zoomGroupStyle: CSSProperties = zoom
     ? {
-        transform: `translate(${ZOOM_TARGET[0] - zoom.scale * zoom.cx}px, ${ZOOM_TARGET[1] - zoom.scale * zoom.cy}px) scale(${zoom.scale})`,
+        transform: `translate(${WIDTH / 2 - zoom.scale * zoom.cx}px, ${HEIGHT / 2 - zoom.scale * zoom.cy}px) scale(${zoom.scale})`,
         transition: `transform ${ZOOM_MS}ms ${ZOOM_EASING}`,
         // Adelanta la promoción a su propia capa de composición antes de
         // que arranque la transición, en vez de que el navegador la arme
@@ -267,49 +335,55 @@ export function NationalMap() {
   }
   const handleLeave = () => setHover(null)
 
-  const drawn = provinciasGeo.features.map((feature) => {
-    // La clasificación ficha/llamado y las opacidades siempre se calculan
-    // sobre la geometría low-poly (nacional) — es una decisión de layout de
-    // la vista sin zoom y no debe cambiar solo porque, al zoomear, el
-    // bounding box más fiel de la geometría de detalle sea distinto.
-    const bounds = path.bounds(feature)
-    const w = bounds[1][0] - bounds[0][0]
-    const h = bounds[1][1] - bounds[0][1]
-    const isSelected = provinciaSeleccionada === feature.properties.id
+  // Solo lectura de los mapas precalculados de arriba + cálculo de color —
+  // nada acá recorre geometría, así que recalcular esto en cada hover o
+  // cambio de selección es barato.
+  const drawn = useMemo(
+    () =>
+      provinciasGeo.features.map((feature) => {
+        const id = feature.properties.id
+        const low = geomLowPoly.get(id)!
+        const isSelected = provinciaSeleccionada === id
 
-    // Con el zoom ya asentado se dibuja con la geometría de detalle (ver
-    // src/data/provincias.ts), no solo en la provincia seleccionada: la
-    // low-poly está pensada para leerse a escala país, y una vecina
-    // (atenuada pero visible) queda con su propio borde groseramente
-    // desalineado una vez que TODO el mapa se amplía 10-400x — se nota
-    // como si invadiera el territorio de la provincia zoomeada. Mientras la
-    // transición todavía está corriendo (`!zoomAsentado`) se sigue usando
-    // la low-poly a propósito — ver el comentario junto a `zoomAsentado`.
-    const hayZoom = zoom !== null
-    const geomParaRender =
-      (hayZoom && zoomAsentado && geometriaDetalle(feature.properties.id)) ||
-      feature
+        // Con el zoom ya asentado se dibuja con la geometría de detalle (ver
+        // src/data/provincias.ts), no solo en la provincia seleccionada: la
+        // low-poly está pensada para leerse a escala país, y una vecina
+        // (atenuada pero visible) queda con su propio borde groseramente
+        // desalineado una vez que TODO el mapa se amplía 10-400x — se nota
+        // como si invadiera el territorio de la provincia zoomeada.
+        // Mientras la transición todavía está corriendo (`!zoomAsentado`) se
+        // sigue usando la low-poly a propósito — ver el comentario junto a
+        // `zoomAsentado`. La clasificación ficha/llamado, en cambio, siempre
+        // se calcula sobre la low-poly: es una decisión de layout de la
+        // vista sin zoom y no debe cambiar solo porque el bounding box de
+        // detalle sea distinto.
+        const hayZoom = zoom !== null
+        const activo = hayZoom && zoomAsentado ? geomDetalle.get(id) : undefined
+        const d = activo?.d ?? low.d
+        const centroid = activo?.centroid ?? low.centroid
 
-    const color = colorForFeature(feature.properties, capaActiva, scales)
+        const color = colorForFeature(feature.properties, capaActiva, scales)
 
-    return {
-      feature,
-      d: path(geomParaRender) ?? undefined,
-      color,
-      // Precalculado en vez de un filtro CSS (`brightness(0.4)`) sobre el
-      // path del lado: un filtro ahí obliga al navegador a re-rasterizarlo
-      // en cada frame mientras el zoom anima — un color ya oscurecido es
-      // gratis de escalar/trasladar (parte del mismo cálculo del `color`).
-      colorLado: darken(color, 0.6),
-      necesitaLlamado: Math.max(w, h) < MIN_TILE_PX,
-      centroid: path.centroid(geomParaRender),
-      isHovered: hover?.feature.properties.id === feature.properties.id,
-      isSelected,
-      // Con una provincia seleccionada, el resto del mapa se atenúa para que
-      // la seleccionada se destaque.
-      opacity: provinciaSeleccionada && !isSelected ? 0.35 : 1,
-    }
-  })
+        return {
+          feature,
+          d,
+          color,
+          // Precalculado en vez de un filtro CSS (`brightness(0.4)`) sobre el
+          // path del lado: un filtro ahí obliga al navegador a re-rasterizarlo
+          // en cada frame mientras el zoom anima — un color ya oscurecido es
+          // gratis de escalar/trasladar (parte del mismo cálculo del `color`).
+          colorLado: darken(color, 0.6),
+          necesitaLlamado: low.necesitaLlamado,
+          centroid,
+          isHovered: hover?.feature.properties.id === id,
+          isSelected,
+          // Con una provincia seleccionada, el resto del mapa se atenúa para
+          // que la seleccionada se destaque.
+          opacity: provinciaSeleccionada && !isSelected ? 0.35 : 1,
+        }
+      }),
+    [geomLowPoly, geomDetalle, zoom, zoomAsentado, capaActiva, scales, provinciaSeleccionada, hover],
+  )
 
   const fichas = drawn.filter((d) => !d.necesitaLlamado)
   const llamados = drawn.filter((d) => d.necesitaLlamado)
@@ -318,9 +392,7 @@ export function NationalMap() {
     <div
       className="relative h-full"
       style={{
-        transform: zoom
-          ? `translateY(-${CORRECCION_ZOOM_VERTICAL_PX}px)`
-          : 'translateY(0px)',
+        transform: zoom ? `translateY(-${headerHeight / 2}px)` : 'translateY(0px)',
         transition: `transform ${ZOOM_MS}ms ${ZOOM_EASING}`,
       }}
     >
@@ -330,10 +402,14 @@ export function NationalMap() {
         className="h-full w-full"
         style={{
           // Apagada mientras el zoom está en transición — ver el
-          // comentario junto a `zoomAsentado`.
-          filter: zoomAsentado
-            ? 'drop-shadow(0 18px 32px rgba(0, 0, 0, 0.65))'
-            : 'none',
+          // comentario junto a `zoomAsentado` — y también en modo claro: es
+          // una sombra pensada para hacer flotar el mapa sobre un fondo
+          // oscuro; sobre fondo claro se ve como un halo negro pegado al
+          // mapa en vez de una sombra de profundidad.
+          filter:
+            zoomAsentado && tema === 'dark'
+              ? 'drop-shadow(0 18px 32px rgba(0, 0, 0, 0.65))'
+              : 'none',
         }}
         role="img"
         aria-label="Mapa de la Argentina por provincia"
@@ -482,7 +558,13 @@ export function NationalMap() {
                       y1={cy}
                       x2={anchorX - CALLOUT_PILL_W / 2}
                       y2={anchorY}
-                      stroke="rgba(245, 242, 234, 0.4)"
+                      // `--color-neutral-500` (no un rgba fijo): un gris
+                      // claro casi invisible sobre el fondo claro del modo
+                      // día — este token sí se invierte con el tema, y un
+                      // gris medio da contraste parecido contra fondo claro
+                      // u oscuro.
+                      stroke="var(--color-neutral-500)"
+                      strokeOpacity={0.6}
                       strokeWidth={1}
                       vectorEffect="non-scaling-stroke"
                       pointerEvents="none"
@@ -533,7 +615,14 @@ export function NationalMap() {
                           dominantBaseline="central"
                           fontSize={10}
                           fontWeight={700}
-                          fill="var(--color-accent-ink)"
+                          // Fijo, no `var(--color-accent-ink)`: ese token
+                          // contrasta contra la superficie de acento fija de
+                          // la marca, pero acá el fondo del globo (`color`)
+                          // es un paso de la escala secuencial de densidad —
+                          // casi siempre oscuro — sin relación con el tema.
+                          // `accent-ink` se vuelve casi negro en modo oscuro,
+                          // ilegible sobre ese fondo oscuro.
+                          fill="#f5f2ea"
                           style={{
                             fontFamily: 'var(--font-mono)',
                             letterSpacing: '0.02em',
@@ -603,6 +692,14 @@ export function NationalMap() {
         <button
           type="button"
           onClick={alejarUnNivel}
+          // `data-mapa-ui`: ProvincePanel cierra el panel (y deselecciona
+          // la provincia) en cualquier click que no sea sobre `[data-provincia]`
+          // ni dentro del panel — sin esto, este botón quedaba atrapado por
+          // esa regla y CADA click acá también deseleccionaba todo, así que
+          // "alejar" un nivel terminaba pareciendo "volver al mapa nacional"
+          // de golpe en vez de retroceder de a un nivel como hace de verdad
+          // `alejarUnNivel` (`niveles.slice(0, -1)`).
+          data-mapa-ui="true"
           className="absolute bottom-4 left-4 z-10 rounded-full border border-neutral-800 bg-neutral-950/95 px-3 py-1.5 font-mono text-xs text-neutral-300 shadow-lg transition-colors hover:text-neutral-100"
         >
           ← alejar
