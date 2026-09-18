@@ -6,7 +6,7 @@ Permite filtrar y analizar en profundidad los espacios culturales del país (mus
 
 ## Fuentes de datos
 
-- **Espacios culturales**: dataset ["Espacios Culturales de la Argentina" (SInCA)](https://datos.cultura.gob.ar), Sistema de Información Cultural de la Argentina — Ministerio de Cultura de la Nación.
+- **Espacios culturales**: dataset ["Espacios Culturales de la Argentina" (SInCA)](https://datos.cultura.gob.ar), Sistema de Información Cultural de la Argentina - Ministerio de Cultura de la Nación.
 - **Geometría de provincias**: [API Georef Argentina](https://apis.datos.gob.ar/georef/api/provincias.geojson), Ministerio de Economía.
 - **Población por provincia**: Censo Nacional de Población, Hogares y Viviendas 2022 (INDEC).
 
@@ -34,4 +34,4 @@ Si el entorno no tiene salida de red a `datos.cultura.gob.ar`, `fetch-data.mjs` 
 
 ## Estado del proyecto
 
-En construcción, siguiendo `PLAN.md`.
+En construcción
