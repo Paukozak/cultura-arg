@@ -4,6 +4,7 @@ import { distanciaAGeometria } from '../../data/geometriaProvincia'
 import { geometriaDetalle } from '../../data/provincias'
 import { useEspacios } from '../../data/useEspacios'
 import { useMapStore } from '../../store/mapStore'
+import { clusterizarPuntos } from './clusterizarPuntos'
 
 export interface ZoomState {
   cx: number
@@ -110,31 +111,10 @@ export function ProvincePins({
   // (sin zoom) a partir de la separación deseada en pantalla dividida por
   // la escala actual — así el agrupamiento se recalcula solo al cambiar de
   // nivel de zoom (clic en cluster), no en cada frame de la animación.
-  const grupos = useMemo(() => {
-    const celda = CLUSTER_CELL_PX / zoom.scale
-    const buckets = new Map<
-      string,
-      { ix: number; iy: number; items: typeof puntos }
-    >()
-    for (const p of puntos) {
-      const ix = Math.floor(p.x / celda)
-      const iy = Math.floor(p.y / celda)
-      const clave = `${ix}:${iy}`
-      const actual = buckets.get(clave)
-      if (actual) actual.items.push(p)
-      else buckets.set(clave, { ix, iy, items: [p] })
-    }
-    return Array.from(buckets.values()).map(({ ix, iy, items }) =>
-      items.length === 1
-        ? { x: items[0].x, y: items[0].y, items }
-        : // Centro de la celda de la grilla, no el promedio de sus puntos: dos
-          // clusters vecinos pueden tener puntos muy cerca del borde
-          // compartido, y promediar sus posiciones los deja casi pegados
-          // (superpuestos e imposibles de clickear por separado). Anclar al
-          // centro de celda garantiza como mínimo `celda` de separación.
-          { x: (ix + 0.5) * celda, y: (iy + 0.5) * celda, items },
-    )
-  }, [puntos, zoom.scale])
+  const grupos = useMemo(
+    () => clusterizarPuntos(puntos, CLUSTER_CELL_PX / zoom.scale),
+    [puntos, zoom.scale],
+  )
 
   const contraescala = 1 / zoom.scale
 

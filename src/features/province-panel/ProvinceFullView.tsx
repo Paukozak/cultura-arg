@@ -4,10 +4,10 @@ import { List, type RowComponentProps } from 'react-window'
 import { cargarEspacios, type Espacio } from '../../data/espacios'
 import { provinciasGeo } from '../../data/provincias'
 import { useMapStore } from '../../store/mapStore'
-import { normalizar } from '../../utils/texto'
 import { ICONOS_POR_CATEGORIA, ICONO_POR_DEFECTO } from './categoriaIcons'
 import { nombreMostradoPara } from './curaduriaDestacados'
 import { EspacioFoto } from './EspacioFoto'
+import { filtrarYOrdenarEspacios, ORDEN_LABEL, type Orden } from './filtrarEspacios'
 import { GoogleMapsEmbed } from './GoogleMapsEmbed'
 
 /** Nombre a mostrar: el editorial curado (ver destacados-curados.json) si
@@ -16,41 +16,6 @@ import { GoogleMapsEmbed } from './GoogleMapsEmbed'
  * la vista completa. */
 function nombreEfectivo(espacio: Espacio): string {
   return nombreMostradoPara(espacio.id) ?? espacio.nombre ?? ''
-}
-
-type Orden = 'alfabetico' | 'anio-asc' | 'anio-desc' | 'categoria'
-
-const ORDEN_LABEL: Record<Orden, string> = {
-  alfabetico: 'Alfabético',
-  'anio-asc': 'Año (más antiguo)',
-  'anio-desc': 'Año (más reciente)',
-  categoria: 'Categoría',
-}
-
-function ordenar(espacios: Espacio[], orden: Orden): Espacio[] {
-  const arr = [...espacios]
-  switch (orden) {
-    case 'alfabetico':
-      return arr.sort((a, b) =>
-        (a.nombre ?? '').localeCompare(b.nombre ?? '', 'es'),
-      )
-    case 'anio-asc':
-      return arr.sort(
-        (a, b) =>
-          (a.anioInauguracion ?? Infinity) - (b.anioInauguracion ?? Infinity),
-      )
-    case 'anio-desc':
-      return arr.sort(
-        (a, b) =>
-          (b.anioInauguracion ?? -Infinity) - (a.anioInauguracion ?? -Infinity),
-      )
-    case 'categoria':
-      return arr.sort(
-        (a, b) =>
-          a.categoria.localeCompare(b.categoria, 'es') ||
-          (a.nombre ?? '').localeCompare(b.nombre ?? '', 'es'),
-      )
-  }
 }
 
 interface RowProps {
@@ -293,37 +258,12 @@ function ProvinceFullViewContent({
 
   const filtrados = useMemo(() => {
     if (!espacios) return []
-    const q = normalizar(busqueda.trim())
-    let resultado = espacios
-    if (q) {
-      resultado = resultado.filter(
-        (e) =>
-          normalizar(e.nombre ?? '').includes(q) ||
-          normalizar(e.localidad ?? '').includes(q),
-      )
-    }
-    if (categoriasActivas) {
-      resultado = resultado.filter((e) => categoriasActivas.has(e.categoria))
-    }
-    if (gestionesActivas) {
-      resultado = resultado.filter((e) =>
-        gestionesActivas.has(e.gestion ?? 'sin dato'),
-      )
-    }
-    if (localidadActiva) {
-      resultado = resultado.filter(
-        (e) => (e.localidad ?? 'sin dato') === localidadActiva,
-      )
-    }
-    return ordenar(resultado, orden)
-  }, [
-    espacios,
-    busqueda,
-    categoriasActivas,
-    gestionesActivas,
-    localidadActiva,
-    orden,
-  ])
+    return filtrarYOrdenarEspacios(
+      espacios,
+      { busqueda, categoriasActivas, gestionesActivas, localidadActiva },
+      orden,
+    )
+  }, [espacios, busqueda, categoriasActivas, gestionesActivas, localidadActiva, orden])
 
   // Por default se muestra la ficha del primero de la lista filtrada; si el
   // usuario eligió uno que sigue en el filtro actual, se respeta esa elección.

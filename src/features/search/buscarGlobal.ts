@@ -1,8 +1,6 @@
 import { provinciasGeo } from '../../data/provincias'
 import { normalizar } from '../../utils/texto'
 import { nombreMostradoPara } from '../province-panel/curaduriaDestacados'
-import indiceEspaciosRaw from '../../data/indice-busqueda.json'
-import indiceLocalidadesRaw from '../../data/indice-localidades.json'
 
 interface EntradaIndiceEspacio {
   id: string
@@ -18,8 +16,29 @@ interface EntradaIndiceLocalidad {
   cantidadEspacios: number
 }
 
-const indiceEspacios = indiceEspaciosRaw as EntradaIndiceEspacio[]
-const indiceLocalidades = indiceLocalidadesRaw as EntradaIndiceLocalidad[]
+// `indice-busqueda.json` pesa ~1.8MB (uno de los campos por cada uno de los
+// ~11 mil espacios del país) — importado de forma estática like antes, se
+// sumaba entero al bundle principal, algo que descargar y parsear ANTES de
+// poder pintar la página, para un buscador que ni siquiera se usa hasta que
+// alguien le hace click. `import()` dinámico lo separa en su propio chunk,
+// pedido en paralelo apenas monta el buscador (ver `precargarIndiceBusqueda`
+// en GlobalSearch.tsx) en vez de bloquear la carga inicial.
+let indiceEspacios: EntradaIndiceEspacio[] | null = null
+let indiceLocalidades: EntradaIndiceLocalidad[] | null = null
+let cargaEnCurso: Promise<void> | null = null
+
+export function precargarIndiceBusqueda(): Promise<void> {
+  if (!cargaEnCurso) {
+    cargaEnCurso = Promise.all([
+      import('../../data/indice-busqueda.json'),
+      import('../../data/indice-localidades.json'),
+    ]).then(([espaciosMod, localidadesMod]) => {
+      indiceEspacios = espaciosMod.default as EntradaIndiceEspacio[]
+      indiceLocalidades = localidadesMod.default as EntradaIndiceLocalidad[]
+    })
+  }
+  return cargaEnCurso
+}
 
 const NOMBRE_PROVINCIA_POR_ID = new Map(
   provinciasGeo.features.map((f) => [f.properties.id, f.properties.nombre]),
@@ -83,7 +102,7 @@ export function buscarGlobal(query: string): ResultadoBusqueda[] {
   provincias.sort(porRelevancia)
 
   const localidades: [ResultadoBusqueda, number][] = []
-  for (const l of indiceLocalidades) {
+  for (const l of indiceLocalidades ?? []) {
     const rank = coincidencia(l.localidad, q)
     if (rank > 0) {
       localidades.push([
@@ -101,7 +120,7 @@ export function buscarGlobal(query: string): ResultadoBusqueda[] {
   localidades.sort(porRelevancia)
 
   const espacios: [ResultadoBusqueda, number][] = []
-  for (const e of indiceEspacios) {
+  for (const e of indiceEspacios ?? []) {
     const nombreEfectivo = nombreMostradoPara(e.id) ?? e.nombre
     const rank = Math.max(coincidencia(nombreEfectivo, q), e.localidad ? coincidencia(e.localidad, q) : 0)
     if (rank > 0) {

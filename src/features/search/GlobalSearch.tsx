@@ -2,7 +2,7 @@ import { MapPin } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useMapStore } from '../../store/mapStore'
 import { ICONOS_POR_CATEGORIA, ICONO_POR_DEFECTO } from '../province-panel/categoriaIcons'
-import { buscarGlobal, type ResultadoBusqueda } from './buscarGlobal'
+import { buscarGlobal, precargarIndiceBusqueda, type ResultadoBusqueda } from './buscarGlobal'
 
 const QUERY_MINIMA = 2
 
@@ -10,6 +10,12 @@ export function GlobalSearch() {
   const [query, setQuery] = useState('')
   const [abierto, setAbierto] = useState(false)
   const [indiceActivo, setIndiceActivo] = useState(0)
+  // Se suma 1 cuando termina de cargar el índice de espacios/localidades
+  // (ver buscarGlobal.ts) para forzar a recalcular `resultados` — si el
+  // usuario ya escribió algo mientras el índice todavía viajaba por red,
+  // los resultados de espacio/localidad aparecen solos apenas está listo,
+  // en vez de quedar pegados a lo que había en ese primer cálculo.
+  const [indiceListoTick, setIndiceListoTick] = useState(0)
   const contenedorRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -17,7 +23,20 @@ export function GlobalSearch() {
   const abrirVistaCompleta = useMapStore((s) => s.abrirVistaCompleta)
   const abrirVistaCompletaPorLocalidad = useMapStore((s) => s.abrirVistaCompletaPorLocalidad)
 
-  const resultados = useMemo(() => buscarGlobal(query), [query])
+  // Precarga apenas monta el buscador (siempre visible en el header), no
+  // recién al primer tipeo: para cuando el usuario termina de escribir las
+  // 2 letras mínimas, el índice ya está listo en la enorme mayoría de los
+  // casos, sin haber bloqueado la carga inicial de la página (ver el
+  // comentario en buscarGlobal.ts).
+  useEffect(() => {
+    precargarIndiceBusqueda().then(() => setIndiceListoTick((t) => t + 1))
+  }, [])
+
+  // `indiceListoTick` no lo lee `buscarGlobal` directamente (lee el módulo
+  // cacheado en buscarGlobal.ts), está a propósito para forzar el
+  // recálculo cuando el índice lazy-loaded termina de llegar.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const resultados = useMemo(() => buscarGlobal(query), [query, indiceListoTick])
   const hayQuery = query.trim().length >= QUERY_MINIMA
 
   // Si cambia la búsqueda y el resultado resaltado quedó fuera de rango
