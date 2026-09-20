@@ -17,14 +17,18 @@ export function ordenarEspacios(espacios: Espacio[], orden: Orden): Espacio[] {
   const arr = [...espacios]
   switch (orden) {
     case 'alfabetico':
-      return arr.sort((a, b) => (a.nombre ?? '').localeCompare(b.nombre ?? '', 'es'))
+      return arr.sort((a, b) =>
+        (a.nombre ?? '').localeCompare(b.nombre ?? '', 'es'),
+      )
     case 'anio-asc':
       return arr.sort(
-        (a, b) => (a.anioInauguracion ?? Infinity) - (b.anioInauguracion ?? Infinity),
+        (a, b) =>
+          (a.anioInauguracion ?? Infinity) - (b.anioInauguracion ?? Infinity),
       )
     case 'anio-desc':
       return arr.sort(
-        (a, b) => (b.anioInauguracion ?? -Infinity) - (a.anioInauguracion ?? -Infinity),
+        (a, b) =>
+          (b.anioInauguracion ?? -Infinity) - (a.anioInauguracion ?? -Infinity),
       )
     case 'categoria':
       return arr.sort(
@@ -49,22 +53,33 @@ export interface FiltrosEspacios {
   localidadActiva?: string | null
 }
 
-export function filtrarEspacios(espacios: Espacio[], filtros: FiltrosEspacios): Espacio[] {
+export function filtrarEspacios(
+  espacios: Espacio[],
+  filtros: FiltrosEspacios,
+): Espacio[] {
   const q = normalizar((filtros.busqueda ?? '').trim())
   let resultado = espacios
   if (q) {
     resultado = resultado.filter(
-      (e) => normalizar(e.nombre ?? '').includes(q) || normalizar(e.localidad ?? '').includes(q),
+      (e) =>
+        normalizar(e.nombre ?? '').includes(q) ||
+        normalizar(e.localidad ?? '').includes(q),
     )
   }
   if (filtros.categoriasActivas) {
-    resultado = resultado.filter((e) => filtros.categoriasActivas!.has(e.categoria))
+    resultado = resultado.filter((e) =>
+      filtros.categoriasActivas!.has(e.categoria),
+    )
   }
   if (filtros.gestionesActivas) {
-    resultado = resultado.filter((e) => filtros.gestionesActivas!.has(e.gestion ?? 'sin dato'))
+    resultado = resultado.filter((e) =>
+      filtros.gestionesActivas!.has(e.gestion ?? 'sin dato'),
+    )
   }
   if (filtros.localidadActiva) {
-    resultado = resultado.filter((e) => (e.localidad ?? 'sin dato') === filtros.localidadActiva)
+    resultado = resultado.filter(
+      (e) => (e.localidad ?? 'sin dato') === filtros.localidadActiva,
+    )
   }
   return resultado
 }

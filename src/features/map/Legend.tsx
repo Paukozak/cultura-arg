@@ -40,14 +40,17 @@ function LegendDetail({ onCerrar }: { onCerrar: () => void }) {
     () => buildColorScales(provinciasGeo.features, modoDaltonico),
     [modoDaltonico],
   )
-  const scale = capaActiva === 'densidad' ? scales.densidadScale : scales.totalScale
+  const scale =
+    capaActiva === 'densidad' ? scales.densidadScale : scales.totalScale
   const escalones = useMemo(() => desglosarEscala(scale), [scale])
 
   const filas = useMemo(() => {
     return provinciasGeo.features
       .map((f) => {
         const valor =
-          capaActiva === 'densidad' ? f.properties.densidadPor100k : f.properties.totalEspacios
+          capaActiva === 'densidad'
+            ? f.properties.densidadPor100k
+            : f.properties.totalEspacios
         const color = valor === null ? SIN_DATOS_COLOR : scale(valor)
         return { nombre: f.properties.nombre, valor, color }
       })
@@ -77,7 +80,10 @@ function LegendDetail({ onCerrar }: { onCerrar: () => void }) {
         className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl"
       >
         <div className="flex items-start justify-between gap-4 border-b border-neutral-800 p-5">
-          <h2 id="leyenda-detalle-titulo" className="text-lg font-semibold text-neutral-100">
+          <h2
+            id="leyenda-detalle-titulo"
+            className="text-lg font-semibold text-neutral-100"
+          >
             {TITULO[capaActiva]}
           </h2>
           <button
@@ -86,8 +92,18 @@ function LegendDetail({ onCerrar }: { onCerrar: () => void }) {
             aria-label="Cerrar"
             className="shrink-0 rounded-full border border-neutral-800 p-1.5 text-neutral-400 transition-colors hover:text-neutral-100"
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path
+                d="M18 6 6 18M6 6l12 12"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
         </div>
@@ -99,7 +115,10 @@ function LegendDetail({ onCerrar }: { onCerrar: () => void }) {
             </h3>
             <div className="flex flex-col gap-1.5">
               {[...escalones].reverse().map((escalon) => (
-                <div key={escalon.color} className="flex items-center gap-3 text-sm">
+                <div
+                  key={escalon.color}
+                  className="flex items-center gap-3 text-sm"
+                >
                   <span
                     className="h-4 w-4 shrink-0 rounded"
                     style={{ backgroundColor: escalon.color }}
@@ -133,7 +152,9 @@ function LegendDetail({ onCerrar }: { onCerrar: () => void }) {
                     className="h-3 w-3 shrink-0 rounded-full"
                     style={{ backgroundColor: fila.color }}
                   />
-                  <span className="flex-1 truncate text-neutral-200">{fila.nombre}</span>
+                  <span className="flex-1 truncate text-neutral-200">
+                    {fila.nombre}
+                  </span>
                   <span className="font-mono text-xs text-neutral-400">
                     {fila.valor === null ? 's/d' : formatNumero(fila.valor)}
                   </span>
@@ -157,7 +178,8 @@ export function Legend() {
     [modoDaltonico],
   )
 
-  const scale = capaActiva === 'densidad' ? scales.densidadScale : scales.totalScale
+  const scale =
+    capaActiva === 'densidad' ? scales.densidadScale : scales.totalScale
   const valores = scale.domain()
   const min = valores[0]
   const max = valores[valores.length - 1]

@@ -7,7 +7,11 @@ import { useMapStore } from '../../store/mapStore'
 import { ICONOS_POR_CATEGORIA, ICONO_POR_DEFECTO } from './categoriaIcons'
 import { nombreMostradoPara } from './curaduriaDestacados'
 import { EspacioFoto } from './EspacioFoto'
-import { filtrarYOrdenarEspacios, ORDEN_LABEL, type Orden } from './filtrarEspacios'
+import {
+  filtrarYOrdenarEspacios,
+  ORDEN_LABEL,
+  type Orden,
+} from './filtrarEspacios'
 import { GoogleMapsEmbed } from './GoogleMapsEmbed'
 
 /** Nombre a mostrar: el editorial curado (ver destacados-curados.json) si
@@ -263,7 +267,14 @@ function ProvinceFullViewContent({
       { busqueda, categoriasActivas, gestionesActivas, localidadActiva },
       orden,
     )
-  }, [espacios, busqueda, categoriasActivas, gestionesActivas, localidadActiva, orden])
+  }, [
+    espacios,
+    busqueda,
+    categoriasActivas,
+    gestionesActivas,
+    localidadActiva,
+    orden,
+  ])
 
   // Por default se muestra la ficha del primero de la lista filtrada; si el
   // usuario eligió uno que sigue en el filtro actual, se respeta esa elección.
@@ -522,8 +533,18 @@ function ProvinceFullViewContent({
               onClick={() => setVistaMobil('lista')}
               className="mb-4 flex items-center gap-1.5 self-start text-sm text-neutral-400 transition-colors hover:text-neutral-100 md:hidden"
             >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path
+                  d="M19 12H5M12 19l-7-7 7-7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
               Volver a la lista
             </button>

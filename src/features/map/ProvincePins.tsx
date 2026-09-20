@@ -146,7 +146,10 @@ export function ProvincePins({
           >
             {/* Área de toque/hover invisible, más grande que el punto
                 visual — ver HIT_RADIO_MULT. */}
-            <circle r={(esCluster ? CLUSTER_RADIO : PIN_RADIO) * HIT_RADIO_MULT} fill="transparent" />
+            <circle
+              r={(esCluster ? CLUSTER_RADIO : PIN_RADIO) * HIT_RADIO_MULT}
+              fill="transparent"
+            />
             {/* Individual: un punto del color de fondo de la página con un
                 aro de acento — más "marcador discreto" que un círculo de
                 acento sólido repetido cientos de veces. Cluster: badge de

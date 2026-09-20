@@ -25,7 +25,11 @@ export function EspacioFoto({ espacio, className, onClick }: Props) {
 
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className={`block ${className ?? ''}`}>
+      <button
+        type="button"
+        onClick={onClick}
+        className={`block ${className ?? ''}`}
+      >
         {contenido}
       </button>
     )

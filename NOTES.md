@@ -46,7 +46,7 @@ existiendo igual en el listado completo y la ficha, solo no se pinea.
 4. **Posible sobre-filtrado en `dropRemoteParts()`** (mismo script): algunos
    casos "afuera" en Tierra del Fuego (p. ej. Isla de los Estados) y
    Corrientes (Anfiteatro Salvador Sena, cerca de Ituzaingó) están dentro de
-   la geometría *cruda* de Georef pero el filtro de partes remotas/antárticas
+   la geometría _cruda_ de Georef pero el filtro de partes remotas/antárticas
    los descarta — vale la pena revisar si `MAX_DISTANCE_FROM_ANCHOR_DEG` (hoy
    5°) es demasiado estricto para islotes legítimos que sí tienen espacios
    culturales reales, en vez de asumir que todos son casos como el sector

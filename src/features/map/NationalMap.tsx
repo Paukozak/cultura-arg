@@ -190,7 +190,10 @@ export function NationalMap() {
     for (const f of provinciasGeo.features) {
       const detalle = geometriaDetalle(f.properties.id)
       const g = detalle ?? f
-      m.set(f.properties.id, { d: path(g) ?? undefined, centroid: path.centroid(g) })
+      m.set(f.properties.id, {
+        d: path(g) ?? undefined,
+        centroid: path.centroid(g),
+      })
     }
     return m
   }, [path])
@@ -382,7 +385,16 @@ export function NationalMap() {
           opacity: provinciaSeleccionada && !isSelected ? 0.35 : 1,
         }
       }),
-    [geomLowPoly, geomDetalle, zoom, zoomAsentado, capaActiva, scales, provinciaSeleccionada, hover],
+    [
+      geomLowPoly,
+      geomDetalle,
+      zoom,
+      zoomAsentado,
+      capaActiva,
+      scales,
+      provinciaSeleccionada,
+      hover,
+    ],
   )
 
   const fichas = drawn.filter((d) => !d.necesitaLlamado)
@@ -392,7 +404,9 @@ export function NationalMap() {
     <div
       className="relative h-full"
       style={{
-        transform: zoom ? `translateY(-${headerHeight / 2}px)` : 'translateY(0px)',
+        transform: zoom
+          ? `translateY(-${headerHeight / 2}px)`
+          : 'translateY(0px)',
         transition: `transform ${ZOOM_MS}ms ${ZOOM_EASING}`,
       }}
     >

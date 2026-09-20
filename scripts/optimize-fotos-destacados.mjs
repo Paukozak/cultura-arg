@@ -43,7 +43,12 @@ async function main() {
 
     await sharp(rutaOriginal)
       .rotate() // respeta la orientación EXIF antes de perderla al reescribir
-      .resize({ width: MAX_DIMENSION, height: MAX_DIMENSION, fit: 'inside', withoutEnlargement: true })
+      .resize({
+        width: MAX_DIMENSION,
+        height: MAX_DIMENSION,
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
       .jpeg({ quality: CALIDAD_JPEG, mozjpeg: true })
       .toFile(rutaTemp)
 
@@ -59,9 +64,14 @@ async function main() {
     )
   }
 
-  console.log(`\nTotal: ${(totalAntes / 1024 / 1024).toFixed(1)}MB -> ${(totalDespues / 1024 / 1024).toFixed(1)}MB`)
+  console.log(
+    `\nTotal: ${(totalAntes / 1024 / 1024).toFixed(1)}MB -> ${(totalDespues / 1024 / 1024).toFixed(1)}MB`,
+  )
   if (renombrados.length) {
-    console.log('\nRenombrados (actualizar destacados-curados.json):', JSON.stringify(renombrados))
+    console.log(
+      '\nRenombrados (actualizar destacados-curados.json):',
+      JSON.stringify(renombrados),
+    )
   }
 }
 

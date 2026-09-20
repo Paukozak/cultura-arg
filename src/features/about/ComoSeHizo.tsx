@@ -78,7 +78,10 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
         className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl"
       >
         <div className="flex items-start justify-between gap-4 border-b border-neutral-800 p-5">
-          <h2 id="como-se-hizo-titulo" className="text-lg font-semibold text-neutral-100">
+          <h2
+            id="como-se-hizo-titulo"
+            className="text-lg font-semibold text-neutral-100"
+          >
             ¿Cómo se hizo?
           </h2>
           <button
@@ -87,29 +90,44 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
             aria-label="Cerrar"
             className="shrink-0 rounded-full border border-neutral-800 p-1.5 text-neutral-400 transition-colors hover:text-neutral-100"
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path
+                d="M18 6 6 18M6 6l12 12"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
         </div>
 
         <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-5 text-sm leading-relaxed text-neutral-300 text-justify">
           <section className="flex flex-col gap-2">
-            <h3 className="text-xs uppercase tracking-wide text-neutral-500">Para qué es este mapa</h3>
+            <h3 className="text-xs uppercase tracking-wide text-neutral-500">
+              Para qué es este mapa
+            </h3>
             <p>
-              Argentina tiene {TOTAL_ESPACIOS.toLocaleString('es-AR')} espacios culturales
-              documentados por el Estado en 11 categorías: museos, bibliotecas populares y
-              especializadas, salas de teatro, centros culturales, cines, galerías, librerías,
-              monumentos, sitios Patrimonio UNESCO y Casas del Bicentenario, repartidos en
-              las 24 jurisdicciones de primer orden. Este mapa junta esos datos, hoy
-              dispersos en planillas separadas por categoría, en un solo lugar navegable por
-              provincia: la idea es que se pueda ver y comparar de un vistazo la oferta cultural
-              de cada rincón del país.
+              Argentina tiene {TOTAL_ESPACIOS.toLocaleString('es-AR')} espacios
+              culturales documentados por el Estado en 11 categorías: museos,
+              bibliotecas populares y especializadas, salas de teatro, centros
+              culturales, cines, galerías, librerías, monumentos, sitios
+              Patrimonio UNESCO y Casas del Bicentenario, repartidos en las 24
+              jurisdicciones de primer orden. Este mapa junta esos datos, hoy
+              dispersos en planillas separadas por categoría, en un solo lugar
+              navegable por provincia: la idea es que se pueda ver y comparar de
+              un vistazo la oferta cultural de cada rincón del país.
             </p>
           </section>
 
           <section className="flex flex-col gap-2">
-            <h3 className="text-xs uppercase tracking-wide text-neutral-500">Fuentes de datos</h3>
+            <h3 className="text-xs uppercase tracking-wide text-neutral-500">
+              Fuentes de datos
+            </h3>
             <ul className="flex flex-col gap-3">
               <Fuente
                 nombre="SInCA · Espacios Culturales de la Argentina"
@@ -128,42 +146,50 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
               />
             </ul>
             <p className="text-xs text-neutral-500">
-              Corte de los datos de SInCA: {FECHA_CORTE}. La app no se actualiza sola con datos
-              nuevos del dataset.
+              Corte de los datos de SInCA: {FECHA_CORTE}. La app no se actualiza
+              sola con datos nuevos del dataset.
             </p>
           </section>
 
           <section className="flex flex-col gap-2">
-            <h3 className="text-xs uppercase tracking-wide text-neutral-500">Normalización</h3>
+            <h3 className="text-xs uppercase tracking-wide text-neutral-500">
+              Normalización
+            </h3>
             <p>
-              SInCA distribuye los espacios culturales en 11 planillas separadas, una por
-              categoría, y cada una nombra y da formato a los mismos datos de manera distinta.
-              El primer paso fue traducir las 11 planillas a un mismo esquema, los mismos
-              campos, con el mismo formato, para que cualquier registro se pueda tratar igual sin
-              importar de qué categoría vino. 
+              SInCA distribuye los espacios culturales en 11 planillas
+              separadas, una por categoría, y cada una nombra y da formato a los
+              mismos datos de manera distinta. El primer paso fue traducir las
+              11 planillas a un mismo esquema, los mismos campos, con el mismo
+              formato, para que cualquier registro se pueda tratar igual sin
+              importar de qué categoría vino.
             </p>
           </section>
 
           <section className="flex flex-col gap-2">
-            <h3 className="text-xs uppercase tracking-wide text-neutral-500">Limpieza</h3>
+            <h3 className="text-xs uppercase tracking-wide text-neutral-500">
+              Limpieza
+            </h3>
             <p>
-              Con los datos ya en un esquema común, la limpieza fue el paso en el que se corrigieron y completaron
-              los valores en sí. Se siguió un mismo criterio en todo el proceso, usar siempre el dato
-              más confiable disponible, y no completar nada que no se pueda sostener con otro dato
-              ya presente en el registro.
+              Con los datos ya en un esquema común, la limpieza fue el paso en
+              el que se corrigieron y completaron los valores en sí. Se siguió
+              un mismo criterio en todo el proceso, usar siempre el dato más
+              confiable disponible, y no completar nada que no se pueda sostener
+              con otro dato ya presente en el registro.
             </p>
             <p>
-              En la práctica, esto significó calcular la provincia de cada espacio a partir de un
-              código de localidad numérico en vez de la columna de texto libre (mucho más
-              propensa a errores de tipeo); tratar los marcadores de "sin dato" que trae la fuente
-              (como "s/d") como campo vacío en vez de mostrarlos como si fueran un valor real;
-              unificar variantes de un mismo nombre de localidad, por acentos o mayúsculas
-              inconsistentes, eligiendo la forma mejor escrita, no la más repetida; completar
-              campos vacíos solo cuando otro dato confiable del mismo registro o de un vecino
-              geográfico muy cercano lo resuelve sin ambigüedad, dejándolo como faltante si no hay
-              esa certeza; y aplicar a mano un puñado de correcciones puntuales para errores de
-              origen que no siguen ningún patrón general, verificadas cruzando otras columnas del
-              mismo registro.
+              En la práctica, esto significó calcular la provincia de cada
+              espacio a partir de un código de localidad numérico en vez de la
+              columna de texto libre (mucho más propensa a errores de tipeo);
+              tratar los marcadores de "sin dato" que trae la fuente (como
+              "s/d") como campo vacío en vez de mostrarlos como si fueran un
+              valor real; unificar variantes de un mismo nombre de localidad,
+              por acentos o mayúsculas inconsistentes, eligiendo la forma mejor
+              escrita, no la más repetida; completar campos vacíos solo cuando
+              otro dato confiable del mismo registro o de un vecino geográfico
+              muy cercano lo resuelve sin ambigüedad, dejándolo como faltante si
+              no hay esa certeza; y aplicar a mano un puñado de correcciones
+              puntuales para errores de origen que no siguen ningún patrón
+              general, verificadas cruzando otras columnas del mismo registro.
             </p>
           </section>
 
@@ -172,17 +198,18 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
               Criterio de elección de visualización
             </h3>
             <p>
-              Se eligió un mapa coroplético, permitiendo comparar
-              la oferta cultural entre provincias de un vistazo.
+              Se eligió un mapa coroplético, permitiendo comparar la oferta
+              cultural entre provincias de un vistazo.
             </p>
             <p>
-              Además, hay dos formas de ver ese color (Densidad y Total, alternables con el
-              selector arriba del mapa) porque cada una responde una pregunta distinta. El Total
-              muestra la cantidad bruta de espacios culturales de cada provincia. La Densidad
-              divide ese total por cada 100 mil habitantes, para que una provincia chica no quede
-              siempre opacada por una grande solo por tener menos población. Ninguna reemplaza a la
-              otra, por eso conviven como dos vistas del mismo mapa en vez de mezclarse en una sola
-              métrica.
+              Además, hay dos formas de ver ese color (Densidad y Total,
+              alternables con el selector arriba del mapa) porque cada una
+              responde una pregunta distinta. El Total muestra la cantidad bruta
+              de espacios culturales de cada provincia. La Densidad divide ese
+              total por cada 100 mil habitantes, para que una provincia chica no
+              quede siempre opacada por una grande solo por tener menos
+              población. Ninguna reemplaza a la otra, por eso conviven como dos
+              vistas del mismo mapa en vez de mezclarse en una sola métrica.
             </p>
           </section>
 
@@ -195,20 +222,24 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
                 valor={TOTAL_ESPACIOS.toLocaleString('es-AR')}
                 etiqueta="espacios culturales relevados en las 24 jurisdicciones"
               />
-              <Metrica valor={`${PCT_SIN_ANIO}%`} etiqueta="de los espacios no tiene año de inauguración documentado" />
+              <Metrica
+                valor={`${PCT_SIN_ANIO}%`}
+                etiqueta="de los espacios no tiene año de inauguración documentado"
+              />
               <Metrica
                 valor={`${PCT_SIN_LOCALIDAD}%`}
                 etiqueta="de los espacios no tiene localidad documentada"
               />
             </div>
             <p className="text-xs text-neutral-500">
-              El año varía mucho por categoría: cuatro categorías (bibliotecas especializadas,
-              cines, galerías de arte y librerías) directamente no traen ese campo en la fuente.
+              El año varía mucho por categoría: cuatro categorías (bibliotecas
+              especializadas, cines, galerías de arte y librerías) directamente
+              no traen ese campo en la fuente.
             </p>
             <p className="text-xs text-neutral-500">
-              Año y localidad no son los únicos con faltantes: web, mail, teléfono, gestión,
-              subcategoría y departamento también tienen huecos, algunos grandes, en distinta
-              medida por categoría.
+              Año y localidad no son los únicos con faltantes: web, mail,
+              teléfono, gestión, subcategoría y departamento también tienen
+              huecos, algunos grandes, en distinta medida por categoría.
             </p>
           </section>
 
@@ -217,8 +248,9 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
               Destacados de cada provincia
             </h3>
             <p>
-              Se eligieron a mano, provincia por provincia. No reflejan un ranking de importancia, sino una selección que
-              intenta mostrar variedad de categorías y de partes del territorio.
+              Se eligieron a mano, provincia por provincia. No reflejan un
+              ranking de importancia, sino una selección que intenta mostrar
+              variedad de categorías y de partes del territorio.
             </p>
           </section>
 
@@ -227,10 +259,11 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
               Asistencia de inteligencia artificial
             </h3>
             <p>
-              El desarrollo (el pipeline de procesamiento de datos y la interfaz) se hizo con
-              asistencia de Claude Code, bajo dirección y revisión humana en cada etapa. La
-              curaduría de destacados y las decisiones de qué mostrar y cómo son editoriales, no
-              generadas automáticamente.
+              El desarrollo (el pipeline de procesamiento de datos y la
+              interfaz) se hizo con asistencia de Claude Code, bajo dirección y
+              revisión humana en cada etapa. La curaduría de destacados y las
+              decisiones de qué mostrar y cómo son editoriales, no generadas
+              automáticamente.
             </p>
           </section>
         </div>

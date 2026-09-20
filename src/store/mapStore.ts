@@ -73,10 +73,18 @@ export const useMapStore = create<MapState>((set) => ({
   setVistaCompleta: (valor) => set({ vistaCompleta: valor }),
   espacioFocoId: null,
   abrirVistaCompleta: (espacioId = null) =>
-    set({ vistaCompleta: true, espacioFocoId: espacioId, localidadFocoId: null }),
+    set({
+      vistaCompleta: true,
+      espacioFocoId: espacioId,
+      localidadFocoId: null,
+    }),
   localidadFocoId: null,
   abrirVistaCompletaPorLocalidad: (localidad) =>
-    set({ vistaCompleta: true, espacioFocoId: null, localidadFocoId: localidad }),
+    set({
+      vistaCompleta: true,
+      espacioFocoId: null,
+      localidadFocoId: localidad,
+    }),
   modoDaltonico: modoDaltonicoInicial(),
   toggleModoDaltonico: () =>
     set((state) => {

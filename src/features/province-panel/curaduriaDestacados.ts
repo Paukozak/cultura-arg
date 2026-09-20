@@ -6,14 +6,15 @@ const TODAS_LAS_ENTRADAS = Object.values(
 ).flat()
 
 const FOTOS_POR_ID = new Map(
-  TODAS_LAS_ENTRADAS.filter((e): e is EntradaCurada & { foto: string } => Boolean(e.foto)).map(
-    (e) => [e.id, e.foto],
-  ),
+  TODAS_LAS_ENTRADAS.filter((e): e is EntradaCurada & { foto: string } =>
+    Boolean(e.foto),
+  ).map((e) => [e.id, e.foto]),
 )
 
 const NOMBRES_POR_ID = new Map(
-  TODAS_LAS_ENTRADAS.filter((e): e is EntradaCurada & { nombreMostrado: string } =>
-    Boolean(e.nombreMostrado),
+  TODAS_LAS_ENTRADAS.filter(
+    (e): e is EntradaCurada & { nombreMostrado: string } =>
+      Boolean(e.nombreMostrado),
   ).map((e) => [e.id, e.nombreMostrado]),
 )
 

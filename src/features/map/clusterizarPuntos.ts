@@ -24,7 +24,10 @@ export function clusterizarPuntos(
   puntos: PuntoProyectado[],
   celdaPx: number,
 ): GrupoPuntos[] {
-  const buckets = new Map<string, { ix: number; iy: number; items: PuntoProyectado[] }>()
+  const buckets = new Map<
+    string,
+    { ix: number; iy: number; items: PuntoProyectado[] }
+  >()
   for (const p of puntos) {
     const ix = Math.floor(p.x / celdaPx)
     const iy = Math.floor(p.y / celdaPx)

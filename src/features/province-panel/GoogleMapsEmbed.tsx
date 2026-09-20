@@ -16,7 +16,9 @@ interface Props {
 // como respaldo solo cuando no hay ni dirección ni localidad para buscar —
 // ahí un nombre solo puede ser ambiguo y el pin exacto es más confiable.
 function buildQuery({ nombre, direccion, localidad, lat, lon }: Props): string {
-  const textoDescriptivo = [nombre, direccion, localidad].filter(Boolean).join(', ')
+  const textoDescriptivo = [nombre, direccion, localidad]
+    .filter(Boolean)
+    .join(', ')
   if (direccion || localidad) return textoDescriptivo
   if (lat !== null && lon !== null) return `${lat},${lon}`
   return textoDescriptivo
@@ -58,7 +60,10 @@ export function GoogleMapsEmbed(props: Props) {
   const linkHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
 
   return (
-    <div ref={containerRef} className={`flex flex-col gap-1.5 ${props.className ?? ''}`}>
+    <div
+      ref={containerRef}
+      className={`flex flex-col gap-1.5 ${props.className ?? ''}`}
+    >
       {visible ? (
         <iframe
           title={`Mapa de ${props.nombre}`}

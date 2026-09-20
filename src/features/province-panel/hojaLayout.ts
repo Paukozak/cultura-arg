@@ -10,12 +10,18 @@
 export const PEEK_FRACCION = 0.48
 
 /** Alto total de la hoja (expandida), en píxeles reales. */
-export function alturaHojaPx(alturaVentana: number, headerHeight: number): number {
+export function alturaHojaPx(
+  alturaVentana: number,
+  headerHeight: number,
+): number {
   return alturaVentana - headerHeight - 16
 }
 
 /** Cuánto asoma la hoja en reposo (sin expandir), en píxeles reales — el
  * mismo valor que App.tsx debe reservarle al mapa como espacio libre. */
-export function altoPeekPx(alturaVentana: number, headerHeight: number): number {
+export function altoPeekPx(
+  alturaVentana: number,
+  headerHeight: number,
+): number {
   return alturaHojaPx(alturaVentana, headerHeight) * PEEK_FRACCION
 }

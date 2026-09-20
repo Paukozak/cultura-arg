@@ -106,7 +106,9 @@ function dropRemoteParts(geometry) {
     bounds: ringBounds(p[0]),
   }))
 
-  const northOfCutoff = info.filter((c) => c.bounds.maxLat > ANTARCTIC_LAT_CUTOFF)
+  const northOfCutoff = info.filter(
+    (c) => c.bounds.maxLat > ANTARCTIC_LAT_CUTOFF,
+  )
   const anchorPool = northOfCutoff.length ? northOfCutoff : info
   const anchor = anchorPool.reduce((a, b) => (b.area > a.area ? b : a))
 
@@ -144,7 +146,15 @@ function dropRemoteParts(geometry) {
 // fuente) y la frecuencia no es un criterio de corrección ortográfica. La
 // cantidad de ocurrencias solo se usa como desempate entre formas de igual
 // calidad.
-const CONECTORES_TOPONIMOS = new Set(['de', 'del', 'la', 'las', 'los', 'y', 'en'])
+const CONECTORES_TOPONIMOS = new Set([
+  'de',
+  'del',
+  'la',
+  'las',
+  'los',
+  'y',
+  'en',
+])
 
 function normalizeKeyLocalidad(s) {
   return s
@@ -162,7 +172,9 @@ function calidadLocalidad(s) {
   const casingOk = palabras.every((p) => {
     if (/^\d/.test(p)) return true // "9" y "25" de "9 de Julio"/"25 de Mayo"
     if (CONECTORES_TOPONIMOS.has(p.toLowerCase())) return p === p.toLowerCase()
-    return p[0] === p[0].toUpperCase() && p.slice(1) === p.slice(1).toLowerCase()
+    return (
+      p[0] === p[0].toUpperCase() && p.slice(1) === p.slice(1).toLowerCase()
+    )
   })
   if (casingOk) score += 50
   if (s.length > 1 && s === s.toUpperCase()) score -= 50
@@ -175,7 +187,8 @@ function unifyLocalidades(espacios) {
     if (!e.localidad || !e.provinciaId) continue
     const limpio = e.localidad.replace(/\s+/g, ' ').trim()
     const key = normalizeKeyLocalidad(limpio)
-    if (!variantesPorProvincia.has(e.provinciaId)) variantesPorProvincia.set(e.provinciaId, new Map())
+    if (!variantesPorProvincia.has(e.provinciaId))
+      variantesPorProvincia.set(e.provinciaId, new Map())
     const grupos = variantesPorProvincia.get(e.provinciaId)
     if (!grupos.has(key)) grupos.set(key, new Map())
     const variantes = grupos.get(key)
@@ -186,12 +199,15 @@ function unifyLocalidades(espacios) {
   for (const [provinciaId, grupos] of variantesPorProvincia) {
     const canonico = new Map()
     for (const [key, variantes] of grupos) {
-      const [mejorForma] = [...variantes.entries()].sort(([formaA, countA], [formaB, countB]) => {
-        const diffCalidad = calidadLocalidad(formaB) - calidadLocalidad(formaA)
-        if (diffCalidad !== 0) return diffCalidad
-        if (countB !== countA) return countB - countA
-        return formaA.localeCompare(formaB, 'es')
-      })[0]
+      const [mejorForma] = [...variantes.entries()].sort(
+        ([formaA, countA], [formaB, countB]) => {
+          const diffCalidad =
+            calidadLocalidad(formaB) - calidadLocalidad(formaA)
+          if (diffCalidad !== 0) return diffCalidad
+          if (countB !== countA) return countB - countA
+          return formaA.localeCompare(formaB, 'es')
+        },
+      )[0]
       canonico.set(key, mejorForma)
     }
     canonicoPorProvincia.set(provinciaId, canonico)
@@ -220,7 +236,10 @@ function aplicarCorreccionesPuntuales(espacios) {
     // (-34.5759413, -58.5130596) son el Parque Tecnológico Miguelete del
     // INTI, que está del lado de la provincia de Buenos Aires: Av. General
     // Paz es justamente la avenida límite con CABA.
-    if (e.nombre === 'INTI - Tecnologías de Gestión, Biblioteca' && e.provinciaId === '02') {
+    if (
+      e.nombre === 'INTI - Tecnologías de Gestión, Biblioteca' &&
+      e.provinciaId === '02'
+    ) {
       e.provinciaId = '06'
       e.departamento = 'General San Martín'
       e.localidad = 'General San Martín' // mismo partido que las otras 24 entradas ya cargadas como "General San Martín"
@@ -266,7 +285,11 @@ const LOCALIDAD_DESDE_DIRECCION_MONUMENTOS = {
 
 function inferirLocalidadesMonumentos(espacios) {
   for (const e of espacios) {
-    if (e.categoria !== 'Monumentos y Lugares Históricos' || e.localidad !== null) continue
+    if (
+      e.categoria !== 'Monumentos y Lugares Históricos' ||
+      e.localidad !== null
+    )
+      continue
 
     const mapeada = LOCALIDAD_DESDE_DIRECCION_MONUMENTOS[e.id]
     if (mapeada) {
@@ -303,14 +326,24 @@ function distanciaKm(lat1, lon1, lat2, lon2) {
 function inferirLocalidadPorProximidad(espacios) {
   const referenciasPorProvincia = new Map()
   for (const e of espacios) {
-    if (!e.provinciaId || !e.localidad || e.lat === null || e.lon === null) continue
-    if (!referenciasPorProvincia.has(e.provinciaId)) referenciasPorProvincia.set(e.provinciaId, [])
-    referenciasPorProvincia.get(e.provinciaId).push({ lat: e.lat, lon: e.lon, localidad: e.localidad })
+    if (!e.provinciaId || !e.localidad || e.lat === null || e.lon === null)
+      continue
+    if (!referenciasPorProvincia.has(e.provinciaId))
+      referenciasPorProvincia.set(e.provinciaId, [])
+    referenciasPorProvincia
+      .get(e.provinciaId)
+      .push({ lat: e.lat, lon: e.lon, localidad: e.localidad })
   }
 
   let inferidos = 0
   for (const e of espacios) {
-    if (e.localidad !== null || !e.provinciaId || e.lat === null || e.lon === null) continue
+    if (
+      e.localidad !== null ||
+      !e.provinciaId ||
+      e.lat === null ||
+      e.lon === null
+    )
+      continue
     const referencias = referenciasPorProvincia.get(e.provinciaId)
     if (!referencias) continue
     let mejor = null
@@ -348,7 +381,10 @@ function normalizeGestion(raw) {
   const v = raw.trim().toLowerCase()
   if (!v || v === 's/d') return null
   const isPriv = /priv/.test(v)
-  const isPub = /(p[uú]b[l]?[ií]c[oa]|municipal|provincial|nacional|comunal|gobierno)/.test(v)
+  const isPub =
+    /(p[uú]b[l]?[ií]c[oa]|municipal|provincial|nacional|comunal|gobierno)/.test(
+      v,
+    )
   if (isPriv && isPub) return 'mixta'
   if (isPriv) return 'privada'
   if (isPub) return 'pública'
@@ -599,8 +635,12 @@ async function loadEspacios() {
 
     rows.forEach((row, i) => {
       const codLocRaw = field(row, config.codLoc)
-      const provinciaId = codLocRaw ? codLocRaw.padStart(8, '0').slice(0, 2) : null
-      const anio = config.anio ? parseYear(row[config.anio.key], config.anio.format) : null
+      const provinciaId = codLocRaw
+        ? codLocRaw.padStart(8, '0').slice(0, 2)
+        : null
+      const anio = config.anio
+        ? parseYear(row[config.anio.key], config.anio.format)
+        : null
       if (anio !== null) conAnio++
 
       espacios.push({
@@ -614,7 +654,9 @@ async function loadEspacios() {
         lat: parseCoord(field(row, config.lat)),
         lon: parseCoord(field(row, config.lon)),
         anioInauguracion: anio,
-        gestion: config.gestion ? normalizeGestion(field(row, config.gestion)) : null,
+        gestion: config.gestion
+          ? normalizeGestion(field(row, config.gestion))
+          : null,
         direccion: field(row, config.direccion),
         telefono: field(row, config.telefono),
         mail: field(row, config.mail),
@@ -639,7 +681,9 @@ function buildDataQualityReport(completitud, totalEspacios, totalConAnio) {
   const lines = []
   lines.push('# Reporte de calidad de datos')
   lines.push('')
-  lines.push(`Generado el ${new Date().toISOString().slice(0, 10)} a partir de los CSV de SInCA descargados de datos.cultura.gob.ar.`)
+  lines.push(
+    `Generado el ${new Date().toISOString().slice(0, 10)} a partir de los CSV de SInCA descargados de datos.cultura.gob.ar.`,
+  )
   lines.push('')
   lines.push('## Completitud de `anioInauguracion`')
   lines.push('')
@@ -647,7 +691,9 @@ function buildDataQualityReport(completitud, totalEspacios, totalConAnio) {
     `En total, **${totalConAnio} de ${totalEspacios}** registros (${((totalConAnio / totalEspacios) * 100).toFixed(1)}%) tienen un año documentado y válido (entre 1400 y ${CURRENT_YEAR}).`,
   )
   lines.push('')
-  lines.push('| Categoría | Total | Con año válido | % | ¿El dataset trae ese campo? |')
+  lines.push(
+    '| Categoría | Total | Con año válido | % | ¿El dataset trae ese campo? |',
+  )
   lines.push('|---|---:|---:|---:|:---:|')
   for (const c of completitud) {
     lines.push(
@@ -655,9 +701,13 @@ function buildDataQualityReport(completitud, totalEspacios, totalConAnio) {
     )
   }
   lines.push('')
-  lines.push('## Notas importantes para el diseño de la línea de tiempo (Etapa 8)')
+  lines.push(
+    '## Notas importantes para el diseño de la línea de tiempo (Etapa 8)',
+  )
   lines.push('')
-  const sinCampo = completitud.filter((c) => !c.tieneCampoAnio).map((c) => c.categoria)
+  const sinCampo = completitud
+    .filter((c) => !c.tieneCampoAnio)
+    .map((c) => c.categoria)
   lines.push(
     `- Las categorías **${sinCampo.join(', ')}** no traen ningún campo de año en el CSV de origen: para esos registros \`anioInauguracion\` es siempre \`null\`, no es un dato faltante por casualidad.`,
   )
@@ -696,7 +746,10 @@ async function main() {
 
   console.log('Leyendo población (Censo 2022)...')
   const { poblacion } = JSON.parse(
-    await readFile(path.join(ROOT, 'data', 'poblacion-provincias.json'), 'utf8'),
+    await readFile(
+      path.join(ROOT, 'data', 'poblacion-provincias.json'),
+      'utf8',
+    ),
   )
 
   console.log('Leyendo y normalizando CSV de SInCA...')
@@ -705,22 +758,32 @@ async function main() {
   console.log('Aplicando correcciones puntuales...')
   aplicarCorreccionesPuntuales(espacios)
 
-  console.log('Infiriendo localidad faltante en Monumentos y Lugares Históricos...')
+  console.log(
+    'Infiriendo localidad faltante en Monumentos y Lugares Históricos...',
+  )
   inferirLocalidadesMonumentos(espacios)
 
-  console.log('CABA: unificando a una sola localidad (es una ciudad, no un conjunto de localidades)...')
+  console.log(
+    'CABA: unificando a una sola localidad (es una ciudad, no un conjunto de localidades)...',
+  )
   forzarLocalidadCaba(espacios)
 
   console.log('Unificando variantes de localidad (acentos, mayúsculas)...')
   unifyLocalidades(espacios)
 
   const inferidosPorProximidad = inferirLocalidadPorProximidad(espacios)
-  console.log(`Localidad inferida por proximidad geográfica (radio ${MAX_RADIO_INFERENCIA_KM}km): ${inferidosPorProximidad} registros`)
+  console.log(
+    `Localidad inferida por proximidad geográfica (radio ${MAX_RADIO_INFERENCIA_KM}km): ${inferidosPorProximidad} registros`,
+  )
   const sinLocalidad = espacios.filter((e) => e.localidad === null).length
-  console.log(`Quedan sin localidad (genuinamente sin dato en la fuente y sin ubicación cercana confiable): ${sinLocalidad}`)
+  console.log(
+    `Quedan sin localidad (genuinamente sin dato en la fuente y sin ubicación cercana confiable): ${sinLocalidad}`,
+  )
 
   const totalEspacios = espacios.length
-  const totalConAnio = espacios.filter((e) => e.anioInauguracion !== null).length
+  const totalConAnio = espacios.filter(
+    (e) => e.anioInauguracion !== null,
+  ).length
 
   // --- Agregados por provincia ----------------------------------------------
   const porProvincia = new Map()
@@ -731,11 +794,16 @@ async function main() {
     }
     const agg = porProvincia.get(e.provinciaId)
     agg.total++
-    agg.porCategoria.set(e.categoria, (agg.porCategoria.get(e.categoria) ?? 0) + 1)
+    agg.porCategoria.set(
+      e.categoria,
+      (agg.porCategoria.get(e.categoria) ?? 0) + 1,
+    )
   }
 
   // --- Geometría simplificada + propiedades ---------------------------------
-  console.log(`Simplificando geometría (tolerancia ${SIMPLIFY_TOLERANCE}, descarte de partes antárticas/remotas)...`)
+  console.log(
+    `Simplificando geometría (tolerancia ${SIMPLIFY_TOLERANCE}, descarte de partes antárticas/remotas)...`,
+  )
   const features = geojsonRaw.features.map((f) => {
     const id = f.properties.id
     const agg = porProvincia.get(id) ?? { total: 0, porCategoria: new Map() }
@@ -770,7 +838,9 @@ async function main() {
         totalEspacios: agg.total,
         porCategoria: porCategoriaObj,
         categoriasPredominantes,
-        densidadPor100k: pob ? Number(((agg.total / pob) * 100000).toFixed(2)) : null,
+        densidadPor100k: pob
+          ? Number(((agg.total / pob) * 100000).toFixed(2))
+          : null,
       },
       geometry: simplifiedFeature.geometry,
       geometryDetalle: detalleFeature.geometry,
@@ -802,13 +872,17 @@ async function main() {
     path.join(DATA_DIR, 'provincias-resumen.json'),
     JSON.stringify(provinciasResumen),
   )
-  console.log(`Escrito src/data/provincias-resumen.json (${features.length} provincias)`)
+  console.log(
+    `Escrito src/data/provincias-resumen.json (${features.length} provincias)`,
+  )
 
   await writeFile(
     path.join(DATA_DIR, 'provincias-detalle.json'),
     JSON.stringify(provinciasDetalle),
   )
-  console.log(`Escrito src/data/provincias-detalle.json (${features.length} provincias)`)
+  console.log(
+    `Escrito src/data/provincias-detalle.json (${features.length} provincias)`,
+  )
 
   const porProvinciaEspacios = new Map()
   for (const e of espacios) {
@@ -822,7 +896,9 @@ async function main() {
       JSON.stringify(lista),
     )
   }
-  console.log(`Escritos src/data/espacios/*.json (${porProvinciaEspacios.size} archivos)`)
+  console.log(
+    `Escritos src/data/espacios/*.json (${porProvinciaEspacios.size} archivos)`,
+  )
 
   // Índice liviano para el buscador global (Etapa 7): buscar sobre nombre de
   // espacio requeriría, si no, bajar los 24 JSON de /espacios (4+MB) enteros
@@ -843,7 +919,9 @@ async function main() {
     path.join(DATA_DIR, 'indice-busqueda.json'),
     JSON.stringify(indiceBusqueda),
   )
-  console.log(`Escrito src/data/indice-busqueda.json (${indiceBusqueda.length} espacios)`)
+  console.log(
+    `Escrito src/data/indice-busqueda.json (${indiceBusqueda.length} espacios)`,
+  )
 
   // Índice de localidades para el buscador global: buscar "Villa Carlos Paz"
   // debe encontrar la localidad como resultado propio (no solo aparecer
@@ -858,24 +936,32 @@ async function main() {
   const conteoLocalidades = new Map()
   for (const e of espacios) {
     if (!e.provinciaId || !e.localidad) continue
-    if (!conteoLocalidades.has(e.provinciaId)) conteoLocalidades.set(e.provinciaId, new Map())
+    if (!conteoLocalidades.has(e.provinciaId))
+      conteoLocalidades.set(e.provinciaId, new Map())
     const porLocalidad = conteoLocalidades.get(e.provinciaId)
     porLocalidad.set(e.localidad, (porLocalidad.get(e.localidad) ?? 0) + 1)
   }
-  const indiceLocalidades = [...conteoLocalidades.entries()].flatMap(([provinciaId, porLocalidad]) =>
-    [...porLocalidad.entries()].map(([localidad, cantidadEspacios]) => ({
-      localidad,
-      provinciaId,
-      cantidadEspacios,
-    })),
+  const indiceLocalidades = [...conteoLocalidades.entries()].flatMap(
+    ([provinciaId, porLocalidad]) =>
+      [...porLocalidad.entries()].map(([localidad, cantidadEspacios]) => ({
+        localidad,
+        provinciaId,
+        cantidadEspacios,
+      })),
   )
   await writeFile(
     path.join(DATA_DIR, 'indice-localidades.json'),
     JSON.stringify(indiceLocalidades),
   )
-  console.log(`Escrito src/data/indice-localidades.json (${indiceLocalidades.length} localidades)`)
+  console.log(
+    `Escrito src/data/indice-localidades.json (${indiceLocalidades.length} localidades)`,
+  )
 
-  const report = buildDataQualityReport(completitud, totalEspacios, totalConAnio)
+  const report = buildDataQualityReport(
+    completitud,
+    totalEspacios,
+    totalConAnio,
+  )
   await writeFile(path.join(DOCS_DIR, 'data-quality-report.md'), report)
   console.log('Escrito docs/data-quality-report.md')
 

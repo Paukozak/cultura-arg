@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { Espacio } from '../../data/espacios'
-import { filtrarEspacios, filtrarYOrdenarEspacios, ordenarEspacios } from './filtrarEspacios'
+import {
+  filtrarEspacios,
+  filtrarYOrdenarEspacios,
+  ordenarEspacios,
+} from './filtrarEspacios'
 
-function espacio(overrides: Partial<Espacio> & Pick<Espacio, 'id' | 'categoria'>): Espacio {
+function espacio(
+  overrides: Partial<Espacio> & Pick<Espacio, 'id' | 'categoria'>,
+): Espacio {
   return {
     nombre: overrides.id,
     subcategoria: null,
@@ -23,9 +29,24 @@ function espacio(overrides: Partial<Espacio> & Pick<Espacio, 'id' | 'categoria'>
 
 describe('ordenarEspacios', () => {
   const espacios: Espacio[] = [
-    espacio({ id: 'a', categoria: 'Museos', nombre: 'Biblioteca Sur', anioInauguracion: 1990 }),
-    espacio({ id: 'b', categoria: 'Cines', nombre: 'Archivo Norte', anioInauguracion: 1920 }),
-    espacio({ id: 'c', categoria: 'Museos', nombre: 'Centro Este', anioInauguracion: null }),
+    espacio({
+      id: 'a',
+      categoria: 'Museos',
+      nombre: 'Biblioteca Sur',
+      anioInauguracion: 1990,
+    }),
+    espacio({
+      id: 'b',
+      categoria: 'Cines',
+      nombre: 'Archivo Norte',
+      anioInauguracion: 1920,
+    }),
+    espacio({
+      id: 'c',
+      categoria: 'Museos',
+      nombre: 'Centro Este',
+      anioInauguracion: null,
+    }),
   ]
 
   it('alfabetico ordena por nombre sin importar categoría', () => {
@@ -97,11 +118,15 @@ describe('filtrarEspacios', () => {
   })
 
   it('categoriasActivas como Set vacío filtra todo (a propósito, "Ninguna")', () => {
-    expect(filtrarEspacios(espacios, { categoriasActivas: new Set() })).toEqual([])
+    expect(filtrarEspacios(espacios, { categoriasActivas: new Set() })).toEqual(
+      [],
+    )
   })
 
   it('categoriasActivas filtra solo a las categorías incluidas', () => {
-    const resultado = filtrarEspacios(espacios, { categoriasActivas: new Set(['Cines']) })
+    const resultado = filtrarEspacios(espacios, {
+      categoriasActivas: new Set(['Cines']),
+    })
     expect(resultado.map((e) => e.id)).toEqual(['b'])
   })
 

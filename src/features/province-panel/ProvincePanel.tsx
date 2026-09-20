@@ -1,4 +1,9 @@
-import { AnimatePresence, motion, useDragControls, type PanInfo } from 'motion/react'
+import {
+  AnimatePresence,
+  motion,
+  useDragControls,
+  type PanInfo,
+} from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 import type { Espacio } from '../../data/espacios'
 import { provinciasGeo } from '../../data/provincias'
@@ -122,7 +127,9 @@ function ProvincePanelContent({
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [vistaCompleta, onCerrar])
 
-  const provincia = provinciasGeo.features.find((f) => f.properties.id === provinciaId)
+  const provincia = provinciasGeo.features.find(
+    (f) => f.properties.id === provinciaId,
+  )
   if (!provincia) return null
   const { nombre, totalEspacios, densidadPor100k } = provincia.properties
   const destacados = espacios ? getDestacados(provinciaId, espacios) : []
@@ -133,7 +140,10 @@ function ProvincePanelContent({
   // el cual limitarla) y se usa el offset + la velocidad del gesto al
   // soltar como señal de dirección. Un arrastre chico/ambiguo no cambia
   // nada: `animate.y` vuelve solo al target del estado actual.
-  const onDragEnd = (_e: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
+  const onDragEnd = (
+    _e: PointerEvent | MouseEvent | TouchEvent,
+    info: PanInfo,
+  ) => {
     if (info.offset.y < -40 || info.velocity.y < -300) setExpandida(true)
     else if (info.offset.y > 40 || info.velocity.y > 300) setExpandida(false)
   }
@@ -208,8 +218,18 @@ function ProvincePanelContent({
           aria-label="Volver al mapa"
           className="mt-1 shrink-0 rounded-full border border-neutral-800 p-1.5 text-neutral-400 transition-colors hover:text-neutral-100"
         >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+          <svg
+            viewBox="0 0 24 24"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path
+              d="M19 12H5M12 19l-7-7 7-7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
         <div>
@@ -217,12 +237,16 @@ function ProvincePanelContent({
           <dl className="mt-1 flex gap-4 font-mono text-xs text-neutral-400">
             <div>
               <dt className="uppercase tracking-wide">Espacios</dt>
-              <dd className="text-neutral-200">{formatNumero(totalEspacios)}</dd>
+              <dd className="text-neutral-200">
+                {formatNumero(totalEspacios)}
+              </dd>
             </div>
             <div>
               <dt className="uppercase tracking-wide">Densidad/100k</dt>
               <dd className="text-neutral-200">
-                {densidadPor100k === null ? 's/d' : formatNumero(densidadPor100k)}
+                {densidadPor100k === null
+                  ? 's/d'
+                  : formatNumero(densidadPor100k)}
               </dd>
             </div>
           </dl>
@@ -236,7 +260,9 @@ function ProvincePanelContent({
         {!espacios ? (
           <p className="text-sm text-neutral-500">Cargando espacios…</p>
         ) : destacados.length === 0 ? (
-          <p className="text-sm text-neutral-500">No hay espacios registrados en esta provincia.</p>
+          <p className="text-sm text-neutral-500">
+            No hay espacios registrados en esta provincia.
+          </p>
         ) : (
           <div className="flex flex-col gap-3">
             {destacados.map((espacio) => (
@@ -257,7 +283,8 @@ function ProvincePanelContent({
           disabled={!espacios}
           className="w-full rounded-full bg-accent px-4 py-2.5 text-sm font-medium text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          Ver todos los espacios ({espacios ? formatNumero(totalEspacios) : '…'})
+          Ver todos los espacios ({espacios ? formatNumero(totalEspacios) : '…'}
+          )
         </button>
       </div>
     </motion.div>

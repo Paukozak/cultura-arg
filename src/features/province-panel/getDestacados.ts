@@ -10,7 +10,10 @@ export interface EntradaCurada {
   foto?: string
 }
 
-const CURADOS = destacadosCurados.porProvincia as Record<string, EntradaCurada[]>
+const CURADOS = destacadosCurados.porProvincia as Record<
+  string,
+  EntradaCurada[]
+>
 
 /**
  * Devuelve los espacios destacados de una provincia según la curaduría
@@ -34,7 +37,9 @@ export function getDestacados(
     const espacio = porId.get(entrada.id)
     if (!espacio) continue
     resultado.push(
-      entrada.nombreMostrado ? { ...espacio, nombre: entrada.nombreMostrado } : espacio,
+      entrada.nombreMostrado
+        ? { ...espacio, nombre: entrada.nombreMostrado }
+        : espacio,
     )
   }
   return resultado

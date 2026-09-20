@@ -69,11 +69,15 @@ function App() {
                 // hacia la izquierda no tiene sentido acá; se lo corre
                 // hacia arriba para que el área visible por encima de la
                 // hoja sea donde el mapa se termina centrando.
-                paddingBottom: provinciaSeleccionada ? altoHojaMobilPx : undefined,
+                paddingBottom: provinciaSeleccionada
+                  ? altoHojaMobilPx
+                  : undefined,
                 transition: 'padding-bottom 300ms ease',
               }
             : {
-                paddingRight: provinciaSeleccionada ? ANCHO_PANEL_PX + 24 : undefined,
+                paddingRight: provinciaSeleccionada
+                  ? ANCHO_PANEL_PX + 24
+                  : undefined,
                 transition: 'padding-right 300ms ease',
               }
         }

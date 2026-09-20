@@ -63,9 +63,7 @@ async function main() {
     for (const f of failed) {
       console.error(`  - ${f.url}\n    -> ${f.dest}`)
     }
-    console.error(
-      '\nUna vez colocados, corré: node scripts/process-data.mjs',
-    )
+    console.error('\nUna vez colocados, corré: node scripts/process-data.mjs')
     process.exit(1)
   }
 

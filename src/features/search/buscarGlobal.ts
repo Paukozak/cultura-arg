@@ -80,7 +80,10 @@ function coincidencia(campo: string, q: string): 0 | 1 | 2 {
   return norm.includes(q) ? 1 : 0
 }
 
-function porRelevancia(a: [ResultadoBusqueda, number], b: [ResultadoBusqueda, number]) {
+function porRelevancia(
+  a: [ResultadoBusqueda, number],
+  b: [ResultadoBusqueda, number],
+) {
   return b[1] - a[1] || a[0].nombre.localeCompare(b[0].nombre, 'es')
 }
 
@@ -122,7 +125,10 @@ export function buscarGlobal(query: string): ResultadoBusqueda[] {
   const espacios: [ResultadoBusqueda, number][] = []
   for (const e of indiceEspacios ?? []) {
     const nombreEfectivo = nombreMostradoPara(e.id) ?? e.nombre
-    const rank = Math.max(coincidencia(nombreEfectivo, q), e.localidad ? coincidencia(e.localidad, q) : 0)
+    const rank = Math.max(
+      coincidencia(nombreEfectivo, q),
+      e.localidad ? coincidencia(e.localidad, q) : 0,
+    )
     if (rank > 0) {
       espacios.push([
         {

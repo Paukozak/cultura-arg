@@ -1,8 +1,15 @@
 import { MapPin } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useMapStore } from '../../store/mapStore'
-import { ICONOS_POR_CATEGORIA, ICONO_POR_DEFECTO } from '../province-panel/categoriaIcons'
-import { buscarGlobal, precargarIndiceBusqueda, type ResultadoBusqueda } from './buscarGlobal'
+import {
+  ICONOS_POR_CATEGORIA,
+  ICONO_POR_DEFECTO,
+} from '../province-panel/categoriaIcons'
+import {
+  buscarGlobal,
+  precargarIndiceBusqueda,
+  type ResultadoBusqueda,
+} from './buscarGlobal'
 
 const QUERY_MINIMA = 2
 
@@ -21,7 +28,9 @@ export function GlobalSearch() {
 
   const seleccionarProvincia = useMapStore((s) => s.seleccionarProvincia)
   const abrirVistaCompleta = useMapStore((s) => s.abrirVistaCompleta)
-  const abrirVistaCompletaPorLocalidad = useMapStore((s) => s.abrirVistaCompletaPorLocalidad)
+  const abrirVistaCompletaPorLocalidad = useMapStore(
+    (s) => s.abrirVistaCompletaPorLocalidad,
+  )
 
   // Precarga apenas monta el buscador (siempre visible en el header), no
   // recién al primer tipeo: para cuando el usuario termina de escribir las
@@ -35,8 +44,11 @@ export function GlobalSearch() {
   // `indiceListoTick` no lo lee `buscarGlobal` directamente (lee el módulo
   // cacheado en buscarGlobal.ts), está a propósito para forzar el
   // recálculo cuando el índice lazy-loaded termina de llegar.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const resultados = useMemo(() => buscarGlobal(query), [query, indiceListoTick])
+  const resultados = useMemo(
+    () => buscarGlobal(query),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [query, indiceListoTick],
+  )
   const hayQuery = query.trim().length >= QUERY_MINIMA
 
   // Si cambia la búsqueda y el resultado resaltado quedó fuera de rango
@@ -122,12 +134,19 @@ export function GlobalSearch() {
           className="absolute left-0 right-0 top-full z-40 mt-2 max-h-96 overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-950/98 py-1.5 shadow-xl shadow-black/50 backdrop-blur"
         >
           {resultados.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-neutral-500">Sin resultados.</p>
+            <p className="px-4 py-3 text-sm text-neutral-500">
+              Sin resultados.
+            </p>
           ) : (
             resultados.map((r, i) => {
-              const Icono = r.tipo === 'espacio' ? (ICONOS_POR_CATEGORIA[r.categoria] ?? ICONO_POR_DEFECTO) : MapPin
+              const Icono =
+                r.tipo === 'espacio'
+                  ? (ICONOS_POR_CATEGORIA[r.categoria] ?? ICONO_POR_DEFECTO)
+                  : MapPin
               const clave =
-                r.tipo === 'localidad' ? `localidad-${r.provinciaId}-${r.nombre}` : `${r.tipo}-${r.id}`
+                r.tipo === 'localidad'
+                  ? `localidad-${r.provinciaId}-${r.nombre}`
+                  : `${r.tipo}-${r.id}`
               const subtitulo =
                 r.tipo === 'provincia'
                   ? 'Provincia'
@@ -146,10 +165,17 @@ export function GlobalSearch() {
                     i === indiceActivo ? 'bg-neutral-900' : ''
                   }`}
                 >
-                  <Icono className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+                  <Icono
+                    className="h-4 w-4 shrink-0 text-accent"
+                    aria-hidden="true"
+                  />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm text-neutral-100">{r.nombre}</div>
-                    <div className="truncate font-mono text-xs text-neutral-500">{subtitulo}</div>
+                    <div className="truncate text-sm text-neutral-100">
+                      {r.nombre}
+                    </div>
+                    <div className="truncate font-mono text-xs text-neutral-500">
+                      {subtitulo}
+                    </div>
                   </div>
                 </button>
               )

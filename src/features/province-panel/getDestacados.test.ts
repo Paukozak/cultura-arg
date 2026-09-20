@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { Espacio } from '../../data/espacios'
 import { getDestacados } from './getDestacados'
 
-function espacio(overrides: Partial<Espacio> & Pick<Espacio, 'id' | 'categoria'>): Espacio {
+function espacio(
+  overrides: Partial<Espacio> & Pick<Espacio, 'id' | 'categoria'>,
+): Espacio {
   return {
     nombre: overrides.id,
     subcategoria: null,
@@ -35,7 +37,9 @@ describe('getDestacados', () => {
   })
 
   it('omite en silencio un id curado que ya no existe en los espacios de la provincia', () => {
-    const espacios: Espacio[] = [espacio({ id: 'museos-1', categoria: 'Museos' })]
+    const espacios: Espacio[] = [
+      espacio({ id: 'museos-1', categoria: 'Museos' }),
+    ]
     const curados = { '99': [{ id: 'museos-1' }, { id: 'museos-borrado' }] }
 
     const destacados = getDestacados('99', espacios, curados)
@@ -46,10 +50,19 @@ describe('getDestacados', () => {
 
   it('aplica nombreMostrado como override del nombre real cuando está definido', () => {
     const espacios: Espacio[] = [
-      espacio({ id: 'salas-de-teatro-1', categoria: 'Salas de Teatro', nombre: 'Panaderia Museo Maritimo Presidio' }),
+      espacio({
+        id: 'salas-de-teatro-1',
+        categoria: 'Salas de Teatro',
+        nombre: 'Panaderia Museo Maritimo Presidio',
+      }),
     ]
     const curados = {
-      '99': [{ id: 'salas-de-teatro-1', nombreMostrado: 'Museo Marítimo y del Presidio' }],
+      '99': [
+        {
+          id: 'salas-de-teatro-1',
+          nombreMostrado: 'Museo Marítimo y del Presidio',
+        },
+      ],
     }
 
     const destacados = getDestacados('99', espacios, curados)
