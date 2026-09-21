@@ -84,6 +84,25 @@ export function filtrarEspacios(
   return resultado
 }
 
+/** Si `filtrarEspacios` está recortando la lista con estos filtros. Usa los
+ * mismos criterios que ella (búsqueda sin espacios sobrantes; un Set cuenta
+ * aunque esté vacío) para que el aviso de "hay filtros aplicados" con los
+ * filtros plegados no pueda contradecir lo que realmente se filtra. */
+export function hayFiltrosAplicados(filtros: FiltrosEspacios): boolean {
+  return (
+    (filtros.busqueda ?? '').trim() !== '' ||
+    filtros.categoriasActivas != null ||
+    filtros.gestionesActivas != null ||
+    Boolean(filtros.localidadActiva)
+  )
+}
+
+/** Texto del botón que cierra los filtros en mobile. */
+export function etiquetaVerEspacios(cantidad: number): string {
+  if (cantidad === 0) return 'Sin resultados · cerrar filtros'
+  return `Ver ${cantidad} ${cantidad === 1 ? 'espacio' : 'espacios'}`
+}
+
 export function filtrarYOrdenarEspacios(
   espacios: Espacio[],
   filtros: FiltrosEspacios,

@@ -1,14 +1,18 @@
+import { ChevronDown, SlidersHorizontal } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { List, type RowComponentProps } from 'react-window'
 import { cargarEspacios, type Espacio } from '../../data/espacios'
 import { provinciasGeo } from '../../data/provincias'
 import { useMapStore } from '../../store/mapStore'
+import { useMediaQuery } from '../../utils/useMediaQuery'
 import { ICONOS_POR_CATEGORIA, ICONO_POR_DEFECTO } from './categoriaIcons'
 import { nombreMostradoPara } from './curaduriaDestacados'
 import { EspacioFoto } from './EspacioFoto'
 import {
+  etiquetaVerEspacios,
   filtrarYOrdenarEspacios,
+  hayFiltrosAplicados,
   ORDEN_LABEL,
   type Orden,
 } from './filtrarEspacios'
@@ -163,6 +167,7 @@ function Ficha({ espacio }: { espacio: Espacio }) {
         lat={espacio.lat}
         lon={espacio.lon}
         className="mt-1"
+        alto="h-72 lg:h-[28rem]"
       />
     </div>
   )
@@ -193,11 +198,17 @@ function ProvinceFullViewContent({
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(
     espacioInicialId,
   )
+  // En mobile arrancan plegados: los filtros ocupan la pantalla entera al
+  // abrirse (ver el botón "Ver N espacios") y lo primero que se quiere ver
+  // es la lista. En pantallas más grandes conviven con ella, así que abiertos.
+  const esMobil = useMediaQuery('(max-width: 767px)')
+  const [filtrosAbiertos, setFiltrosAbiertos] = useState(!esMobil)
   // Mobile: lista y ficha no entran apiladas en una sola pantalla (los
   // chips de categoría solos pueden ocupar varias líneas), así que se
   // muestra una u otra — nunca las dos — y se navega entre ellas como dos
-  // pantallas separadas. En desktop (`md:` en las clases de abajo) esta
-  // variable se ignora y ambas conviven lado a lado como siempre. Arranca
+  // pantallas separadas. Desde `md:` en las clases de abajo esta variable
+  // se ignora y todo convive lado a lado (dos columnas en `md`, tres —
+  // filtros, espacios y ficha — desde `lg`). Arranca
   // en la ficha si se entró con un espacio puntual ya elegido (buscador
   // global): ahí lo que se quiere ver es esa ficha, no la lista.
   const [vistaMobil, setVistaMobil] = useState<'lista' | 'ficha'>(
@@ -276,6 +287,13 @@ function ProvinceFullViewContent({
     orden,
   ])
 
+  const conFiltrosAplicados = hayFiltrosAplicados({
+    busqueda,
+    categoriasActivas,
+    gestionesActivas,
+    localidadActiva,
+  })
+
   // Por default se muestra la ficha del primero de la lista filtrada; si el
   // usuario eligió uno que sigue en el filtro actual, se respeta esa elección.
   const seleccionado = useMemo(() => {
@@ -348,8 +366,14 @@ function ProvinceFullViewContent({
         </div>
       ) : (
         <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
+          {/* Desktop (`lg:`): tres columnas — filtros, espacios y ficha. Este
+              contenedor pasa a `contents` (deja de generar caja) para que
+              filtros y lista sean hijos directos de la fila y cada uno sea
+              su propia columna. Debajo de `lg` sigue siendo una sola caja
+              con filtros arriba y lista abajo (dos columnas en `md`, una
+              pantalla a la vez en mobile). */}
           <div
-            className={`w-full min-w-0 min-h-0 flex-col border-b border-neutral-800 md:flex md:w-[380px] md:flex-shrink-0 md:border-b-0 md:border-r ${
+            className={`w-full min-w-0 min-h-0 flex-col max-md:flex-1 border-b border-neutral-800 md:flex md:w-[380px] md:flex-shrink-0 md:border-b-0 md:border-r lg:contents ${
               vistaMobil === 'lista' ? 'flex' : 'hidden'
             }`}
           >
@@ -359,108 +383,110 @@ function ProvinceFullViewContent({
                 podía empujar la lista de abajo hasta dejarla con 0px de
                 alto (el `flex-1 min-h-0` de la lista se achica sin piso) —
                 ahí no faltaban opciones, estaban ahí pero sin cómo verlas
-                ni scrollear hasta ellas. */}
-            <div className="flex max-h-[46vh] flex-col gap-3 overflow-y-auto p-4 md:max-h-[42vh]">
-              <input
-                type="search"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                placeholder="Buscar por nombre o localidad…"
-                className="rounded-full border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm text-neutral-200 placeholder:text-neutral-600"
-              />
-
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs uppercase tracking-wide text-neutral-500">
-                  Ordenar
+                ni scrollear hasta ellas. En `lg:` ya no comparten columna
+                con la lista, así que el techo se saca y ocupan todo el
+                alto. */}
+            <div
+              className={`flex min-h-0 flex-col lg:shrink-0 lg:overflow-hidden lg:border-r lg:border-neutral-800 lg:transition-[width] lg:duration-200 ${
+                filtrosAbiertos ? 'max-md:flex-1 lg:w-80' : 'lg:w-12'
+              }`}
+            >
+              {/* Plegar los filtros: en `lg:` la columna se achica a un riel
+                  angosto (solo el ícono y la flecha, apilados) y le deja el
+                  lugar a la lista y la ficha; debajo de `lg` el bloque se
+                  esconde y la lista sube. El punto sobre el ícono avisa que
+                  hay filtros aplicados aunque no se los vea. */}
+              <button
+                type="button"
+                onClick={() => setFiltrosAbiertos((abiertos) => !abiertos)}
+                aria-expanded={filtrosAbiertos}
+                aria-controls="filtros-espacios"
+                aria-label={
+                  filtrosAbiertos ? 'Ocultar filtros' : 'Mostrar filtros'
+                }
+                title={filtrosAbiertos ? 'Ocultar filtros' : 'Mostrar filtros'}
+                className={`flex shrink-0 items-center gap-2 border-b border-neutral-800 px-4 py-2.5 text-left font-mono text-xs uppercase tracking-wide text-neutral-400 transition-colors hover:text-neutral-100 ${
+                  filtrosAbiertos ? '' : 'lg:flex-col lg:gap-3 lg:px-0 lg:py-3'
+                }`}
+              >
+                <span className="relative">
+                  <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                  {conFiltrosAplicados && (
+                    <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-accent" />
+                  )}
                 </span>
-                <select
-                  value={orden}
-                  onChange={(e) => setOrden(e.target.value as Orden)}
-                  className="rounded-md border border-neutral-800 bg-neutral-900 px-2 py-1 text-xs text-neutral-200"
+                <span
+                  className={filtrosAbiertos ? 'flex-1' : 'flex-1 lg:hidden'}
                 >
-                  {(Object.keys(ORDEN_LABEL) as Orden[]).map((key) => (
-                    <option key={key} value={key}>
-                      {ORDEN_LABEL[key]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs uppercase tracking-wide text-neutral-500">
-                  Localidad
+                  Filtros
                 </span>
-                <select
-                  value={localidadActiva ?? ''}
-                  onChange={(e) => setLocalidadActiva(e.target.value || null)}
-                  className="max-w-55 rounded-md border border-neutral-800 bg-neutral-900 px-2 py-1 text-xs text-neutral-200"
-                >
-                  <option value="">Todas ({espacios.length})</option>
-                  {localidades.map(([localidad, count]) => (
-                    <option key={localidad} value={localidad}>
-                      {localidad} ({count})
-                    </option>
-                  ))}
-                </select>
-              </div>
+                <ChevronDown
+                  aria-hidden="true"
+                  className={`h-4 w-4 transition-transform ${
+                    filtrosAbiertos
+                      ? 'rotate-180 lg:rotate-90'
+                      : 'lg:-rotate-90'
+                  }`}
+                />
+              </button>
+              <div
+                id="filtros-espacios"
+                className={`min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 md:max-h-[42vh] md:flex-none lg:max-h-none lg:w-80 lg:flex-1 ${
+                  filtrosAbiertos ? 'flex' : 'hidden'
+                }`}
+              >
+                <input
+                  type="search"
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  placeholder="Buscar por nombre o localidad…"
+                  className="rounded-full border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm text-neutral-200 placeholder:text-neutral-600"
+                />
 
-              <div>
-                <div className="mb-1.5 flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <span className="font-mono text-xs uppercase tracking-wide text-neutral-500">
-                    Categoría
+                    Ordenar
                   </span>
-                  <div className="flex gap-2 font-mono text-[10px] uppercase tracking-wide text-neutral-500">
-                    <button
-                      type="button"
-                      onClick={() => setCategoriasActivas(null)}
-                      className="hover:text-neutral-200"
-                    >
-                      Todas
-                    </button>
-                    <span aria-hidden="true">·</span>
-                    <button
-                      type="button"
-                      onClick={() => setCategoriasActivas(new Set())}
-                      className="hover:text-neutral-200"
-                    >
-                      Ninguna
-                    </button>
-                  </div>
+                  <select
+                    value={orden}
+                    onChange={(e) => setOrden(e.target.value as Orden)}
+                    className="rounded-md border border-neutral-800 bg-neutral-900 px-2 py-1 text-xs text-neutral-200"
+                  >
+                    {(Object.keys(ORDEN_LABEL) as Orden[]).map((key) => (
+                      <option key={key} value={key}>
+                        {ORDEN_LABEL[key]}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {categorias.map(([categoria, count]) => {
-                    const activa = categoriasActivas
-                      ? categoriasActivas.has(categoria)
-                      : true
-                    return (
-                      <button
-                        key={categoria}
-                        type="button"
-                        onClick={() => toggleCategoria(categoria)}
-                        aria-pressed={activa}
-                        className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                          activa
-                            ? 'border-accent bg-accent/15 text-accent'
-                            : 'border-neutral-800 text-neutral-500'
-                        }`}
-                      >
-                        {categoria} ({count})
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
 
-              {gestiones.length > 1 && (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-mono text-xs uppercase tracking-wide text-neutral-500">
+                    Localidad
+                  </span>
+                  <select
+                    value={localidadActiva ?? ''}
+                    onChange={(e) => setLocalidadActiva(e.target.value || null)}
+                    className="min-w-0 max-w-55 rounded-md border border-neutral-800 bg-neutral-900 px-2 py-1 text-xs text-neutral-200"
+                  >
+                    <option value="">Todas ({espacios.length})</option>
+                    {localidades.map(([localidad, count]) => (
+                      <option key={localidad} value={localidad}>
+                        {localidad} ({count})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div>
                   <div className="mb-1.5 flex items-center justify-between">
                     <span className="font-mono text-xs uppercase tracking-wide text-neutral-500">
-                      Gestión
+                      Categoría
                     </span>
                     <div className="flex gap-2 font-mono text-[10px] uppercase tracking-wide text-neutral-500">
                       <button
                         type="button"
-                        onClick={() => setGestionesActivas(null)}
+                        onClick={() => setCategoriasActivas(null)}
                         className="hover:text-neutral-200"
                       >
                         Todas
@@ -468,7 +494,7 @@ function ProvinceFullViewContent({
                       <span aria-hidden="true">·</span>
                       <button
                         type="button"
-                        onClick={() => setGestionesActivas(new Set())}
+                        onClick={() => setCategoriasActivas(new Set())}
                         className="hover:text-neutral-200"
                       >
                         Ninguna
@@ -476,32 +502,99 @@ function ProvinceFullViewContent({
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {gestiones.map(([gestion, count]) => {
-                      const activa = gestionesActivas
-                        ? gestionesActivas.has(gestion)
+                    {categorias.map(([categoria, count]) => {
+                      const activa = categoriasActivas
+                        ? categoriasActivas.has(categoria)
                         : true
                       return (
                         <button
-                          key={gestion}
+                          key={categoria}
                           type="button"
-                          onClick={() => toggleGestion(gestion)}
+                          onClick={() => toggleCategoria(categoria)}
                           aria-pressed={activa}
-                          className={`rounded-full border px-2.5 py-1 text-xs capitalize transition-colors ${
+                          className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
                             activa
                               ? 'border-accent bg-accent/15 text-accent'
                               : 'border-neutral-800 text-neutral-500'
                           }`}
                         >
-                          {gestion} ({count})
+                          {categoria} ({count})
                         </button>
                       )
                     })}
                   </div>
                 </div>
+
+                {gestiones.length > 1 && (
+                  <div>
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <span className="font-mono text-xs uppercase tracking-wide text-neutral-500">
+                        Gestión
+                      </span>
+                      <div className="flex gap-2 font-mono text-[10px] uppercase tracking-wide text-neutral-500">
+                        <button
+                          type="button"
+                          onClick={() => setGestionesActivas(null)}
+                          className="hover:text-neutral-200"
+                        >
+                          Todas
+                        </button>
+                        <span aria-hidden="true">·</span>
+                        <button
+                          type="button"
+                          onClick={() => setGestionesActivas(new Set())}
+                          className="hover:text-neutral-200"
+                        >
+                          Ninguna
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {gestiones.map(([gestion, count]) => {
+                        const activa = gestionesActivas
+                          ? gestionesActivas.has(gestion)
+                          : true
+                        return (
+                          <button
+                            key={gestion}
+                            type="button"
+                            onClick={() => toggleGestion(gestion)}
+                            aria-pressed={activa}
+                            className={`rounded-full border px-2.5 py-1 text-xs capitalize transition-colors ${
+                              activa
+                                ? 'border-accent bg-accent/15 text-accent'
+                                : 'border-neutral-800 text-neutral-500'
+                            }`}
+                          >
+                            {gestion} ({count})
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Solo mobile: con los filtros abiertos ocupan toda la pantalla
+                  (la lista se esconde), así que hace falta una salida clara
+                  que además diga cuánto quedó filtrado. */}
+              {filtrosAbiertos && (
+                <div className="shrink-0 border-t border-neutral-800 p-3 md:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setFiltrosAbiertos(false)}
+                    className="w-full rounded-full bg-accent px-4 py-2.5 text-sm font-medium text-accent-ink transition-opacity hover:opacity-90"
+                  >
+                    {etiquetaVerEspacios(filtrados.length)}
+                  </button>
+                </div>
               )}
             </div>
 
-            <div className="min-h-0 min-w-0 flex-1 border-t border-neutral-800/70 pt-2">
+            <div
+              className={`min-h-0 min-w-0 flex-1 border-t border-neutral-800/70 pt-2 lg:w-85 lg:flex-none lg:border-r lg:border-t-0 lg:border-neutral-800 ${
+                filtrosAbiertos ? 'max-md:hidden' : ''
+              }`}
+            >
               {filtrados.length === 0 ? (
                 <p className="p-3 text-sm text-neutral-500">Sin resultados.</p>
               ) : (
@@ -524,7 +617,7 @@ function ProvinceFullViewContent({
           </div>
 
           <div
-            className={`flex-1 flex-col overflow-y-auto p-6 md:flex ${
+            className={`min-w-0 flex-1 flex-col overflow-y-auto p-6 md:flex lg:px-10 xl:px-14 ${
               vistaMobil === 'ficha' ? 'flex' : 'hidden'
             }`}
           >

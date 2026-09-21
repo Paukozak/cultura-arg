@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { Espacio } from '../../data/espacios'
 import {
+  etiquetaVerEspacios,
   filtrarEspacios,
   filtrarYOrdenarEspacios,
+  hayFiltrosAplicados,
   ordenarEspacios,
+  type FiltrosEspacios,
 } from './filtrarEspacios'
 
 function espacio(
@@ -149,6 +152,71 @@ describe('filtrarEspacios', () => {
       localidadActiva: 'Rosario',
     })
     expect(resultado.map((e) => e.id)).toEqual(['a'])
+  })
+})
+
+describe('hayFiltrosAplicados', () => {
+  it('sin filtros, o con todos en su valor por defecto, es falso', () => {
+    expect(hayFiltrosAplicados({})).toBe(false)
+    expect(
+      hayFiltrosAplicados({
+        busqueda: '',
+        categoriasActivas: null,
+        gestionesActivas: null,
+        localidadActiva: null,
+      }),
+    ).toBe(false)
+  })
+
+  it('una búsqueda de solo espacios no cuenta (filtrarEspacios también la ignora)', () => {
+    expect(hayFiltrosAplicados({ busqueda: '   ' })).toBe(false)
+  })
+
+  it('una búsqueda con texto cuenta', () => {
+    expect(hayFiltrosAplicados({ busqueda: 'museo' })).toBe(true)
+  })
+
+  it('un Set de categorías o gestiones cuenta aunque esté vacío ("Ninguna")', () => {
+    expect(hayFiltrosAplicados({ categoriasActivas: new Set() })).toBe(true)
+    expect(hayFiltrosAplicados({ gestionesActivas: new Set() })).toBe(true)
+    expect(hayFiltrosAplicados({ categoriasActivas: new Set(['Cines']) })).toBe(
+      true,
+    )
+  })
+
+  it('una localidad elegida cuenta', () => {
+    expect(hayFiltrosAplicados({ localidadActiva: 'Famaillá' })).toBe(true)
+  })
+
+  it('coincide con filtrarEspacios: si dice que no hay filtros, no recorta nada', () => {
+    const espacios: Espacio[] = [
+      espacio({ id: 'a', categoria: 'Museos' }),
+      espacio({ id: 'b', categoria: 'Cines' }),
+    ]
+    const sinFiltro: FiltrosEspacios[] = [
+      {},
+      { busqueda: '  ' },
+      {
+        categoriasActivas: null,
+        gestionesActivas: null,
+        localidadActiva: null,
+      },
+    ]
+    for (const filtros of sinFiltro) {
+      expect(hayFiltrosAplicados(filtros)).toBe(false)
+      expect(filtrarEspacios(espacios, filtros)).toHaveLength(espacios.length)
+    }
+  })
+})
+
+describe('etiquetaVerEspacios', () => {
+  it('singular con uno, plural con varios', () => {
+    expect(etiquetaVerEspacios(1)).toBe('Ver 1 espacio')
+    expect(etiquetaVerEspacios(249)).toBe('Ver 249 espacios')
+  })
+
+  it('sin resultados avisa y deja cerrar igual', () => {
+    expect(etiquetaVerEspacios(0)).toBe('Sin resultados · cerrar filtros')
   })
 })
 

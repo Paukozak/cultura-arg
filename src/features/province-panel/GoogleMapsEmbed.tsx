@@ -7,6 +7,8 @@ interface Props {
   lat: number | null
   lon: number | null
   className?: string
+  /** Clase de alto del mapa (default `h-36`, el de las tarjetas de destacados). */
+  alto?: string
 }
 
 // Prioriza nombre + dirección/localidad por sobre la coordenada cruda:
@@ -54,6 +56,7 @@ export function GoogleMapsEmbed(props: Props) {
     return () => observer.disconnect()
   }, [visible])
 
+  const alto = props.alto ?? 'h-36'
   const query = buildQuery(props)
   if (!query) return null
   const embedSrc = `https://maps.google.com/maps?q=${encodeURIComponent(query)}&z=15&output=embed`
@@ -68,11 +71,13 @@ export function GoogleMapsEmbed(props: Props) {
         <iframe
           title={`Mapa de ${props.nombre}`}
           src={embedSrc}
-          className="h-36 w-full rounded-lg border border-neutral-800"
+          className={`${alto} w-full rounded-lg border border-neutral-800`}
           referrerPolicy="no-referrer-when-downgrade"
         />
       ) : (
-        <div className="h-36 w-full rounded-lg border border-neutral-800 bg-neutral-900" />
+        <div
+          className={`${alto} w-full rounded-lg border border-neutral-800 bg-neutral-900`}
+        />
       )}
       <a
         href={linkHref}
