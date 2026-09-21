@@ -15,6 +15,7 @@ import {
 import { useMapStore, type Capa } from '../../store/mapStore'
 import { useMediaQuery } from '../../utils/useMediaQuery'
 import {
+  apagarConFondo,
   buildColorScales,
   colorForFeature,
   darken,
@@ -39,8 +40,8 @@ const MIN_TILE_PX = 12
 const ETIQUETA_CORTA: Record<string, string> = { '02': 'CABA' }
 const CALLOUT_DX = 95
 const CALLOUT_DY = -10
-const CALLOUT_PILL_W = 52
-const CALLOUT_PILL_H = 22
+const CALLOUT_PILL_W = 64
+const CALLOUT_PILL_H = 28
 
 // Look "relieve isométrico": cada provincia es una ficha extruida. El "lado"
 // (una copia del mismo path, oscurecida y corrida hacia abajo) simula el
@@ -120,6 +121,7 @@ export function NationalMap() {
   const tema = useMapStore((s) => s.tema)
   const headerHeight = useMapStore((s) => s.headerHeight)
   const entradaMapa = useMapStore((s) => s.entradaMapa)
+  const provinciaResaltada = useMapStore((s) => s.provinciaResaltada)
   const provinciaSeleccionada = useMapStore((s) => s.provinciaSeleccionada)
   const seleccionarProvincia = useMapStore((s) => s.seleccionarProvincia)
   const esMobil = useMediaQuery('(max-width: 767px)')
@@ -372,6 +374,20 @@ export function NationalMap() {
 
         const color = colorForFeature(feature.properties, capaActiva, scales)
 
+        // Con una provincia seleccionada, el resto del mapa se atenúa para que
+        // la seleccionada se destaque. Resaltada desde el ranking: las demás
+        // se apagan un poco — el levantado + brillo de una sola provincia no
+        // alcanza para encontrarla desde una lista lejana, sobre todo las
+        // chicas (Tucumán, Tierra del Fuego) y las de color muy claro.
+        const atenuacion =
+          provinciaSeleccionada && !isSelected
+            ? 0.35
+            : !provinciaSeleccionada &&
+                provinciaResaltada &&
+                provinciaResaltada !== id
+              ? 0.45
+              : 1
+
         return {
           feature,
           d,
@@ -390,11 +406,22 @@ export function NationalMap() {
               ENTRADA_ONDA_MS,
           )}ms`,
           centroid,
-          isHovered: hover?.feature.properties.id === id,
+          // Hover propio del mapa, o resaltada desde el ranking del panel de
+          // información (solo sin provincia elegida: con una zoomeada ese
+          // panel queda tapado).
+          isHovered:
+            hover?.feature.properties.id === id ||
+            (!provinciaSeleccionada && provinciaResaltada === id),
           isSelected,
-          // Con una provincia seleccionada, el resto del mapa se atenúa para
-          // que la seleccionada se destaque.
-          opacity: provinciaSeleccionada && !isSelected ? 0.35 : 1,
+          // Ver `atenuacion` arriba: `opacity` solo lo usan los llamados (CABA),
+          // que van sobre el fondo y no tienen nada debajo que se transparente;
+          // las provincias dibujadas usan `relleno`/`rellenoLado`.
+          opacity: atenuacion,
+          relleno: atenuacion < 1 ? apagarConFondo(color, atenuacion) : color,
+          rellenoLado:
+            atenuacion < 1
+              ? apagarConFondo(darken(color, 0.6), atenuacion)
+              : darken(color, 0.6),
         }
       }),
     [
@@ -406,6 +433,7 @@ export function NationalMap() {
       capaActiva,
       scales,
       provinciaSeleccionada,
+      provinciaResaltada,
       hover,
     ],
   )
@@ -426,7 +454,14 @@ export function NationalMap() {
       <svg
         ref={svgRef}
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        className="h-full w-full"
+        // `overflow-visible`: por defecto un `<svg>` recorta lo que se sale de
+        // su caja, y con el zoom (contenido ampliado 10-400x) eso cortaba el
+        // mapa en seco con bordes verticales rectos, en el medio de la
+        // pantalla — una línea recta cruzando las provincias (Corrientes,
+        // Misiones) durante la transición y un "rectángulo" con costados
+        // duros una vez asentado. Ahora el recorte lo hace `<main>` (ver
+        // App.tsx), en los bordes de la pantalla y bajo el header.
+        className="h-full w-full overflow-visible"
         style={{
           // Apagada mientras el zoom está en transición — ver el
           // comentario junto a `zoomAsentado` — y también en modo claro: es
@@ -447,17 +482,6 @@ export function NationalMap() {
           setHover((prev) => (prev ? { ...prev, x, y } : prev))
         }}
       >
-        <defs>
-          {/* Degradé tipo "bisel" sobre la cara de arriba: luz arriba a la
-              izquierda, sombra abajo a la derecha. Da textura de relieve sin
-              tocar el color de datos (se dibuja como capa aparte encima). */}
-          <linearGradient id="bevel" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.22" />
-            <stop offset="45%" stopColor="#ffffff" stopOpacity="0" />
-            <stop offset="100%" stopColor="#000000" stopOpacity="0.28" />
-          </linearGradient>
-        </defs>
-
         {/* Grupo con zoom: envuelve fichas + llamados + pines para que todo
             se escale/traslade como una sola unidad al entrar a una
             provincia (Etapa 6). `vectorEffect="non-scaling-stroke"` en los
@@ -469,7 +493,7 @@ export function NationalMap() {
             las provincias repiten su animación de entrada. */}
           <g key={entradaMapa}>
             {fichas.map(
-              ({ feature, d, colorLado, opacity, retrasoEntrada }) => (
+              ({ feature, d, colorLado, rellenoLado, retrasoEntrada }) => (
                 <path
                   key={`side-${feature.properties.id}`}
                   d={d}
@@ -477,8 +501,8 @@ export function NationalMap() {
                   fill={colorLado}
                   className="provincia-lado"
                   style={{
-                    opacity,
-                    transition: 'opacity 250ms ease',
+                    fill: rellenoLado,
+                    transition: 'fill 250ms ease',
                     animationDelay: retrasoEntrada,
                   }}
                   pointerEvents="none"
@@ -486,16 +510,20 @@ export function NationalMap() {
               ),
             )}
 
-            {/* Paso 2: las caras de arriba (interactivas) + su bisel, todo por
-            encima de cualquier lado. */}
+            {/* Paso 2: las caras de arriba (interactivas), por encima de cualquier
+            lado. Color PLANO, el de la escala y nada más: antes había un
+            degradé de "bisel" (luz/sombra) encima, y una misma provincia se
+            veía de varios tonos — eso contradice la leyenda, donde cada color
+            es un rango exacto de valores. El relieve lo dan los lados
+            extruidos del paso 1, que no tocan el color de la cara. */}
             {fichas.map(
               ({
                 feature,
                 d,
                 color,
+                relleno,
                 isHovered,
                 isSelected,
-                opacity,
                 retrasoEntrada,
               }) => {
                 const lift = isHovered ? -HOVER_LIFT : 0
@@ -513,11 +541,7 @@ export function NationalMap() {
                   <g
                     key={`top-${feature.properties.id}`}
                     className="provincia-cara"
-                    style={{
-                      opacity,
-                      transition: 'opacity 250ms ease',
-                      animationDelay: retrasoEntrada,
-                    }}
+                    style={{ animationDelay: retrasoEntrada }}
                   >
                     <path
                       d={d}
@@ -528,6 +552,7 @@ export function NationalMap() {
                       strokeLinejoin="round"
                       vectorEffect="non-scaling-stroke"
                       style={{
+                        fill: relleno,
                         transform: `translate(0, ${lift}px)`,
                         transition:
                           'transform 150ms ease, fill 200ms ease, stroke 150ms ease, filter 200ms ease',
@@ -546,15 +571,6 @@ export function NationalMap() {
                       onMouseEnter={handleEnter(feature)}
                       onMouseLeave={handleLeave}
                       onClick={onClick}
-                    />
-                    <path
-                      d={d}
-                      fill="url(#bevel)"
-                      pointerEvents="none"
-                      style={{
-                        transform: `translate(0, ${lift}px)`,
-                        transition: 'transform 150ms ease',
-                      }}
                     />
                   </g>
                 )
@@ -618,7 +634,7 @@ export function NationalMap() {
                         // u oscuro.
                         stroke="var(--color-neutral-500)"
                         strokeOpacity={0.6}
-                        strokeWidth={1}
+                        strokeWidth={1.75}
                         vectorEffect="non-scaling-stroke"
                         pointerEvents="none"
                       />
@@ -669,7 +685,7 @@ export function NationalMap() {
                             y={anchorY}
                             textAnchor="middle"
                             dominantBaseline="central"
-                            fontSize={10}
+                            fontSize={15}
                             fontWeight={700}
                             // Fijo, no `var(--color-accent-ink)`: ese token
                             // contrasta contra la superficie de acento fija de

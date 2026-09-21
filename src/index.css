@@ -106,16 +106,25 @@ input[type='checkbox'] {
 }
 
 /* Entrada del mapa (NationalMap): las provincias "brotan" en una ola de norte
-   a sur — la cara de arriba sube desde abajo con un fundido, y los lados
-   (extrusión) y el llamado de CABA solo aparecen. El retraso de cada una va
-   inline (`animationDelay`, según su latitud). `backwards` deja la provincia
-   oculta durante ese retraso; sin `to`, la animación termina en el estilo
-   normal del elemento (opacidad de atenuación incluida), sin salto. La
-   distancia son unidades del viewBox del SVG, no px. */
+   a sur — cada una crece hacia arriba desde su borde de abajo (`clip-path`
+   que se abre) mientras sube desde 28 unidades más abajo; sus lados (el
+   volumen) hacen la misma apertura. NADA se anima con opacidad: una cara
+   semitransparente deja ver los lados oscuros de las provincias vecinas que
+   hay debajo, y se formaba una línea fantasma en los bordes durante la
+   entrada. El retraso de cada una va inline (`animationDelay`, según su
+   latitud); `backwards` la deja oculta (recortada del todo) hasta que le
+   toca, y sin `to` termina en su estilo normal, sin salto. La distancia son
+   unidades del viewBox del SVG, no px. El llamado de CABA, en cambio, va
+   sobre el fondo y no tiene nada debajo: solo aparece con un fundido. */
 @keyframes provincia-sube {
   from {
-    opacity: 0;
+    clip-path: inset(100% 0 0 0);
     transform: translateY(28px);
+  }
+}
+@keyframes provincia-lado-sube {
+  from {
+    clip-path: inset(100% 0 0 0);
   }
 }
 @keyframes provincia-aparece {
@@ -127,6 +136,9 @@ input[type='checkbox'] {
   animation: provincia-sube 750ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 .provincia-lado {
+  animation: provincia-lado-sube 750ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.provincia-llamado {
   animation: provincia-aparece 550ms ease-out backwards;
 }
 
@@ -138,7 +150,8 @@ input[type='checkbox'] {
   /* Sin esto el retraso de la ola seguiría ocultando cada provincia unos
      instantes antes de mostrarla de golpe. */
   .provincia-cara,
-  .provincia-lado {
+  .provincia-lado,
+  .provincia-llamado {
     animation: none !important;
   }
   *,

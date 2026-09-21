@@ -93,6 +93,18 @@ export function highlightStroke(hex: string): string {
   return darken(hex, 0.4)
 }
 
+/** Color "apagado" y OPACO: mezcla `color` con el fondo de la página (el
+ * token `--color-neutral-950`, que cambia con el tema) en vez de bajarle la
+ * opacidad al elemento. Con opacidad, la cara queda semitransparente y se
+ * transparentan los lados extruidos oscuros de las provincias vecinas que hay
+ * debajo — una línea fantasma sobre el borde. Mezclado, se ve igual de
+ * apagado sobre el fondo pero no deja ver nada de abajo. Se aplica por CSS
+ * (`style.fill`), donde `var()` y `color-mix()` funcionan; un navegador que no
+ * soporte `color-mix` ignora el valor y deja el color normal. */
+export function apagarConFondo(color: string, opacidad: number): string {
+  return `color-mix(in srgb, var(--color-neutral-950) ${Math.round((1 - opacidad) * 100)}%, ${color})`
+}
+
 export function colorForFeature(
   props: ProvinciaProperties,
   capa: Capa,

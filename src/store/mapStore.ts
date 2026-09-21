@@ -7,6 +7,11 @@ interface MapState {
   setCapaActiva: (capa: Capa) => void
   provinciaSeleccionada: string | null
   seleccionarProvincia: (provinciaId: string | null) => void
+  /** Provincia resaltada en el mapa desde FUERA de él: hoy, pasar el mouse
+   * (o el foco de teclado) por su fila del ranking en el panel de información.
+   * NationalMap la dibuja como si el cursor estuviera sobre ella. */
+  provinciaResaltada: string | null
+  resaltarProvincia: (provinciaId: string | null) => void
   vistaCompleta: boolean
   setVistaCompleta: (valor: boolean) => void
   /** Espacio a preseleccionar la próxima vez que se abra la vista completa
@@ -73,8 +78,18 @@ export const useMapStore = create<MapState>((set) => ({
   capaActiva: 'densidad',
   setCapaActiva: (capa) => set({ capaActiva: capa }),
   provinciaSeleccionada: null,
+  // Elegir una provincia limpia también el resaltado: la fila del ranking que
+  // la resaltaba queda tapada por el panel de la provincia (o inerte) y el
+  // navegador puede no mandar nunca el "mouse salió" — sin esto el resaltado
+  // se quedaría pegado y reaparecería al volver al mapa.
   seleccionarProvincia: (provinciaId) =>
-    set({ provinciaSeleccionada: provinciaId, vistaCompleta: false }),
+    set({
+      provinciaSeleccionada: provinciaId,
+      vistaCompleta: false,
+      provinciaResaltada: null,
+    }),
+  provinciaResaltada: null,
+  resaltarProvincia: (provinciaId) => set({ provinciaResaltada: provinciaId }),
   vistaCompleta: false,
   setVistaCompleta: (valor) => set({ vistaCompleta: valor }),
   espacioFocoId: null,

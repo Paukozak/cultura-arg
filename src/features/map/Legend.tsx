@@ -23,9 +23,11 @@ function formatNumero(n: number) {
  * provincias — el "panorama completo". Lo comparten el modal de mobile
  * (`LegendDetail`) y el panel lateral fijo de desktop (`MapInfoPanel`), que
  * lo muestra siempre a la vista en vez de detrás de un botón. */
-export function LegendContenido() {
+export function LegendContenido({ onElegir }: { onElegir?: () => void }) {
   const capaActiva = useMapStore((s) => s.capaActiva)
   const modoDaltonico = useMapStore((s) => s.modoDaltonico)
+  const resaltarProvincia = useMapStore((s) => s.resaltarProvincia)
+  const seleccionarProvincia = useMapStore((s) => s.seleccionarProvincia)
 
   const scales = useMemo(
     () => buildColorScales(provinciasGeo.features, modoDaltonico),
@@ -43,7 +45,12 @@ export function LegendContenido() {
             ? f.properties.densidadPor100k
             : f.properties.totalEspacios
         const color = valor === null ? SIN_DATOS_COLOR : scale(valor)
-        return { nombre: f.properties.nombre, valor, color }
+        return {
+          id: f.properties.id,
+          nombre: f.properties.nombre,
+          valor,
+          color,
+        }
       })
       .sort((a, b) => (b.valor ?? -1) - (a.valor ?? -1))
   }, [capaActiva, scale])
@@ -92,8 +99,20 @@ export function LegendContenido() {
               (`i`), pero el de `layout` va aparte para que reordenar no se
               sienta demorado. */}
           {filas.map((fila, i) => (
-            <motion.div
+            <motion.button
               key={fila.nombre}
+              type="button"
+              // Cada fila es un botón: el mouse o el foco de teclado la
+              // resaltan en el mapa y el clic entra a la provincia. `onElegir`
+              // lo usa el modal de mobile para cerrarse al elegir.
+              onMouseEnter={() => resaltarProvincia(fila.id)}
+              onMouseLeave={() => resaltarProvincia(null)}
+              onFocus={() => resaltarProvincia(fila.id)}
+              onBlur={() => resaltarProvincia(null)}
+              onClick={() => {
+                seleccionarProvincia(fila.id)
+                onElegir?.()
+              }}
               layout="position"
               initial={{ opacity: 0, x: 14 }}
               animate={{ opacity: 1, x: 0 }}
@@ -103,7 +122,7 @@ export function LegendContenido() {
                 ease: [0.16, 1, 0.3, 1],
                 layout: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
               }}
-              className="flex items-center gap-3 border-b border-neutral-900 py-1.5 text-sm last:border-b-0"
+              className="-mx-2 flex items-center gap-3 rounded-md border-b border-neutral-900 px-2 py-1.5 text-left text-sm transition-colors last:border-b-0 hover:bg-neutral-900 focus-visible:bg-neutral-900"
             >
               <span
                 className="h-3 w-3 shrink-0 rounded-full transition-colors duration-300"
@@ -118,7 +137,7 @@ export function LegendContenido() {
               <span className="font-mono text-xs text-neutral-400">
                 {fila.valor === null ? 's/d' : formatNumero(fila.valor)}
               </span>
-            </motion.div>
+            </motion.button>
           ))}
         </div>
       </section>
@@ -193,7 +212,7 @@ function LegendDetail({ onCerrar }: { onCerrar: () => void }) {
           layoutScroll
           className="flex flex-col gap-5 overflow-y-auto p-5"
         >
-          <LegendContenido />
+          <LegendContenido onElegir={onCerrar} />
         </motion.div>
       </motion.div>
     </motion.div>

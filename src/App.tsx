@@ -68,7 +68,11 @@ function App() {
         // sola pantalla (`h-full`/`preserveAspectRatio` ya se encargan de
         // eso, ver los comentarios de arriba), solo que ocupa mejor el
         // espacio que tiene.
-        className="flex min-h-0 flex-1 items-center justify-center p-1 md:p-6"
+        // `overflow-hidden`: el mapa con zoom se sale de la caja de su SVG a
+        // propósito (ver `overflow-visible` en NationalMap.tsx) y acá se
+        // recorta contra los bordes de la pantalla y la línea del header — el
+        // header (que va antes en el DOM) no queda tapado.
+        className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-1 md:p-6"
         style={
           esMobil
             ? {
