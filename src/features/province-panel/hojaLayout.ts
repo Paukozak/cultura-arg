@@ -25,3 +25,63 @@ export function altoPeekPx(
 ): number {
   return alturaHojaPx(alturaVentana, headerHeight) * PEEK_FRACCION
 }
+
+// --- Gesto de arrastre de la hoja ---------------------------------------------
+
+/** Cuánto hay que arrastrar la hoja (px) para que cuente como expandir o
+ * colapsar, y cuánto por debajo del peek para que cuente como cerrar. */
+export const UMBRAL_ARRASTRE_PX = 40
+
+/** Velocidad (px/s) a partir de la cual un tirón cuenta como intención de
+ * expandir/colapsar (o de cerrar, si sale del peek), aunque el recorrido sea
+ * corto. */
+export const VELOCIDAD_ARRASTRE = 300
+
+/** Dónde termina la hoja tras soltar un arrastre. */
+export type DestinoHoja = 'cerrada' | 'expandida' | 'peek'
+
+/**
+ * Decide el destino de la hoja al soltar un arrastre. Se ignora la distancia
+ * exacta y se usa el recorrido + la velocidad al soltar como señal de
+ * dirección; un arrastre chico o ambiguo deja la hoja en el estado en que
+ * estaba.
+ *
+ * Tirar hacia abajo cierra (como una hoja nativa) si se soltó más de
+ * `UMBRAL_ARRASTRE_PX` por debajo de la posición de peek, o si se la tiró
+ * rápido estando ya en peek. Desde expandida un tirón rápido solo baja al
+ * peek: cerrar es un segundo gesto.
+ *
+ * @param expandida       Estado antes del arrastre.
+ * @param posicionY       `translateY` de la hoja al soltar (0 = expandida).
+ * @param offsetPeekPx    `translateY` de la hoja en peek.
+ * @param recorridoY      Cuánto se arrastró (px; negativo = hacia arriba).
+ * @param velocidadY      Velocidad al soltar (px/s; negativa = hacia arriba).
+ */
+export function destinoTrasArrastre({
+  expandida,
+  posicionY,
+  offsetPeekPx,
+  recorridoY,
+  velocidadY,
+}: {
+  expandida: boolean
+  posicionY: number
+  offsetPeekPx: number
+  recorridoY: number
+  velocidadY: number
+}): DestinoHoja {
+  const pasadoDelPeek = posicionY - offsetPeekPx
+  if (
+    pasadoDelPeek > UMBRAL_ARRASTRE_PX ||
+    (!expandida && velocidadY > VELOCIDAD_ARRASTRE)
+  ) {
+    return 'cerrada'
+  }
+  if (recorridoY < -UMBRAL_ARRASTRE_PX || velocidadY < -VELOCIDAD_ARRASTRE) {
+    return 'expandida'
+  }
+  if (recorridoY > UMBRAL_ARRASTRE_PX || velocidadY > VELOCIDAD_ARRASTRE) {
+    return 'peek'
+  }
+  return expandida ? 'expandida' : 'peek'
+}

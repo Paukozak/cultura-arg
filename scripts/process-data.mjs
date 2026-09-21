@@ -429,6 +429,13 @@ function field(row, key) {
   return esMarcadorSinDato(limpio) ? null : limpio
 }
 
+// La fuente trae varios teléfonos con coma ("49,012,932"): es el separador de
+// miles que le puso la planilla a un número que en realidad es un teléfono
+// (4901-2932). Se saca la coma y quedan los dígitos originales.
+function limpiarTelefono(v) {
+  return v ? v.replace(/,/g, '') : v
+}
+
 function parseCoord(raw) {
   if (!raw) return null
   const n = Number(raw)
@@ -658,7 +665,7 @@ async function loadEspacios() {
           ? normalizeGestion(field(row, config.gestion))
           : null,
         direccion: field(row, config.direccion),
-        telefono: field(row, config.telefono),
+        telefono: limpiarTelefono(field(row, config.telefono)),
         mail: field(row, config.mail),
         web: field(row, config.web),
       })

@@ -1,11 +1,19 @@
 import {
   AnimatePresence,
+  animate,
   motion,
   useDragControls,
+  useMotionValue,
   type PanInfo,
   type Variants,
 } from 'motion/react'
-import { useEffect, useRef, useState } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import { ContadorAnimado } from '../../components/ContadorAnimado'
 import type { Espacio } from '../../data/espacios'
 import { provinciasGeo } from '../../data/provincias'
@@ -17,7 +25,11 @@ import { ICONOS_POR_CATEGORIA, ICONO_POR_DEFECTO } from './categoriaIcons'
 import { EspacioFoto } from './EspacioFoto'
 import { getDestacados } from './getDestacados'
 import { GoogleMapsEmbed } from './GoogleMapsEmbed'
-import { alturaHojaPx as calcularAlturaHojaPx, altoPeekPx } from './hojaLayout'
+import {
+  alturaHojaPx as calcularAlturaHojaPx,
+  altoPeekPx,
+  destinoTrasArrastre,
+} from './hojaLayout'
 
 function formatNumero(n: number) {
   return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 }).format(n)
@@ -39,6 +51,16 @@ const itemDestacado: Variants = {
     transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] },
   },
 }
+
+// Resorte de la hoja de mobile (entrar, expandir, colapsar y volver a su lugar
+// tras un arrastre): `damping` cerca del crítico para esta `stiffness`
+// (crítico ≈ 2·√stiffness), llega rápido pero sin rebotar de más.
+const TRANSICION_HOJA = {
+  type: 'spring',
+  stiffness: 380,
+  damping: 38,
+  mass: 0.9,
+} as const
 
 function DestacadoCard({
   espacio,
@@ -103,6 +125,17 @@ function ProvincePanelContent({
   const panelRef = useRef<HTMLDivElement>(null)
   const [expandida, setExpandida] = useState(false)
   const dragControls = useDragControls()
+  // Con mouse (no con el dedo), al soltar un arrastre el navegador dispara
+  // además un `click` sobre lo que quedó bajo el cursor — la agarradera o la
+  // barra, que se mueven junto con la hoja. Ese clic alternaba el estado justo
+  // después de que el arrastre ya lo había decidido, deshaciéndolo. Se marca
+  // que hubo un arrastre para ignorar ese clic (ver `alternarExpandida`).
+  const huboArrastre = useRef(false)
+  // `y` propio (en vez del que crea `motion.div` por su cuenta): hace falta
+  // para poder devolver la hoja a su lugar a mano al soltar el arrastre (ver
+  // `onDragEnd`). El prop `animate` sigue manejándolo igual para entrar,
+  // expandir y colapsar.
+  const y = useMotionValue(0)
   const alturaVentana = useWindowHeight()
 
   // Píxeles reales, no `calc()`: Framer Motion anima `y` interpolando
@@ -153,19 +186,64 @@ function ProvincePanelContent({
   const { nombre, totalEspacios, densidadPor100k } = provincia.properties
   const destacados = espacios ? getDestacados(provinciaId, espacios) : []
 
-  // Deslizar hacia arriba/abajo decide si se expande o vuelve al peek — se
-  // ignora la distancia exacta arrastrada (no hay `dragConstraints` en
-  // píxeles: la hoja usa unidades `vh`/`calc`, no hay un pixel fijo contra
-  // el cual limitarla) y se usa el offset + la velocidad del gesto al
-  // soltar como señal de dirección. Un arrastre chico/ambiguo no cambia
-  // nada: `animate.y` vuelve solo al target del estado actual.
+  // Qué hace cada gesto (expandir, colapsar o cerrar) lo decide
+  // `destinoTrasArrastre` (hojaLayout.ts), donde tiene sus tests.
+  // Si no se cierra, siempre se anima `y` hasta el destino a mano, incluso si
+  // el estado no cambió: `animate` solo se vuelve a disparar cuando su valor
+  // cambia, así que sin esto un arrastre que termina en el mismo estado (p.
+  // ej. tirar hacia arriba estando ya expandida) dejaba la hoja parada donde
+  // se soltó — corrida, con un hueco negro debajo o arriba de ella.
   const onDragEnd = (
     _e: PointerEvent | MouseEvent | TouchEvent,
     info: PanInfo,
   ) => {
-    if (info.offset.y < -40 || info.velocity.y < -300) setExpandida(true)
-    else if (info.offset.y > 40 || info.velocity.y > 300) setExpandida(false)
+    // El `click` (si viene) se despacha en la misma tarea que este
+    // `pointerup`: un timeout 0 baja la marca recién después de que pasó.
+    setTimeout(() => {
+      huboArrastre.current = false
+    }, 0)
+    const resultado = destinoTrasArrastre({
+      expandida,
+      posicionY: y.get(),
+      offsetPeekPx,
+      recorridoY: info.offset.y,
+      velocidadY: info.velocity.y,
+    })
+    if (resultado === 'cerrada') {
+      onCerrar()
+      return
+    }
+    const destino = resultado === 'expandida'
+    setExpandida(destino)
+    animate(y, destino ? 0 : offsetPeekPx, TRANSICION_HOJA)
   }
+
+  // La barra con el nombre de la provincia hace lo mismo que la agarradera
+  // (arrastrar la hoja, o tocarla para expandir/achicar): es un blanco mucho
+  // más grande y natural que la tira fina de arriba. Se excluye lo que sea un
+  // botón — el de "volver" tiene su propia acción y no debe arrastrar ni
+  // alternar la hoja. No hay conflicto con el scroll: la lista de destacados
+  // vive en otro contenedor, fuera de esta barra. La barra lleva `select-none`:
+  // sin eso, un arrastre con mouse deja el nombre seleccionado y el siguiente
+  // arrastre lo toma el navegador como arrastrar-y-soltar de texto (cancela el
+  // puntero y la hoja no se mueve).
+  const alternarExpandida = () => {
+    if (huboArrastre.current) return
+    setExpandida((valor) => !valor)
+  }
+
+  const gestoBarra = esMobil
+    ? {
+        onPointerDown: (e: ReactPointerEvent) => {
+          if ((e.target as Element).closest('button')) return
+          dragControls.start(e)
+        },
+        onClick: (e: ReactMouseEvent) => {
+          if ((e.target as Element).closest('button')) return
+          alternarExpandida()
+        },
+      }
+    : {}
 
   return (
     <motion.div
@@ -173,9 +251,18 @@ function ProvincePanelContent({
       drag={esMobil ? 'y' : false}
       dragListener={false}
       dragControls={dragControls}
-      dragElastic={0.2}
+      // Hacia arriba la hoja no pasa de su posición expandida (`y: 0`): más
+      // arriba dejaba el fondo a la vista debajo de ella. Hacia abajo puede
+      // seguir al dedo hasta salir de pantalla, para poder cerrarla. Sin
+      // elástico: la hoja va pegada al dedo.
+      dragConstraints={{ top: 0, bottom: alturaHojaPx }}
+      dragElastic={0}
       dragMomentum={false}
+      onDragStart={() => {
+        huboArrastre.current = true
+      }}
       onDragEnd={onDragEnd}
+      style={esMobil ? { height: alturaHojaPx, y } : { top: headerHeight }}
       initial={esMobil ? { opacity: 0, y: '100%' } : { opacity: 0, x: '100%' }}
       animate={
         esMobil
@@ -190,9 +277,7 @@ function ProvincePanelContent({
       // crítico para esta `stiffness` (crítico ≈ 2·√stiffness): llega
       // rápido pero sin rebotar de más.
       transition={
-        esMobil
-          ? { type: 'spring', stiffness: 380, damping: 38, mass: 0.9 }
-          : { duration: 0.28, ease: 'easeOut' }
+        esMobil ? TRANSICION_HOJA : { duration: 0.28, ease: 'easeOut' }
       }
       // Desktop: panel angosto acoplado a la derecha, de la altura completa
       // por debajo del header (`top: headerHeight` en vez de `inset-y-0`:
@@ -205,7 +290,6 @@ function ProvincePanelContent({
       // reposo solo asome `PEEK_VH` — deslizar hacia arriba la lleva a
       // `translateY(0)` sin que la altura real cambie (ver el comentario
       // junto a `PEEK_VH`).
-      style={esMobil ? { height: alturaHojaPx } : { top: headerHeight }}
       className={
         esMobil
           ? 'pointer-events-auto fixed inset-x-0 bottom-0 z-30 flex flex-col rounded-t-2xl border-t border-neutral-800 bg-neutral-950/98 shadow-2xl backdrop-blur'
@@ -213,24 +297,29 @@ function ProvincePanelContent({
       }
     >
       {esMobil && (
-        // Agarradera: el único punto desde donde arranca el arrastre
-        // (`dragListener={false}` + `dragControls` arriba) — así scrollear
-        // la lista de destacados o tocar sus botones no se confunde con un
-        // gesto de arrastrar la hoja. También responde a un toque simple
-        // (`onClick`, sin arrastrar nada): no todos van a animarse a hacer
-        // el gesto de deslizar, un tap directo alcanza para expandir o
-        // volver a achicar.
+        // Agarradera: junto con la barra del nombre (`gestoBarra`, abajo),
+        // el único punto desde donde arranca el arrastre (`dragListener=
+        // {false}` + `dragControls` arriba) — así scrollear la lista de
+        // destacados o tocar sus botones no se confunde con un gesto de
+        // arrastrar la hoja. También responde a un toque simple (`onClick`,
+        // sin arrastrar nada): no todos van a animarse a hacer el gesto de
+        // deslizar, un tap directo alcanza para expandir o volver a achicar.
+        // Es el punto accesible por teclado (un `button` real con etiqueta);
+        // la barra del nombre es solo una comodidad extra para el dedo.
         <button
           type="button"
           onPointerDown={(e) => dragControls.start(e)}
-          onClick={() => setExpandida((valor) => !valor)}
+          onClick={alternarExpandida}
           aria-label={expandida ? 'Achicar el panel' : 'Expandir el panel'}
           className="flex shrink-0 cursor-grab touch-none justify-center py-2.5 active:cursor-grabbing"
         >
           <div className="h-1.5 w-10 rounded-full bg-neutral-700" />
         </button>
       )}
-      <div className="flex items-start gap-3 border-b border-neutral-800 p-5">
+      <div
+        {...gestoBarra}
+        className={`flex items-start gap-3 border-b border-neutral-800 p-5 ${esMobil ? 'cursor-grab touch-none select-none active:cursor-grabbing' : ''}`}
+      >
         <button
           type="button"
           onClick={onCerrar}
