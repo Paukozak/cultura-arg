@@ -22,6 +22,11 @@ import {
   highlightStroke,
 } from './colorScales'
 import { ProvincePins, type ZoomState } from './ProvincePins'
+import {
+  ALTO_TOOLTIP_PIN_PX,
+  ALTO_TOOLTIP_PROVINCIA_PX,
+  tooltipVaDebajo,
+} from './tooltipPosicion'
 
 const WIDTH = 800
 // Alto del viewBox: NO es una constante fija, se calcula dentro del
@@ -125,15 +130,18 @@ export function NationalMap() {
   const provinciaSeleccionada = useMapStore((s) => s.provinciaSeleccionada)
   const seleccionarProvincia = useMapStore((s) => s.seleccionarProvincia)
   const esMobil = useMediaQuery('(max-width: 767px)')
+  // `abajo`: el tooltip no entra arriba del cursor (ver `tooltipVaDebajo`).
   const [hover, setHover] = useState<{
     feature: ProvinciaFeature
     x: number
     y: number
+    abajo: boolean
   } | null>(null)
   const [pinHover, setPinHover] = useState<{
     etiqueta: string
     x: number
     y: number
+    abajo: boolean
   } | null>(null)
 
   // Argentina, proyectada, mide (en las unidades del viewBox) mucho más de
@@ -341,9 +349,27 @@ export function NationalMap() {
     if (provinciaSeleccionada) return
     const rect = svgRef.current?.getBoundingClientRect()
     if (!rect) return
-    setHover({ feature, x: e.clientX - rect.left, y: e.clientY - rect.top })
+    setHover({
+      feature,
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      abajo: tooltipVaDebajo(
+        espacioSobreCursor(e.clientY),
+        ALTO_TOOLTIP_PROVINCIA_PX,
+      ),
+    })
   }
   const handleLeave = () => setHover(null)
+
+  // Distancia (px de pantalla) entre el cursor y el borde superior visible del
+  // mapa: `main` recorta contra el header (ver App.tsx). En coordenadas de
+  // pantalla y no del SVG para que valga igual con o sin zoom (el contenedor
+  // se traslada con `translateY` mientras hay una provincia seleccionada).
+  const espacioSobreCursor = (clientY: number) => {
+    const bordeSuperior =
+      svgRef.current?.closest('main')?.getBoundingClientRect().top ?? 0
+    return clientY - bordeSuperior
+  }
 
   // Solo lectura de los mapas precalculados de arriba + cálculo de color —
   // nada acá recorre geometría, así que recalcular esto en cada hover o
@@ -479,7 +505,11 @@ export function NationalMap() {
           const rect = e.currentTarget.getBoundingClientRect()
           const x = e.clientX - rect.left
           const y = e.clientY - rect.top
-          setHover((prev) => (prev ? { ...prev, x, y } : prev))
+          const abajo = tooltipVaDebajo(
+            espacioSobreCursor(e.clientY),
+            ALTO_TOOLTIP_PROVINCIA_PX,
+          )
+          setHover((prev) => (prev ? { ...prev, x, y, abajo } : prev))
         }}
       >
         {/* Grupo con zoom: envuelve fichas + llamados + pines para que todo
@@ -728,6 +758,10 @@ export function NationalMap() {
                   etiqueta,
                   x: clientX - rect.left,
                   y: clientY - rect.top,
+                  abajo: tooltipVaDebajo(
+                    espacioSobreCursor(clientY),
+                    ALTO_TOOLTIP_PIN_PX,
+                  ),
                 })
               }}
               onLeavePin={() => setPinHover(null)}
@@ -738,8 +772,10 @@ export function NationalMap() {
 
       {hover && (
         <div
-          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg border border-neutral-800 bg-neutral-950/95 px-3 py-2 text-sm shadow-lg"
-          style={{ left: hover.x, top: hover.y - 10 }}
+          className={`pointer-events-none absolute z-10 -translate-x-1/2 rounded-lg border border-neutral-800 bg-neutral-950/95 px-3 py-2 text-sm shadow-lg ${
+            hover.abajo ? '' : '-translate-y-full'
+          }`}
+          style={{ left: hover.x, top: hover.y + (hover.abajo ? 20 : -10) }}
         >
           <div className="font-medium text-neutral-100">
             {hover.feature.properties.nombre}
@@ -752,8 +788,13 @@ export function NationalMap() {
 
       {pinHover && (
         <div
-          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg border border-neutral-800 bg-neutral-950/95 px-3 py-2 text-sm shadow-lg"
-          style={{ left: pinHover.x, top: pinHover.y - 10 }}
+          className={`pointer-events-none absolute z-10 -translate-x-1/2 rounded-lg border border-neutral-800 bg-neutral-950/95 px-3 py-2 text-sm shadow-lg ${
+            pinHover.abajo ? '' : '-translate-y-full'
+          }`}
+          style={{
+            left: pinHover.x,
+            top: pinHover.y + (pinHover.abajo ? 20 : -10),
+          }}
         >
           <div className="font-medium text-neutral-100">
             {pinHover.etiqueta}
