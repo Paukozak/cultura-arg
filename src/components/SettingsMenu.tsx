@@ -1,4 +1,5 @@
 import { Eye, Settings, Sun, type LucideIcon } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 import { useMapStore } from '../store/mapStore'
 
@@ -80,26 +81,36 @@ export function SettingsMenu() {
       >
         <Settings className="h-4 w-4" aria-hidden="true" />
       </button>
-      {abierto && (
-        <div
-          role="menu"
-          aria-label="Configuración"
-          className="absolute right-0 top-full z-40 mt-2 w-56 rounded-xl border border-neutral-800 bg-neutral-950/98 p-1.5 shadow-xl shadow-black/50 backdrop-blur"
-        >
-          <FilaToggle
-            icono={Eye}
-            etiqueta="Modo daltónico"
-            activo={modoDaltonico}
-            onClick={toggleModoDaltonico}
-          />
-          <FilaToggle
-            icono={Sun}
-            etiqueta="Modo claro"
-            activo={tema === 'light'}
-            onClick={toggleTema}
-          />
-        </div>
-      )}
+      <AnimatePresence>
+        {abierto && (
+          <motion.div
+            role="menu"
+            aria-label="Configuración"
+            // Se despliega desde el botón (esquina de arriba a la derecha):
+            // baja un poco mientras se agranda y aparece; al cerrar hace lo
+            // mismo al revés, más rápido.
+            initial={{ opacity: 0, y: -6, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.96 }}
+            transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+            style={{ transformOrigin: 'top right' }}
+            className="absolute right-0 top-full z-40 mt-2 w-56 rounded-xl border border-neutral-800 bg-neutral-950/98 p-1.5 shadow-xl shadow-black/50 backdrop-blur"
+          >
+            <FilaToggle
+              icono={Eye}
+              etiqueta="Modo daltónico"
+              activo={modoDaltonico}
+              onClick={toggleModoDaltonico}
+            />
+            <FilaToggle
+              icono={Sun}
+              etiqueta="Modo claro"
+              activo={tema === 'light'}
+              onClick={toggleTema}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -1,6 +1,9 @@
 import { Header } from './components/Header'
 import { Legend } from './features/map/Legend'
 import { LayerToggle } from './features/map/LayerToggle'
+import { MapInfoPanel } from './features/map/MapInfoPanel'
+import { MapIntro } from './features/map/MapIntro'
+import { MapIntroMobil } from './features/map/MapIntroMobil'
 import { NationalMap } from './features/map/NationalMap'
 import { ProvinceFullView } from './features/province-panel/ProvinceFullView'
 import { ProvincePanel } from './features/province-panel/ProvincePanel'
@@ -9,15 +12,20 @@ import { useMapStore } from './store/mapStore'
 import { useMediaQuery } from './utils/useMediaQuery'
 import { useWindowHeight } from './utils/useWindowHeight'
 
-// Ancho del panel lateral (ProvincePanel: `max-w-md`) — con una provincia
-// seleccionada, el mapa se corre este mismo ancho hacia la izquierda para
-// que el panel (fixed, fuera del flujo) no le tape una porción a la derecha.
+// Ancho de los paneles laterales de desktop (ProvincePanel y MapInfoPanel:
+// `max-w-md`) — el mapa reserva este ancho a la derecha para que el panel
+// (fixed, fuera del flujo) no le tape una porción, y el mismo a la izquierda
+// mientras se ve MapIntro, así queda centrado en la pantalla.
 const ANCHO_PANEL_PX = 448
 
 function App() {
   const provinciaSeleccionada = useMapStore((s) => s.provinciaSeleccionada)
   const headerHeight = useMapStore((s) => s.headerHeight)
   const esMobil = useMediaQuery('(max-width: 767px)')
+  // El intro a la izquierda le resta otro ancho de columna al mapa: solo entra en
+  // pantallas anchas. Más angostas, el mapa se queda con el layout de antes
+  // (solo el panel de la derecha).
+  const hayIntro = useMediaQuery('(min-width: 1366px)')
   const alturaVentana = useWindowHeight()
   // Mismo cálculo que ProvincePanel.tsx (ver hojaLayout.ts): antes acá se
   // reservaba un `48vh` fijo, un número más grande que lo que la hoja
@@ -75,10 +83,18 @@ function App() {
                 transition: 'padding-bottom 300ms ease',
               }
             : {
-                paddingRight: provinciaSeleccionada
-                  ? ANCHO_PANEL_PX + 24
-                  : undefined,
-                transition: 'padding-right 300ms ease',
+                // Siempre hay un panel a la derecha en desktop: el de la
+                // provincia elegida o, sin ninguna, el de información de
+                // la capa (MapInfoPanel).
+                paddingRight: ANCHO_PANEL_PX + 24,
+                // Espejo del intro: mientras se ve, reserva su lugar para
+                // centrar el mapa; con una provincia elegida el intro se
+                // retira y el mapa recupera ese espacio para el zoom.
+                paddingLeft:
+                  hayIntro && !provinciaSeleccionada
+                    ? ANCHO_PANEL_PX + 24
+                    : undefined,
+                transition: 'padding 300ms ease',
               }
         }
       >
@@ -102,28 +118,19 @@ function App() {
             </div>
           </div>
         ) : (
-          // Desktop: flotando por encima del mapa, corridos un poco hacia
-          // afuera de la esquina — con una provincia grande zoomeada, su
-          // forma llega hasta casi los bordes del SVG y, pegados a la
-          // esquina, estos controles se leían como parte del mapa en vez de
-          // como su propio elemento de interfaz. Quedan fijos en su lugar
-          // sin importar el zoom (ver NationalMap.tsx para la corrección de
-          // centrado vertical, que solo mueve el mapa).
+          // Desktop: el mapa solo; el toggle de capa y toda la información
+          // (escala + ranking) viven en `MapInfoPanel`, un panel lateral
+          // fijo — no controles flotando sobre el mapa ni una leyenda
+          // detrás de un botón.
           <div className="relative h-full w-full max-w-3xl">
-            {!provinciaSeleccionada && (
-              <>
-                <div className="absolute -left-3 top-3 z-10">
-                  <LayerToggle />
-                </div>
-                <div className="absolute -right-3 top-3 z-10">
-                  <Legend />
-                </div>
-              </>
-            )}
             <NationalMap />
           </div>
         )}
       </main>
+      {!esMobil && <MapInfoPanel />}
+      {!esMobil && hayIntro && <MapIntro />}
+      {/* Mobile: pantalla de bienvenida, una sola vez por dispositivo. */}
+      {esMobil && <MapIntroMobil />}
       <ProvincePanel />
       <ProvinceFullView />
     </div>

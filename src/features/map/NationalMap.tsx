@@ -57,6 +57,10 @@ const HOVER_LIFT = 4
 // la escala) en vez de abrir una vista de zoom completamente nueva — mismo
 // mecanismo, un nivel más.
 const ZOOM_MS = 450
+// Entrada del mapa (ver `.provincia-cara`/`.provincia-lado` en index.css): las
+// provincias aparecen en una ola de norte a sur — la de más arriba arranca de
+// entrada y la de más abajo ENTRADA_ONDA_MS después.
+const ENTRADA_ONDA_MS = 650
 // Curva "ease-out" pronunciada: arranca rápido y llega a destino con una
 // desaceleración larga y suave, en vez de la deceleración más brusca de un
 // "ease" genérico — se nota sobre todo en el zoom-out, que es el tramo más
@@ -115,6 +119,7 @@ export function NationalMap() {
   const modoDaltonico = useMapStore((s) => s.modoDaltonico)
   const tema = useMapStore((s) => s.tema)
   const headerHeight = useMapStore((s) => s.headerHeight)
+  const entradaMapa = useMapStore((s) => s.entradaMapa)
   const provinciaSeleccionada = useMapStore((s) => s.provinciaSeleccionada)
   const seleccionarProvincia = useMapStore((s) => s.seleccionarProvincia)
   const esMobil = useMediaQuery('(max-width: 767px)')
@@ -377,6 +382,13 @@ export function NationalMap() {
           // gratis de escalar/trasladar (parte del mismo cálculo del `color`).
           colorLado: darken(color, 0.6),
           necesitaLlamado: low.necesitaLlamado,
+          // Siempre del centroide de la low-poly (no el de detalle): el
+          // retraso es de la entrada de la vista sin zoom, que no debe
+          // cambiar porque después se acerque a una provincia.
+          retrasoEntrada: `${Math.round(
+            Math.min(1, Math.max(0, low.centroid[1] / HEIGHT)) *
+              ENTRADA_ONDA_MS,
+          )}ms`,
           centroid,
           isHovered: hover?.feature.properties.id === id,
           isSelected,
@@ -388,6 +400,7 @@ export function NationalMap() {
     [
       geomLowPoly,
       geomDetalle,
+      HEIGHT,
       zoom,
       zoomAsentado,
       capaActiva,
@@ -452,206 +465,236 @@ export function NationalMap() {
         <g style={zoomGroupStyle} onTransitionEnd={onZoomTransitionEnd}>
           {/* Paso 1: los "lados" de todas las provincias, para que ninguno
             tape la cara de arriba de una provincia vecina. */}
-          {fichas.map(({ feature, d, colorLado, opacity }) => (
-            <path
-              key={`side-${feature.properties.id}`}
-              d={d}
-              transform={`translate(0, ${EXTRUDE_DEPTH})`}
-              fill={colorLado}
-              style={{
-                opacity,
-                transition: 'opacity 250ms ease',
-              }}
-              pointerEvents="none"
-            />
-          ))}
+          {/* `key={entradaMapa}`: al cambiar, el grupo se vuelve a montar y
+            las provincias repiten su animación de entrada. */}
+          <g key={entradaMapa}>
+            {fichas.map(
+              ({ feature, d, colorLado, opacity, retrasoEntrada }) => (
+                <path
+                  key={`side-${feature.properties.id}`}
+                  d={d}
+                  transform={`translate(0, ${EXTRUDE_DEPTH})`}
+                  fill={colorLado}
+                  className="provincia-lado"
+                  style={{
+                    opacity,
+                    transition: 'opacity 250ms ease',
+                    animationDelay: retrasoEntrada,
+                  }}
+                  pointerEvents="none"
+                />
+              ),
+            )}
 
-          {/* Paso 2: las caras de arriba (interactivas) + su bisel, todo por
+            {/* Paso 2: las caras de arriba (interactivas) + su bisel, todo por
             encima de cualquier lado. */}
-          {fichas.map(
-            ({ feature, d, color, isHovered, isSelected, opacity }) => {
-              const lift = isHovered ? -HOVER_LIFT : 0
-              const stroke =
-                isHovered || isSelected
-                  ? highlightStroke(color)
-                  : 'rgba(10, 10, 10, 0.7)'
-              const onClick = () =>
-                seleccionarProvincia(
-                  provinciaSeleccionada === feature.properties.id
-                    ? null
-                    : feature.properties.id,
+            {fichas.map(
+              ({
+                feature,
+                d,
+                color,
+                isHovered,
+                isSelected,
+                opacity,
+                retrasoEntrada,
+              }) => {
+                const lift = isHovered ? -HOVER_LIFT : 0
+                const stroke =
+                  isHovered || isSelected
+                    ? highlightStroke(color)
+                    : 'rgba(10, 10, 10, 0.7)'
+                const onClick = () =>
+                  seleccionarProvincia(
+                    provinciaSeleccionada === feature.properties.id
+                      ? null
+                      : feature.properties.id,
+                  )
+                return (
+                  <g
+                    key={`top-${feature.properties.id}`}
+                    className="provincia-cara"
+                    style={{
+                      opacity,
+                      transition: 'opacity 250ms ease',
+                      animationDelay: retrasoEntrada,
+                    }}
+                  >
+                    <path
+                      d={d}
+                      data-provincia={feature.properties.id}
+                      fill={color}
+                      stroke={stroke}
+                      strokeWidth={isHovered || isSelected ? 1.5 : 1}
+                      strokeLinejoin="round"
+                      vectorEffect="non-scaling-stroke"
+                      style={{
+                        transform: `translate(0, ${lift}px)`,
+                        transition:
+                          'transform 150ms ease, fill 200ms ease, stroke 150ms ease, filter 200ms ease',
+                        // El halo en la seleccionada es feedback directo del click
+                        // (qué provincia está activa), no decoración: usa el mismo
+                        // violeta de marca en vez de un glow genérico. Apagado
+                        // mientras el zoom está en transición — ver el comentario
+                        // junto a `zoomAsentado`.
+                        filter: isHovered
+                          ? 'brightness(1.15) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5))'
+                          : isSelected && zoomAsentado
+                            ? 'drop-shadow(0 0 10px var(--color-accent)) drop-shadow(0 6px 14px rgba(0, 0, 0, 0.55))'
+                            : 'none',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={handleEnter(feature)}
+                      onMouseLeave={handleLeave}
+                      onClick={onClick}
+                    />
+                    <path
+                      d={d}
+                      fill="url(#bevel)"
+                      pointerEvents="none"
+                      style={{
+                        transform: `translate(0, ${lift}px)`,
+                        transition: 'transform 150ms ease',
+                      }}
+                    />
+                  </g>
                 )
-              return (
-                <g
-                  key={`top-${feature.properties.id}`}
-                  style={{ opacity, transition: 'opacity 250ms ease' }}
-                >
-                  <path
-                    d={d}
-                    data-provincia={feature.properties.id}
-                    fill={color}
-                    stroke={stroke}
-                    strokeWidth={isHovered || isSelected ? 1.5 : 1}
-                    strokeLinejoin="round"
-                    vectorEffect="non-scaling-stroke"
-                    style={{
-                      transform: `translate(0, ${lift}px)`,
-                      transition:
-                        'transform 150ms ease, fill 200ms ease, stroke 150ms ease, filter 200ms ease',
-                      // El halo en la seleccionada es feedback directo del click
-                      // (qué provincia está activa), no decoración: usa el mismo
-                      // violeta de marca en vez de un glow genérico. Apagado
-                      // mientras el zoom está en transición — ver el comentario
-                      // junto a `zoomAsentado`.
-                      filter: isHovered
-                        ? 'brightness(1.15) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5))'
-                        : isSelected && zoomAsentado
-                          ? 'drop-shadow(0 0 10px var(--color-accent)) drop-shadow(0 6px 14px rgba(0, 0, 0, 0.55))'
-                          : 'none',
-                      cursor: 'pointer',
-                    }}
-                    onMouseEnter={handleEnter(feature)}
-                    onMouseLeave={handleLeave}
-                    onClick={onClick}
-                  />
-                  <path
-                    d={d}
-                    fill="url(#bevel)"
-                    pointerEvents="none"
-                    style={{
-                      transform: `translate(0, ${lift}px)`,
-                      transition: 'transform 150ms ease',
-                    }}
-                  />
-                </g>
-              )
-            },
-          )}
+              },
+            )}
 
-          {/* Paso 3: llamados para provincias demasiado chicas para dibujarse
+            {/* Paso 3: llamados para provincias demasiado chicas para dibujarse
             (CABA) — línea guía desde su ubicación real hasta una etiqueta
             legible en el espacio vacío del mapa. El punto (en la ubicación
             real) y la etiqueta forman un solo target clickeable/hoverable;
             solo la línea guía es decorativa. */}
-          {llamados.map(
-            ({
-              feature,
-              color,
-              isHovered,
-              isSelected,
-              centroid: [cx, cy],
-              opacity,
-            }) => {
-              const stroke =
-                isHovered || isSelected
-                  ? highlightStroke(color)
-                  : 'rgba(10, 10, 10, 0.7)'
-              const anchorX = cx + CALLOUT_DX
-              const anchorY = cy + CALLOUT_DY
-              const etiqueta =
-                ETIQUETA_CORTA[feature.properties.id] ??
-                feature.properties.nombre
-              // Una vez zoomeada esta provincia, el llamado (línea guía + globo
-              // con etiqueta) deja de tener sentido: a esta escala ya se ve su
-              // ubicación real con pines. Solo queda el punto como referencia.
-              const zoomeada = isSelected && zoom !== null
-              const onClick = () =>
-                seleccionarProvincia(
-                  provinciaSeleccionada === feature.properties.id
-                    ? null
-                    : feature.properties.id,
-                )
-              return (
-                <g
-                  key={`llamado-${feature.properties.id}`}
-                  style={{ opacity, transition: 'opacity 250ms ease' }}
-                >
-                  {!zoomeada && (
-                    <line
-                      x1={cx}
-                      y1={cy}
-                      x2={anchorX - CALLOUT_PILL_W / 2}
-                      y2={anchorY}
-                      // `--color-neutral-500` (no un rgba fijo): un gris
-                      // claro casi invisible sobre el fondo claro del modo
-                      // día — este token sí se invierte con el tema, y un
-                      // gris medio da contraste parecido contra fondo claro
-                      // u oscuro.
-                      stroke="var(--color-neutral-500)"
-                      strokeOpacity={0.6}
-                      strokeWidth={1}
-                      vectorEffect="non-scaling-stroke"
-                      pointerEvents="none"
-                    />
-                  )}
+            {llamados.map(
+              ({
+                feature,
+                color,
+                isHovered,
+                isSelected,
+                centroid: [cx, cy],
+                opacity,
+                retrasoEntrada,
+              }) => {
+                const stroke =
+                  isHovered || isSelected
+                    ? highlightStroke(color)
+                    : 'rgba(10, 10, 10, 0.7)'
+                const anchorX = cx + CALLOUT_DX
+                const anchorY = cy + CALLOUT_DY
+                const etiqueta =
+                  ETIQUETA_CORTA[feature.properties.id] ??
+                  feature.properties.nombre
+                // Una vez zoomeada esta provincia, el llamado (línea guía + globo
+                // con etiqueta) deja de tener sentido: a esta escala ya se ve su
+                // ubicación real con pines. Solo queda el punto como referencia.
+                const zoomeada = isSelected && zoom !== null
+                const onClick = () =>
+                  seleccionarProvincia(
+                    provinciaSeleccionada === feature.properties.id
+                      ? null
+                      : feature.properties.id,
+                  )
+                return (
                   <g
-                    data-provincia={feature.properties.id}
-                    onMouseEnter={handleEnter(feature)}
-                    onMouseLeave={handleLeave}
-                    onClick={onClick}
-                    style={{ cursor: 'pointer' }}
+                    key={`llamado-${feature.properties.id}`}
+                    className="provincia-lado"
+                    style={{
+                      opacity,
+                      transition: 'opacity 250ms ease',
+                      animationDelay: retrasoEntrada,
+                    }}
                   >
-                    {/* Círculo invisible más grande que el punto visual, para
+                    {!zoomeada && (
+                      <line
+                        x1={cx}
+                        y1={cy}
+                        x2={anchorX - CALLOUT_PILL_W / 2}
+                        y2={anchorY}
+                        // `--color-neutral-500` (no un rgba fijo): un gris
+                        // claro casi invisible sobre el fondo claro del modo
+                        // día — este token sí se invierte con el tema, y un
+                        // gris medio da contraste parecido contra fondo claro
+                        // u oscuro.
+                        stroke="var(--color-neutral-500)"
+                        strokeOpacity={0.6}
+                        strokeWidth={1}
+                        vectorEffect="non-scaling-stroke"
+                        pointerEvents="none"
+                      />
+                    )}
+                    <g
+                      data-provincia={feature.properties.id}
+                      onMouseEnter={handleEnter(feature)}
+                      onMouseLeave={handleLeave}
+                      onClick={onClick}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {/* Círculo invisible más grande que el punto visual, para
                     que hoverear/clickear la ubicación real no requiera
                     apuntar a un punto de 3px exactos. */}
-                    <circle cx={cx} cy={cy} r={8} fill="transparent" />
-                    <circle
-                      cx={cx}
-                      cy={cy}
-                      r={isHovered || isSelected ? 4 : 3}
-                      fill={color}
-                      stroke={stroke}
-                      strokeWidth={1.25}
-                      vectorEffect="non-scaling-stroke"
-                      style={{ transition: 'r 150ms ease, stroke 150ms ease' }}
-                    />
-                    {!zoomeada && (
-                      <>
-                        <rect
-                          x={anchorX - CALLOUT_PILL_W / 2}
-                          y={anchorY - CALLOUT_PILL_H / 2}
-                          width={CALLOUT_PILL_W}
-                          height={CALLOUT_PILL_H}
-                          rx={CALLOUT_PILL_H / 2}
-                          fill={color}
-                          stroke={stroke}
-                          strokeWidth={isHovered || isSelected ? 1.5 : 1}
-                          vectorEffect="non-scaling-stroke"
-                          style={{
-                            filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6))',
-                            transition: 'stroke 150ms ease, fill 150ms ease',
-                          }}
-                        />
-                        <text
-                          x={anchorX}
-                          y={anchorY}
-                          textAnchor="middle"
-                          dominantBaseline="central"
-                          fontSize={10}
-                          fontWeight={700}
-                          // Fijo, no `var(--color-accent-ink)`: ese token
-                          // contrasta contra la superficie de acento fija de
-                          // la marca, pero acá el fondo del globo (`color`)
-                          // es un paso de la escala secuencial de densidad —
-                          // casi siempre oscuro — sin relación con el tema.
-                          // `accent-ink` se vuelve casi negro en modo oscuro,
-                          // ilegible sobre ese fondo oscuro.
-                          fill="#f5f2ea"
-                          style={{
-                            fontFamily: 'var(--font-mono)',
-                            letterSpacing: '0.02em',
-                          }}
-                          pointerEvents="none"
-                        >
-                          {etiqueta}
-                        </text>
-                      </>
-                    )}
+                      <circle cx={cx} cy={cy} r={8} fill="transparent" />
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={isHovered || isSelected ? 4 : 3}
+                        fill={color}
+                        stroke={stroke}
+                        strokeWidth={1.25}
+                        vectorEffect="non-scaling-stroke"
+                        style={{
+                          transition: 'r 150ms ease, stroke 150ms ease',
+                        }}
+                      />
+                      {!zoomeada && (
+                        <>
+                          <rect
+                            x={anchorX - CALLOUT_PILL_W / 2}
+                            y={anchorY - CALLOUT_PILL_H / 2}
+                            width={CALLOUT_PILL_W}
+                            height={CALLOUT_PILL_H}
+                            rx={CALLOUT_PILL_H / 2}
+                            fill={color}
+                            stroke={stroke}
+                            strokeWidth={isHovered || isSelected ? 1.5 : 1}
+                            vectorEffect="non-scaling-stroke"
+                            style={{
+                              filter:
+                                'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6))',
+                              transition: 'stroke 150ms ease, fill 150ms ease',
+                            }}
+                          />
+                          <text
+                            x={anchorX}
+                            y={anchorY}
+                            textAnchor="middle"
+                            dominantBaseline="central"
+                            fontSize={10}
+                            fontWeight={700}
+                            // Fijo, no `var(--color-accent-ink)`: ese token
+                            // contrasta contra la superficie de acento fija de
+                            // la marca, pero acá el fondo del globo (`color`)
+                            // es un paso de la escala secuencial de densidad —
+                            // casi siempre oscuro — sin relación con el tema.
+                            // `accent-ink` se vuelve casi negro en modo oscuro,
+                            // ilegible sobre ese fondo oscuro.
+                            fill="#f5f2ea"
+                            style={{
+                              fontFamily: 'var(--font-mono)',
+                              letterSpacing: '0.02em',
+                            }}
+                            pointerEvents="none"
+                          >
+                            {etiqueta}
+                          </text>
+                        </>
+                      )}
+                    </g>
                   </g>
-                </g>
-              )
-            },
-          )}
+                )
+              },
+            )}
+          </g>
 
           {/* Paso 4: pines por espacio cultural, uno por provincia
             seleccionada — solo una vez que el zoom llegó a destino. */}

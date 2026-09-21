@@ -3,8 +3,10 @@ import {
   motion,
   useDragControls,
   type PanInfo,
+  type Variants,
 } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
+import { ContadorAnimado } from '../../components/ContadorAnimado'
 import type { Espacio } from '../../data/espacios'
 import { provinciasGeo } from '../../data/provincias'
 import { useEspacios } from '../../data/useEspacios'
@@ -19,6 +21,23 @@ import { alturaHojaPx as calcularAlturaHojaPx, altoPeekPx } from './hojaLayout'
 
 function formatNumero(n: number) {
   return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 }).format(n)
+}
+
+// Las tarjetas de destacados entran una tras otra (fundido + subida) al
+// abrirse el panel. La animación va en un contenedor aparte de cada tarjeta,
+// no en la tarjeta misma: esa ya usa `transform` para su elevación en hover
+// (`hover:-translate-y-1`) y las dos se pisarían.
+const listaDestacados: Variants = {
+  oculto: {},
+  visible: { transition: { staggerChildren: 0.08, delayChildren: 0.2 } },
+}
+const itemDestacado: Variants = {
+  oculto: { opacity: 0, y: 18 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] },
+  },
 }
 
 function DestacadoCard({
@@ -238,7 +257,7 @@ function ProvincePanelContent({
             <div>
               <dt className="uppercase tracking-wide">Espacios</dt>
               <dd className="text-neutral-200">
-                {formatNumero(totalEspacios)}
+                <ContadorAnimado valor={totalEspacios} />
               </dd>
             </div>
             <div>
@@ -264,15 +283,21 @@ function ProvincePanelContent({
             No hay espacios registrados en esta provincia.
           </p>
         ) : (
-          <div className="flex flex-col gap-3">
+          <motion.div
+            variants={listaDestacados}
+            initial="oculto"
+            animate="visible"
+            className="flex flex-col gap-3"
+          >
             {destacados.map((espacio) => (
-              <DestacadoCard
-                key={espacio.id}
-                espacio={espacio}
-                onAbrirFicha={(e) => abrirVistaCompleta(e.id)}
-              />
+              <motion.div key={espacio.id} variants={itemDestacado}>
+                <DestacadoCard
+                  espacio={espacio}
+                  onAbrirFicha={(e) => abrirVistaCompleta(e.id)}
+                />
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         )}
       </div>
 

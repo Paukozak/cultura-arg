@@ -1,4 +1,5 @@
 import { MapPin } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useMapStore } from '../../store/mapStore'
 import {
@@ -123,66 +124,72 @@ export function GlobalSearch() {
         aria-controls="resultados-busqueda-global"
       />
 
-      {abierto && hayQuery && (
-        <div
-          id="resultados-busqueda-global"
-          role="listbox"
-          // z-40, por encima del panel lateral (z-30): con un panel de
-          // provincia abierto, este dropdown puede caer geométricamente
-          // debajo de su franja derecha y quedar tapado si no se le da
-          // más jerarquía.
-          className="absolute left-0 right-0 top-full z-40 mt-2 max-h-96 overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-950/98 py-1.5 shadow-xl shadow-black/50 backdrop-blur"
-        >
-          {resultados.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-neutral-500">
-              Sin resultados.
-            </p>
-          ) : (
-            resultados.map((r, i) => {
-              const Icono =
-                r.tipo === 'espacio'
-                  ? (ICONOS_POR_CATEGORIA[r.categoria] ?? ICONO_POR_DEFECTO)
-                  : MapPin
-              const clave =
-                r.tipo === 'localidad'
-                  ? `localidad-${r.provinciaId}-${r.nombre}`
-                  : `${r.tipo}-${r.id}`
-              const subtitulo =
-                r.tipo === 'provincia'
-                  ? 'Provincia'
-                  : r.tipo === 'localidad'
-                    ? `Localidad · ${r.provinciaNombre} · ${r.cantidadEspacios} ${r.cantidadEspacios === 1 ? 'espacio' : 'espacios'}`
-                    : [r.categoria, r.localidad].filter(Boolean).join(' · ')
-              return (
-                <button
-                  key={clave}
-                  type="button"
-                  role="option"
-                  aria-selected={i === indiceActivo}
-                  onMouseEnter={() => setIndiceActivo(i)}
-                  onClick={() => elegir(r)}
-                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                    i === indiceActivo ? 'bg-neutral-900' : ''
-                  }`}
-                >
-                  <Icono
-                    className="h-4 w-4 shrink-0 text-accent"
-                    aria-hidden="true"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm text-neutral-100">
-                      {r.nombre}
+      <AnimatePresence>
+        {abierto && hayQuery && (
+          <motion.div
+            id="resultados-busqueda-global"
+            role="listbox"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
+            // z-40, por encima del panel lateral (z-30): con un panel de
+            // provincia abierto, este dropdown puede caer geométricamente
+            // debajo de su franja derecha y quedar tapado si no se le da
+            // más jerarquía.
+            className="absolute left-0 right-0 top-full z-40 mt-2 max-h-96 overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-950/98 py-1.5 shadow-xl shadow-black/50 backdrop-blur"
+          >
+            {resultados.length === 0 ? (
+              <p className="px-4 py-3 text-sm text-neutral-500">
+                Sin resultados.
+              </p>
+            ) : (
+              resultados.map((r, i) => {
+                const Icono =
+                  r.tipo === 'espacio'
+                    ? (ICONOS_POR_CATEGORIA[r.categoria] ?? ICONO_POR_DEFECTO)
+                    : MapPin
+                const clave =
+                  r.tipo === 'localidad'
+                    ? `localidad-${r.provinciaId}-${r.nombre}`
+                    : `${r.tipo}-${r.id}`
+                const subtitulo =
+                  r.tipo === 'provincia'
+                    ? 'Provincia'
+                    : r.tipo === 'localidad'
+                      ? `Localidad · ${r.provinciaNombre} · ${r.cantidadEspacios} ${r.cantidadEspacios === 1 ? 'espacio' : 'espacios'}`
+                      : [r.categoria, r.localidad].filter(Boolean).join(' · ')
+                return (
+                  <button
+                    key={clave}
+                    type="button"
+                    role="option"
+                    aria-selected={i === indiceActivo}
+                    onMouseEnter={() => setIndiceActivo(i)}
+                    onClick={() => elegir(r)}
+                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                      i === indiceActivo ? 'bg-neutral-900' : ''
+                    }`}
+                  >
+                    <Icono
+                      className="h-4 w-4 shrink-0 text-accent"
+                      aria-hidden="true"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm text-neutral-100">
+                        {r.nombre}
+                      </div>
+                      <div className="truncate font-mono text-xs text-neutral-500">
+                        {subtitulo}
+                      </div>
                     </div>
-                    <div className="truncate font-mono text-xs text-neutral-500">
-                      {subtitulo}
-                    </div>
-                  </div>
-                </button>
-              )
-            })
-          )}
-        </div>
-      )}
+                  </button>
+                )
+              })
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

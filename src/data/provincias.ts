@@ -20,6 +20,13 @@ export const provinciasGeo = raw as unknown as FeatureCollection<
   ProvinciaProperties
 >
 
+/** Suma de espacios culturales de todas las provincias (para los textos de
+ * bienvenida). */
+export const TOTAL_ESPACIOS = provinciasGeo.features.reduce(
+  (suma, f) => suma + f.properties.totalEspacios,
+  0,
+)
+
 // Geometría con mucho más detalle que la del mapa nacional (ver
 // scripts/process-data.mjs) — la nacional usa un trazo "low-poly" a
 // propósito, que a escala país es invisible pero queda groseramente

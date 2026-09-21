@@ -29,6 +29,12 @@ interface MapState {
    * como dos paletas sueltas en vez de un solo modo coherente. */
   modoDaltonico: boolean
   toggleModoDaltonico: () => void
+  /** Cambia cada vez que hay que volver a hacer la animación de entrada del
+   * mapa (las provincias "brotan"): NationalMap lo usa de `key` de ese
+   * grupo. Hoy lo pide la bienvenida de mobile al cerrarse — la animación
+   * de la carga inicial ocurre detrás de esa pantalla y nadie la vería. */
+  entradaMapa: number
+  reiniciarEntradaMapa: () => void
   /** Alto real del header en px, medido por el propio `Header` con
    * `ResizeObserver`. En desktop son siempre 64px, pero en mobile pasa a
    * dos filas (título+botones arriba, buscador abajo) y mide más — el
@@ -93,6 +99,9 @@ export const useMapStore = create<MapState>((set) => ({
       localStorage.setItem(MODO_DALTONICO_KEY, siguiente ? '1' : '0')
       return { modoDaltonico: siguiente }
     }),
+  entradaMapa: 0,
+  reiniciarEntradaMapa: () =>
+    set((state) => ({ entradaMapa: state.entradaMapa + 1 })),
   headerHeight: 64,
   setHeaderHeight: (px) => set({ headerHeight: px }),
   tema: temaInicial(),

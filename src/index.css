@@ -105,11 +105,42 @@ input[type='checkbox'] {
   }
 }
 
+/* Entrada del mapa (NationalMap): las provincias "brotan" en una ola de norte
+   a sur — la cara de arriba sube desde abajo con un fundido, y los lados
+   (extrusión) y el llamado de CABA solo aparecen. El retraso de cada una va
+   inline (`animationDelay`, según su latitud). `backwards` deja la provincia
+   oculta durante ese retraso; sin `to`, la animación termina en el estilo
+   normal del elemento (opacidad de atenuación incluida), sin salto. La
+   distancia son unidades del viewBox del SVG, no px. */
+@keyframes provincia-sube {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+}
+@keyframes provincia-aparece {
+  from {
+    opacity: 0;
+  }
+}
+.provincia-cara {
+  animation: provincia-sube 750ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.provincia-lado {
+  animation: provincia-aparece 550ms ease-out backwards;
+}
+
 /* Con reducción de movimiento activada en el sistema, todas las
    transiciones/animaciones CSS (zoom del mapa, hover, etc.) pasan a ser
    instantáneas en vez de animadas. Las animaciones de Framer Motion
    (paneles) se manejan aparte con `MotionConfig reducedMotion="user"`. */
 @media (prefers-reduced-motion: reduce) {
+  /* Sin esto el retraso de la ola seguiría ocultando cada provincia unos
+     instantes antes de mostrarla de golpe. */
+  .provincia-cara,
+  .provincia-lado {
+    animation: none !important;
+  }
   *,
   *::before,
   *::after {

@@ -7,6 +7,7 @@ import {
   desglosarEscala,
   pasosActivos,
   SIN_DATOS_COLOR,
+  TITULO_CAPA,
 } from './colorScales'
 
 const UNIDAD: Record<'densidad' | 'total', string> = {
@@ -14,27 +15,17 @@ const UNIDAD: Record<'densidad' | 'total', string> = {
   total: 'ESPACIOS',
 }
 
-const TITULO: Record<'densidad' | 'total', string> = {
-  densidad: 'Densidad de espacios culturales',
-  total: 'Total de espacios culturales',
-}
-
 function formatNumero(n: number) {
   return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 }).format(n)
 }
 
-function LegendDetail({ onCerrar }: { onCerrar: () => void }) {
+/** Escala de color con el rango de cada escalón + ranking de las 24
+ * provincias — el "panorama completo". Lo comparten el modal de mobile
+ * (`LegendDetail`) y el panel lateral fijo de desktop (`MapInfoPanel`), que
+ * lo muestra siempre a la vista en vez de detrás de un botón. */
+export function LegendContenido() {
   const capaActiva = useMapStore((s) => s.capaActiva)
   const modoDaltonico = useMapStore((s) => s.modoDaltonico)
-  const dialogRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onCerrar()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onCerrar])
 
   const scales = useMemo(
     () => buildColorScales(provinciasGeo.features, modoDaltonico),
@@ -56,6 +47,96 @@ function LegendDetail({ onCerrar }: { onCerrar: () => void }) {
       })
       .sort((a, b) => (b.valor ?? -1) - (a.valor ?? -1))
   }, [capaActiva, scale])
+
+  return (
+    <>
+      <section className="flex flex-col gap-2">
+        <h3 className="text-xs uppercase tracking-wide text-neutral-500">
+          Escala ({UNIDAD[capaActiva]})
+        </h3>
+        <div className="flex flex-col gap-1.5">
+          {[...escalones].reverse().map((escalon) => (
+            <div
+              key={escalon.color}
+              className="flex items-center gap-3 text-sm"
+            >
+              <span
+                className="h-4 w-4 shrink-0 rounded"
+                style={{ backgroundColor: escalon.color }}
+              />
+              <span className="font-mono text-neutral-300">
+                {formatNumero(escalon.min)} – {formatNumero(escalon.max)}
+              </span>
+            </div>
+          ))}
+          <div className="flex items-center gap-3 text-sm">
+            <span
+              className="h-4 w-4 shrink-0 rounded"
+              style={{ backgroundColor: SIN_DATOS_COLOR }}
+            />
+            <span className="text-neutral-500">Sin datos de densidad</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h3 className="text-xs uppercase tracking-wide text-neutral-500">
+          Las 24 provincias
+        </h3>
+        <div className="flex flex-col">
+          {/* Cada fila entra escalonada (fundido + deslizamiento desde la
+              derecha) y, con `layout="position"`, cuando cambia la capa y el
+              ranking se reordena, se desliza a su nuevo lugar en vez de
+              saltar. `key={fila.nombre}` es lo que le permite a Motion seguir
+              a cada provincia. El `delay` de la entrada depende del orden
+              (`i`), pero el de `layout` va aparte para que reordenar no se
+              sienta demorado. */}
+          {filas.map((fila, i) => (
+            <motion.div
+              key={fila.nombre}
+              layout="position"
+              initial={{ opacity: 0, x: 14 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{
+                duration: 0.4,
+                delay: 0.4 + i * 0.02,
+                ease: [0.16, 1, 0.3, 1],
+                layout: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
+              }}
+              className="flex items-center gap-3 border-b border-neutral-900 py-1.5 text-sm last:border-b-0"
+            >
+              <span
+                className="h-3 w-3 shrink-0 rounded-full transition-colors duration-300"
+                style={{ backgroundColor: fila.color }}
+              />
+              <span
+                className="flex-1 truncate text-neutral-200"
+                title={fila.nombre}
+              >
+                {fila.nombre}
+              </span>
+              <span className="font-mono text-xs text-neutral-400">
+                {fila.valor === null ? 's/d' : formatNumero(fila.valor)}
+              </span>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+    </>
+  )
+}
+
+function LegendDetail({ onCerrar }: { onCerrar: () => void }) {
+  const capaActiva = useMapStore((s) => s.capaActiva)
+  const dialogRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onCerrar()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onCerrar])
 
   return (
     <motion.div
@@ -84,7 +165,7 @@ function LegendDetail({ onCerrar }: { onCerrar: () => void }) {
             id="leyenda-detalle-titulo"
             className="text-lg font-semibold text-neutral-100"
           >
-            {TITULO[capaActiva]}
+            {TITULO_CAPA[capaActiva]}
           </h2>
           <button
             type="button"
@@ -108,61 +189,12 @@ function LegendDetail({ onCerrar }: { onCerrar: () => void }) {
           </button>
         </div>
 
-        <div className="flex flex-col gap-5 overflow-y-auto p-5">
-          <section className="flex flex-col gap-2">
-            <h3 className="text-xs uppercase tracking-wide text-neutral-500">
-              Escala ({UNIDAD[capaActiva]})
-            </h3>
-            <div className="flex flex-col gap-1.5">
-              {[...escalones].reverse().map((escalon) => (
-                <div
-                  key={escalon.color}
-                  className="flex items-center gap-3 text-sm"
-                >
-                  <span
-                    className="h-4 w-4 shrink-0 rounded"
-                    style={{ backgroundColor: escalon.color }}
-                  />
-                  <span className="font-mono text-neutral-300">
-                    {formatNumero(escalon.min)} – {formatNumero(escalon.max)}
-                  </span>
-                </div>
-              ))}
-              <div className="flex items-center gap-3 text-sm">
-                <span
-                  className="h-4 w-4 shrink-0 rounded"
-                  style={{ backgroundColor: SIN_DATOS_COLOR }}
-                />
-                <span className="text-neutral-500">Sin datos de densidad</span>
-              </div>
-            </div>
-          </section>
-
-          <section className="flex flex-col gap-2">
-            <h3 className="text-xs uppercase tracking-wide text-neutral-500">
-              Las 24 provincias
-            </h3>
-            <div className="flex flex-col">
-              {filas.map((fila) => (
-                <div
-                  key={fila.nombre}
-                  className="flex items-center gap-3 border-b border-neutral-900 py-1.5 text-sm last:border-b-0"
-                >
-                  <span
-                    className="h-3 w-3 shrink-0 rounded-full"
-                    style={{ backgroundColor: fila.color }}
-                  />
-                  <span className="flex-1 truncate text-neutral-200">
-                    {fila.nombre}
-                  </span>
-                  <span className="font-mono text-xs text-neutral-400">
-                    {fila.valor === null ? 's/d' : formatNumero(fila.valor)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
+        <motion.div
+          layoutScroll
+          className="flex flex-col gap-5 overflow-y-auto p-5"
+        >
+          <LegendContenido />
+        </motion.div>
       </motion.div>
     </motion.div>
   )

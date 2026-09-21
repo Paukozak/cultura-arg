@@ -32,6 +32,11 @@ const DALTONICO_SEQUENTIAL_STEPS = [
 
 export const SIN_DATOS_COLOR = '#3f3f46'
 
+export const TITULO_CAPA: Record<Capa, string> = {
+  densidad: 'Densidad de espacios culturales',
+  total: 'Total de espacios culturales',
+}
+
 function pasosPara(daltonico: boolean): string[] {
   return daltonico ? DALTONICO_SEQUENTIAL_STEPS : VIOLETA_SEQUENTIAL_STEPS
 }
