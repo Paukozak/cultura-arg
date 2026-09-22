@@ -49,8 +49,10 @@ export interface FiltrosEspacios {
   categoriasActivas?: Set<string> | null
   gestionesActivas?: Set<string> | null
   /** Un espacio sin gestión/localidad documentada cae bajo la clave
-   * `'sin dato'`, la misma que arma la UI para esos chips/opciones. */
-  localidadActiva?: string | null
+   * `'sin dato'`, la misma que arma la UI para esos chips/opciones. Igual
+   * que `categoriasActivas`: un Set (aunque esté vacío) filtra a esas
+   * localidades puntuales, permitiendo elegir más de una a la vez. */
+  localidadesActivas?: Set<string> | null
 }
 
 export function filtrarEspacios(
@@ -76,9 +78,9 @@ export function filtrarEspacios(
       filtros.gestionesActivas!.has(e.gestion ?? 'sin dato'),
     )
   }
-  if (filtros.localidadActiva) {
-    resultado = resultado.filter(
-      (e) => (e.localidad ?? 'sin dato') === filtros.localidadActiva,
+  if (filtros.localidadesActivas) {
+    resultado = resultado.filter((e) =>
+      filtros.localidadesActivas!.has(e.localidad ?? 'sin dato'),
     )
   }
   return resultado
@@ -93,7 +95,7 @@ export function hayFiltrosAplicados(filtros: FiltrosEspacios): boolean {
     (filtros.busqueda ?? '').trim() !== '' ||
     filtros.categoriasActivas != null ||
     filtros.gestionesActivas != null ||
-    Boolean(filtros.localidadActiva)
+    filtros.localidadesActivas != null
   )
 }
 
@@ -109,4 +111,28 @@ export function filtrarYOrdenarEspacios(
   orden: Orden,
 ): Espacio[] {
   return ordenarEspacios(filtrarEspacios(espacios, filtros), orden)
+}
+
+/** Alterna un valor puntual dentro de un filtro "Todas o algunos"
+ * (categoría/gestión/localidad, en ProvinceFullView.tsx): el chip "Todas"
+ * (`null`) es excluyente con cualquier valor puntual, así que elegir uno
+ * estando en "Todas" arranca una selección nueva con solo ese; si ya había
+ * una selección puntual, se suma/saca de ahí como cualquier multi-select. */
+export function alternarValorFiltro(
+  activos: Set<string> | null,
+  valor: string,
+): Set<string> {
+  if (activos === null) return new Set([valor])
+  const siguiente = new Set(activos)
+  if (siguiente.has(valor)) siguiente.delete(valor)
+  else siguiente.add(valor)
+  return siguiente
+}
+
+/** Alterna el propio chip/checkbox "Todas": si ya está marcado (`null`),
+ * pasa a un Set vacío (ningún valor puntual seleccionado, "Ninguna" a
+ * propósito); si no, vuelve a "Todas". No hay forma implícita de volver a
+ * "Todas" salvo marcándolo de nuevo. */
+export function alternarTodos(activos: Set<string> | null): Set<string> | null {
+  return activos === null ? new Set() : null
 }

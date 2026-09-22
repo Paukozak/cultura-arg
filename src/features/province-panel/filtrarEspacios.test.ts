@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { Espacio } from '../../data/espacios'
 import {
+  alternarTodos,
+  alternarValorFiltro,
   etiquetaVerEspacios,
   filtrarEspacios,
   filtrarYOrdenarEspacios,
@@ -140,16 +142,31 @@ describe('filtrarEspacios', () => {
     expect(resultado.map((e) => e.id)).toEqual(['c'])
   })
 
-  it('localidadActiva filtra por coincidencia exacta', () => {
-    const resultado = filtrarEspacios(espacios, { localidadActiva: 'Rosario' })
+  it('localidadesActivas filtra por coincidencia exacta', () => {
+    const resultado = filtrarEspacios(espacios, {
+      localidadesActivas: new Set(['Rosario']),
+    })
     expect(resultado.map((e) => e.id)).toEqual(['a', 'b'])
+  })
+
+  it('localidadesActivas admite más de una localidad a la vez', () => {
+    const resultado = filtrarEspacios(espacios, {
+      localidadesActivas: new Set(['Rosario', 'Venado Tuerto']),
+    })
+    expect(resultado.map((e) => e.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('localidadesActivas como Set vacío filtra todo (a propósito, "Ninguna")', () => {
+    expect(
+      filtrarEspacios(espacios, { localidadesActivas: new Set() }),
+    ).toEqual([])
   })
 
   it('combina búsqueda, categoría y localidad a la vez', () => {
     const resultado = filtrarEspacios(espacios, {
       busqueda: 'museo',
       categoriasActivas: new Set(['Museos']),
-      localidadActiva: 'Rosario',
+      localidadesActivas: new Set(['Rosario']),
     })
     expect(resultado.map((e) => e.id)).toEqual(['a'])
   })
@@ -163,7 +180,7 @@ describe('hayFiltrosAplicados', () => {
         busqueda: '',
         categoriasActivas: null,
         gestionesActivas: null,
-        localidadActiva: null,
+        localidadesActivas: null,
       }),
     ).toBe(false)
   })
@@ -184,8 +201,11 @@ describe('hayFiltrosAplicados', () => {
     )
   })
 
-  it('una localidad elegida cuenta', () => {
-    expect(hayFiltrosAplicados({ localidadActiva: 'Famaillá' })).toBe(true)
+  it('una o más localidades elegidas cuentan', () => {
+    expect(
+      hayFiltrosAplicados({ localidadesActivas: new Set(['Famaillá']) }),
+    ).toBe(true)
+    expect(hayFiltrosAplicados({ localidadesActivas: new Set() })).toBe(true)
   })
 
   it('coincide con filtrarEspacios: si dice que no hay filtros, no recorta nada', () => {
@@ -199,7 +219,7 @@ describe('hayFiltrosAplicados', () => {
       {
         categoriasActivas: null,
         gestionesActivas: null,
-        localidadActiva: null,
+        localidadesActivas: null,
       },
     ]
     for (const filtros of sinFiltro) {
@@ -233,5 +253,44 @@ describe('filtrarYOrdenarEspacios', () => {
       'alfabetico',
     )
     expect(resultado.map((e) => e.id)).toEqual(['c', 'a'])
+  })
+})
+
+describe('alternarValorFiltro', () => {
+  it('estando en "Todas" (null), elegir un valor arranca una selección nueva con solo ese', () => {
+    expect(alternarValorFiltro(null, 'Museos')).toEqual(new Set(['Museos']))
+  })
+
+  it('con una selección puntual ya activa, suma el valor si no estaba', () => {
+    const resultado = alternarValorFiltro(new Set(['Museos']), 'Cines')
+    expect(resultado).toEqual(new Set(['Museos', 'Cines']))
+  })
+
+  it('con una selección puntual ya activa, saca el valor si ya estaba', () => {
+    const resultado = alternarValorFiltro(new Set(['Museos', 'Cines']), 'Cines')
+    expect(resultado).toEqual(new Set(['Museos']))
+  })
+
+  it('sacar el último valor deja un Set vacío, no vuelve a "Todas"', () => {
+    expect(alternarValorFiltro(new Set(['Museos']), 'Museos')).toEqual(
+      new Set(),
+    )
+  })
+
+  it('no muta el Set recibido', () => {
+    const activos = new Set(['Museos'])
+    alternarValorFiltro(activos, 'Cines')
+    expect(activos).toEqual(new Set(['Museos']))
+  })
+})
+
+describe('alternarTodos', () => {
+  it('de "Todas" (null) pasa a un Set vacío ("Ninguna" a propósito)', () => {
+    expect(alternarTodos(null)).toEqual(new Set())
+  })
+
+  it('de cualquier selección puntual (incluido un Set vacío) vuelve a "Todas" (null)', () => {
+    expect(alternarTodos(new Set())).toBeNull()
+    expect(alternarTodos(new Set(['Museos']))).toBeNull()
   })
 })

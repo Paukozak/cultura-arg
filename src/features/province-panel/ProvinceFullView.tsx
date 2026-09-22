@@ -1,15 +1,17 @@
 import { ChevronDown, SlidersHorizontal } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { List, type RowComponentProps } from 'react-window'
 import { cargarEspacios, type Espacio } from '../../data/espacios'
 import { provinciasGeo } from '../../data/provincias'
 import { useMapStore } from '../../store/mapStore'
-import { useMediaQuery } from '../../utils/useMediaQuery'
+import { normalizar } from '../../utils/texto'
 import { ICONOS_POR_CATEGORIA, ICONO_POR_DEFECTO } from './categoriaIcons'
 import { nombreMostradoPara } from './curaduriaDestacados'
 import { EspacioFoto } from './EspacioFoto'
 import {
+  alternarTodos,
+  alternarValorFiltro,
   etiquetaVerEspacios,
   filtrarYOrdenarEspacios,
   hayFiltrosAplicados,
@@ -192,17 +194,32 @@ function ProvinceFullViewContent({
   const [gestionesActivas, setGestionesActivas] = useState<Set<string> | null>(
     null,
   )
-  const [localidadActiva, setLocalidadActiva] = useState<string | null>(
-    localidadInicial,
-  )
+  // Igual que categoriasActivas/gestionesActivas: `null` = todas, un Set
+  // (aunque vacío) filtra a esas localidades puntuales. Si se llega acá
+  // desde el buscador global con una localidad puntual, arranca con esa
+  // sola marcada en vez de "todas".
+  const [localidadesActivas, setLocalidadesActivas] =
+    useState<Set<string> | null>(
+      localidadInicial ? new Set([localidadInicial]) : null,
+    )
+  // Filtra la propia lista de localidades del selector (no la lista de
+  // espacios: eso lo hace `busqueda`) — con cientos de localidades por
+  // provincia, tipear para encontrar la que se busca es más rápido que
+  // scrollear una lista larga de checkboxes.
+  const [busquedaLocalidad, setBusquedaLocalidad] = useState('')
+  // El picker de localidad arranca plegado — es una lista que puede tener
+  // cientos de filas, así que solo se arma/muestra al hacer clic en su
+  // gatillo (mismo patrón de click-afuera-cierra que GlobalSearch.tsx).
+  const [localidadAbierta, setLocalidadAbierta] = useState(false)
+  const localidadRef = useRef<HTMLDivElement>(null)
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(
     espacioInicialId,
   )
-  // En mobile arrancan plegados: los filtros ocupan la pantalla entera al
-  // abrirse (ver el botón "Ver N espacios") y lo primero que se quiere ver
-  // es la lista. En pantallas más grandes conviven con ella, así que abiertos.
-  const esMobil = useMediaQuery('(max-width: 767px)')
-  const [filtrosAbiertos, setFiltrosAbiertos] = useState(!esMobil)
+  // Arrancan plegados en todos los tamaños: en mobile los filtros ocupan la
+  // pantalla entera al abrirse (ver el botón "Ver N espacios") y lo primero
+  // que se quiere ver es la lista; en desktop lo primero que se quiere ver
+  // es la lista de espacios de la provincia, no el panel de filtros.
+  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false)
   // Mobile: lista y ficha no entran apiladas en una sola pantalla (los
   // chips de categoría solos pueden ocupar varias líneas), así que se
   // muestra una u otra — nunca las dos — y se navega entre ellas como dos
@@ -236,31 +253,55 @@ function ProvinceFullViewContent({
     }
   }, [])
 
+  useEffect(() => {
+    if (!localidadAbierta) return
+    function onPointerDown(e: PointerEvent) {
+      if (!localidadRef.current?.contains(e.target as Node)) {
+        setLocalidadAbierta(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [localidadAbierta])
+
   const provincia = provinciasGeo.features.find(
     (f) => f.properties.id === provinciaId,
   )
 
-  const categorias = useMemo(() => {
+  // Base para los números de categoría/gestión: los espacios de la
+  // provincia recortados por la(s) localidad(es) elegida(s) (si hay), para
+  // que esos conteos —y qué chips aparecen— correspondan a esa localidad en
+  // vez de a la provincia entera. Ojo: es la única otra cosa que los
+  // recorta a propósito; categoría y gestión no se recortan entre sí (si
+  // no, tildar una categoría achicaría la lista de gestiones y viceversa).
+  const espaciosDeLocalidad = useMemo(() => {
     if (!espacios) return []
+    if (!localidadesActivas) return espacios
+    return espacios.filter((e) =>
+      localidadesActivas.has(e.localidad ?? 'sin dato'),
+    )
+  }, [espacios, localidadesActivas])
+
+  const categorias = useMemo(() => {
     const conteo = new Map<string, number>()
-    for (const e of espacios)
+    for (const e of espaciosDeLocalidad)
       conteo.set(e.categoria, (conteo.get(e.categoria) ?? 0) + 1)
     return [...conteo.entries()].sort((a, b) => b[1] - a[1])
-  }, [espacios])
+  }, [espaciosDeLocalidad])
 
   const gestiones = useMemo(() => {
-    if (!espacios) return []
     const conteo = new Map<string, number>()
-    for (const e of espacios) {
+    for (const e of espaciosDeLocalidad) {
       const clave = e.gestion ?? 'sin dato'
       conteo.set(clave, (conteo.get(clave) ?? 0) + 1)
     }
     return [...conteo.entries()]
-  }, [espacios])
+  }, [espaciosDeLocalidad])
 
   // La localidad puede tener cientos de valores distintos (Buenos Aires,
-  // CABA) — a diferencia de categoría/gestión, no entra como chips: va en
-  // un <select> nativo, ordenado alfabéticamente, con conteos.
+  // CABA) — a diferencia de categoría/gestión, no entra como chips sueltos:
+  // va en una lista de checkboxes con buscador propio, ordenada
+  // alfabéticamente, con conteos.
   const localidades = useMemo(() => {
     if (!espacios) return []
     const conteo = new Map<string, number>()
@@ -271,11 +312,33 @@ function ProvinceFullViewContent({
     return [...conteo.entries()].sort((a, b) => a[0].localeCompare(b[0], 'es'))
   }, [espacios])
 
+  // Texto del gatillo del picker (plegado): qué está eligiendo sin tener
+  // que abrirlo. Mismo criterio de "todas" que categoría/gestión — un Set
+  // que terminó incluyendo a todas cuenta como "todas", no como "3 de 3".
+  const resumenLocalidad = useMemo(() => {
+    if (!localidadesActivas) return `Todas (${localidades.length})`
+    if (localidadesActivas.size === 0) return 'Ninguna'
+    if (localidadesActivas.size === localidades.length)
+      return `Todas (${localidades.length})`
+    const [primera] = localidadesActivas
+    return localidadesActivas.size === 1
+      ? primera
+      : `${primera} +${localidadesActivas.size - 1}`
+  }, [localidadesActivas, localidades])
+
+  const localidadesMostradas = useMemo(() => {
+    const q = normalizar(busquedaLocalidad.trim())
+    if (!q) return localidades
+    return localidades.filter(([localidad]) =>
+      normalizar(localidad).includes(q),
+    )
+  }, [localidades, busquedaLocalidad])
+
   const filtrados = useMemo(() => {
     if (!espacios) return []
     return filtrarYOrdenarEspacios(
       espacios,
-      { busqueda, categoriasActivas, gestionesActivas, localidadActiva },
+      { busqueda, categoriasActivas, gestionesActivas, localidadesActivas },
       orden,
     )
   }, [
@@ -283,7 +346,7 @@ function ProvinceFullViewContent({
     busqueda,
     categoriasActivas,
     gestionesActivas,
-    localidadActiva,
+    localidadesActivas,
     orden,
   ])
 
@@ -291,7 +354,7 @@ function ProvinceFullViewContent({
     busqueda,
     categoriasActivas,
     gestionesActivas,
-    localidadActiva,
+    localidadesActivas,
   })
 
   // Por default se muestra la ficha del primero de la lista filtrada; si el
@@ -301,24 +364,31 @@ function ProvinceFullViewContent({
     return filtrados.find((e) => e.id === seleccionadoId) ?? filtrados[0]
   }, [filtrados, seleccionadoId])
 
+  // "Todas" es su propio chip, excluyente con el resto (ver
+  // alternarValorFiltro/alternarTodos en filtrarEspacios.ts, donde vive la
+  // lógica de verdad — acá solo se cablea al estado de cada filtro).
   function toggleCategoria(categoria: string) {
-    setCategoriasActivas((prev) => {
-      const base = prev ?? new Set(categorias.map(([c]) => c))
-      const next = new Set(base)
-      if (next.has(categoria)) next.delete(categoria)
-      else next.add(categoria)
-      return next
-    })
+    setCategoriasActivas((prev) => alternarValorFiltro(prev, categoria))
   }
 
   function toggleGestion(gestion: string) {
-    setGestionesActivas((prev) => {
-      const base = prev ?? new Set(gestiones.map(([g]) => g))
-      const next = new Set(base)
-      if (next.has(gestion)) next.delete(gestion)
-      else next.add(gestion)
-      return next
-    })
+    setGestionesActivas((prev) => alternarValorFiltro(prev, gestion))
+  }
+
+  function toggleLocalidad(localidad: string) {
+    setLocalidadesActivas((prev) => alternarValorFiltro(prev, localidad))
+  }
+
+  function toggleTodasCategoria() {
+    setCategoriasActivas(alternarTodos)
+  }
+
+  function toggleTodasGestion() {
+    setGestionesActivas(alternarTodos)
+  }
+
+  function toggleTodasLocalidad() {
+    setLocalidadesActivas(alternarTodos)
   }
 
   return (
@@ -435,14 +505,6 @@ function ProvinceFullViewContent({
                   filtrosAbiertos ? 'flex' : 'hidden'
                 }`}
               >
-                <input
-                  type="search"
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                  placeholder="Buscar por nombre o localidad…"
-                  className="rounded-full border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm text-neutral-200 placeholder:text-neutral-600"
-                />
-
                 <div className="flex items-center justify-between gap-3">
                   <span className="font-mono text-xs uppercase tracking-wide text-neutral-500">
                     Ordenar
@@ -460,52 +522,118 @@ function ProvinceFullViewContent({
                   </select>
                 </div>
 
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-mono text-xs uppercase tracking-wide text-neutral-500">
+                <div ref={localidadRef} className="relative">
+                  <span className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-neutral-500">
                     Localidad
                   </span>
-                  <select
-                    value={localidadActiva ?? ''}
-                    onChange={(e) => setLocalidadActiva(e.target.value || null)}
-                    className="min-w-0 max-w-55 rounded-md border border-neutral-800 bg-neutral-900 px-2 py-1 text-xs text-neutral-200"
+                  {/* Gatillo: la lista de localidades (buscador + checkboxes)
+                      solo se arma y se muestra al abrirlo, no ocupa lugar de
+                      entrada. */}
+                  <button
+                    type="button"
+                    onClick={() => setLocalidadAbierta((abierta) => !abierta)}
+                    aria-expanded={localidadAbierta}
+                    aria-controls="localidad-picker"
+                    className="flex w-full items-center justify-between gap-2 rounded-md border border-neutral-800 bg-neutral-900 px-2 py-1.5 text-xs text-neutral-200"
                   >
-                    <option value="">Todas ({espacios.length})</option>
-                    {localidades.map(([localidad, count]) => (
-                      <option key={localidad} value={localidad}>
-                        {localidad} ({count})
-                      </option>
-                    ))}
-                  </select>
+                    <span className="min-w-0 flex-1 truncate text-left">
+                      {resumenLocalidad}
+                    </span>
+                    <ChevronDown
+                      aria-hidden="true"
+                      className={`h-3.5 w-3.5 shrink-0 text-neutral-500 transition-transform ${
+                        localidadAbierta ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+                  {localidadAbierta && (
+                    <div
+                      id="localidad-picker"
+                      className="absolute left-0 right-0 top-full z-10 mt-1.5 rounded-md border border-neutral-800 bg-neutral-950 p-1.5 shadow-lg shadow-black/40"
+                    >
+                      <input
+                        type="search"
+                        autoFocus
+                        value={busquedaLocalidad}
+                        onChange={(e) => setBusquedaLocalidad(e.target.value)}
+                        placeholder="Buscar localidad…"
+                        className="mb-1.5 w-full rounded-md border border-neutral-800 bg-neutral-900 px-2 py-1.5 text-xs text-neutral-200 placeholder:text-neutral-600"
+                      />
+                      <div className="max-h-52 overflow-y-auto rounded-md border border-neutral-800">
+                        {/* "Todas" fija arriba de la lista (no se filtra con
+                            el buscador): excluyente con el resto, igual que
+                            en Categoría/Gestión — ver toggleLocalidad. */}
+                        <label className="flex cursor-pointer items-center gap-2 border-b border-neutral-800 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-900">
+                          <input
+                            type="checkbox"
+                            checked={localidadesActivas === null}
+                            onChange={toggleTodasLocalidad}
+                            className="accent-accent"
+                          />
+                          <span className="min-w-0 flex-1 truncate">Todas</span>
+                          <span className="shrink-0 text-neutral-500">
+                            {espacios.length}
+                          </span>
+                        </label>
+                        {localidadesMostradas.length === 0 ? (
+                          <p className="px-2 py-1.5 text-xs text-neutral-500">
+                            Sin resultados.
+                          </p>
+                        ) : (
+                          localidadesMostradas.map(([localidad, count]) => {
+                            const activa = localidadesActivas
+                              ? localidadesActivas.has(localidad)
+                              : false
+                            return (
+                              <label
+                                key={localidad}
+                                className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-900"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={activa}
+                                  onChange={() => toggleLocalidad(localidad)}
+                                  className="accent-accent"
+                                />
+                                <span className="min-w-0 flex-1 truncate">
+                                  {localidad}
+                                </span>
+                                <span className="shrink-0 text-neutral-500">
+                                  {count}
+                                </span>
+                              </label>
+                            )
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <span className="font-mono text-xs uppercase tracking-wide text-neutral-500">
-                      Categoría
-                    </span>
-                    <div className="flex gap-2 font-mono text-[10px] uppercase tracking-wide text-neutral-500">
-                      <button
-                        type="button"
-                        onClick={() => setCategoriasActivas(null)}
-                        className="hover:text-neutral-200"
-                      >
-                        Todas
-                      </button>
-                      <span aria-hidden="true">·</span>
-                      <button
-                        type="button"
-                        onClick={() => setCategoriasActivas(new Set())}
-                        className="hover:text-neutral-200"
-                      >
-                        Ninguna
-                      </button>
-                    </div>
-                  </div>
+                  <span className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-neutral-500">
+                    Categoría
+                  </span>
                   <div className="flex flex-wrap gap-1.5">
+                    {/* "Todas" es un chip más, excluyente con el resto: no
+                        puede convivir marcado con una categoría puntual (ver
+                        toggleCategoria). */}
+                    <button
+                      type="button"
+                      onClick={toggleTodasCategoria}
+                      aria-pressed={categoriasActivas === null}
+                      className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                        categoriasActivas === null
+                          ? 'border-accent bg-accent/15 text-accent'
+                          : 'border-neutral-800 text-neutral-500'
+                      }`}
+                    >
+                      Todas ({espaciosDeLocalidad.length})
+                    </button>
                     {categorias.map(([categoria, count]) => {
                       const activa = categoriasActivas
                         ? categoriasActivas.has(categoria)
-                        : true
+                        : false
                       return (
                         <button
                           key={categoria}
@@ -527,33 +655,26 @@ function ProvinceFullViewContent({
 
                 {gestiones.length > 1 && (
                   <div>
-                    <div className="mb-1.5 flex items-center justify-between">
-                      <span className="font-mono text-xs uppercase tracking-wide text-neutral-500">
-                        Gestión
-                      </span>
-                      <div className="flex gap-2 font-mono text-[10px] uppercase tracking-wide text-neutral-500">
-                        <button
-                          type="button"
-                          onClick={() => setGestionesActivas(null)}
-                          className="hover:text-neutral-200"
-                        >
-                          Todas
-                        </button>
-                        <span aria-hidden="true">·</span>
-                        <button
-                          type="button"
-                          onClick={() => setGestionesActivas(new Set())}
-                          className="hover:text-neutral-200"
-                        >
-                          Ninguna
-                        </button>
-                      </div>
-                    </div>
+                    <span className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-neutral-500">
+                      Gestión
+                    </span>
                     <div className="flex flex-wrap gap-1.5">
+                      <button
+                        type="button"
+                        onClick={toggleTodasGestion}
+                        aria-pressed={gestionesActivas === null}
+                        className={`rounded-full border px-2.5 py-1 text-xs capitalize transition-colors ${
+                          gestionesActivas === null
+                            ? 'border-accent bg-accent/15 text-accent'
+                            : 'border-neutral-800 text-neutral-500'
+                        }`}
+                      >
+                        Todas ({espaciosDeLocalidad.length})
+                      </button>
                       {gestiones.map(([gestion, count]) => {
                         const activa = gestionesActivas
                           ? gestionesActivas.has(gestion)
-                          : true
+                          : false
                         return (
                           <button
                             key={gestion}
@@ -591,28 +712,45 @@ function ProvinceFullViewContent({
             </div>
 
             <div
-              className={`min-h-0 min-w-0 flex-1 border-t border-neutral-800/70 pt-2 lg:w-85 lg:flex-none lg:border-r lg:border-t-0 lg:border-neutral-800 ${
+              className={`flex min-h-0 min-w-0 flex-1 flex-col border-t border-neutral-800/70 lg:w-85 lg:flex-none lg:border-r lg:border-t-0 lg:border-neutral-800 ${
                 filtrosAbiertos ? 'max-md:hidden' : ''
               }`}
             >
-              {filtrados.length === 0 ? (
-                <p className="p-3 text-sm text-neutral-500">Sin resultados.</p>
-              ) : (
-                <List
-                  rowComponent={Fila}
-                  rowCount={filtrados.length}
-                  rowHeight={60}
-                  rowProps={{
-                    items: filtrados,
-                    seleccionadoId: seleccionado?.id ?? null,
-                    onSelect: (espacio) => {
-                      setSeleccionadoId(espacio.id)
-                      setVistaMobil('ficha')
-                    },
-                  }}
-                  style={{ height: '100%' } as CSSProperties}
+              {/* El buscador va con la lista de espacios (no con los demás
+                  filtros): es lo primero que se usa al entrar a la vista
+                  completa, y acá queda a la vista sin depender de que el
+                  panel de filtros esté desplegado. */}
+              <div className="shrink-0 px-3 pb-2 pt-3">
+                <input
+                  type="search"
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  placeholder="Buscar por nombre o localidad…"
+                  className="w-full rounded-full border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm text-neutral-200 placeholder:text-neutral-600"
                 />
-              )}
+              </div>
+              <div className="min-h-0 flex-1">
+                {filtrados.length === 0 ? (
+                  <p className="p-3 text-sm text-neutral-500">
+                    Sin resultados.
+                  </p>
+                ) : (
+                  <List
+                    rowComponent={Fila}
+                    rowCount={filtrados.length}
+                    rowHeight={60}
+                    rowProps={{
+                      items: filtrados,
+                      seleccionadoId: seleccionado?.id ?? null,
+                      onSelect: (espacio) => {
+                        setSeleccionadoId(espacio.id)
+                        setVistaMobil('ficha')
+                      },
+                    }}
+                    style={{ height: '100%' } as CSSProperties}
+                  />
+                )}
+              </div>
             </div>
           </div>
 
