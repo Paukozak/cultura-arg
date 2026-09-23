@@ -7,8 +7,10 @@ import {
   type TransitionEvent,
 } from 'react'
 import { geoMercator, geoPath, type GeoPermissibleObjects } from 'd3-geo'
+import { departamentosResumen } from '../../data/departamentos'
 import {
   geometriaDetalle,
+  malvinasGeo,
   provinciasGeo,
   type ProvinciaFeature,
 } from '../../data/provincias'
@@ -21,12 +23,18 @@ import {
   darken,
   highlightStroke,
 } from './colorScales'
-import { ProvincePins, type ZoomState } from './ProvincePins'
+import { DepartamentosChoropleth } from './DepartamentosChoropleth'
 import {
-  ALTO_TOOLTIP_PIN_PX,
+  ALTO_TOOLTIP_DEPARTAMENTO_PX,
   ALTO_TOOLTIP_PROVINCIA_PX,
   tooltipVaDebajo,
 } from './tooltipPosicion'
+
+interface ZoomState {
+  cx: number
+  cy: number
+  scale: number
+}
 
 const WIDTH = 800
 // Alto del viewBox: NO es una constante fija, se calcula dentro del
@@ -43,10 +51,13 @@ const WIDTH = 800
 // la única que cae acá es CABA.
 const MIN_TILE_PX = 12
 const ETIQUETA_CORTA: Record<string, string> = { '02': 'CABA' }
+// Gris propio de las Malvinas, no `SIN_DATOS_COLOR` (compartido con
+// provincias sin datos): más claro para que la ficha no se lea tan apagada.
+const MALVINAS_COLOR = '#78716c'
 const CALLOUT_DX = 95
 const CALLOUT_DY = -10
-const CALLOUT_PILL_W = 64
-const CALLOUT_PILL_H = 28
+const CALLOUT_PILL_W = 70
+const CALLOUT_PILL_H = 32
 
 // Look "relieve isométrico": cada provincia es una ficha extruida. El "lado"
 // (una copia del mismo path, oscurecida y corrida hacia abajo) simula el
@@ -58,10 +69,7 @@ const HOVER_LIFT = 4
 
 // Zoom animado hacia la provincia clickeada (Etapa 6): al seleccionar una
 // provincia, todo el mapa (fichas + llamados) se escala/traslada como una
-// sola unidad hacia el área real de esa provincia, y ahí aparecen los pines
-// por espacio. Un clic en un cluster de pines profundiza el zoom (multiplica
-// la escala) en vez de abrir una vista de zoom completamente nueva — mismo
-// mecanismo, un nivel más.
+// sola unidad hacia el área real de esa provincia.
 const ZOOM_MS = 450
 // Entrada del mapa (ver `.provincia-cara`/`.provincia-lado` en index.css): las
 // provincias aparecen en una ola de norte a sur — la de más arriba arranca de
@@ -85,7 +93,6 @@ const MIN_ZOOM_BBOX_PX = 40
 // una constante fija (`headerHeight` del store, medido con ResizeObserver
 // en Header.tsx): en mobile pasa a dos filas y mide más que en desktop.
 const MAX_ZOOM_SCALE = 400
-const CLUSTER_ZOOM_BOOST = 4
 
 function bboxZoom(
   geometria: GeoPermissibleObjects,
@@ -137,8 +144,8 @@ export function NationalMap() {
     y: number
     abajo: boolean
   } | null>(null)
-  const [pinHover, setPinHover] = useState<{
-    etiqueta: string
+  const [departamentoHover, setDepartamentoHover] = useState<{
+    nombre: string
     x: number
     y: number
     abajo: boolean
@@ -167,6 +174,20 @@ export function NationalMap() {
 
   const scales = useMemo(
     () => buildColorScales(provinciasGeo.features, modoDaltonico),
+    [modoDaltonico],
+  )
+
+  // Escala de color del choropleth por departamento (Etapa 9), calculada
+  // sobre los ~529 departamentos del país entero (no solo los de la
+  // provincia zoomeada) — así el color de un departamento es el mismo
+  // sin importar qué otra provincia se visitó antes. `departamentosResumen`
+  // es liviano (solo propiedades, sin geometría) y se carga eager.
+  const departamentoScales = useMemo(
+    () =>
+      buildColorScales(
+        departamentosResumen.map((properties) => ({ properties })),
+        modoDaltonico,
+      ),
     [modoDaltonico],
   )
 
@@ -213,6 +234,21 @@ export function NationalMap() {
     return m
   }, [path])
 
+  // Islas Malvinas: ficha gris fija, fuera de `provinciasGeo` (ver el
+  // comentario junto a `malvinasGeo`). Se proyecta con la misma `path`, en su
+  // ubicación real — que cae en mar abierto al sureste de la costa
+  // patagónica, sin superponerse a ninguna provincia.
+  const malvinas = useMemo(
+    () => ({
+      d: path(malvinasGeo) ?? undefined,
+      retrasoEntrada: `${Math.round(
+        Math.min(1, Math.max(0, path.centroid(malvinasGeo)[1] / HEIGHT)) *
+          ENTRADA_ONDA_MS,
+      )}ms`,
+    }),
+    [path, HEIGHT],
+  )
+
   const svgRef = useRef<SVGSVGElement>(null)
 
   // El nivel base de zoom (ajuste a la provincia entera) es una función pura
@@ -234,58 +270,48 @@ export function NationalMap() {
     )
   }, [provinciaSeleccionada, path, HEIGHT])
 
-  // Niveles extra de zoom por encima del base, uno por cada clic en un
-  // cluster de pines. Se resetean al cambiar de provincia ajustando el
+  // Se resetea el tooltip de hover al cambiar de provincia ajustando el
   // estado durante el render (patrón "adjust state during rendering" de
   // React) en vez de con un efecto, para no disparar un setState síncrono
-  // dentro de un efecto.
-  const [extraNiveles, setExtraNiveles] = useState<ZoomState[]>([])
+  // dentro de un efecto. El tooltip queda con datos de la provincia que
+  // estaba bajo el cursor ANTES del zoom: como el mouse no se mueve al
+  // zoomear, no se dispara un mouseenter/mouseleave nuevo y el tooltip
+  // viejo queda colgado apuntando a una provincia que ya no está ahí.
   const [provinciaDelZoom, setProvinciaDelZoom] = useState(
     provinciaSeleccionada,
   )
   if (provinciaSeleccionada !== provinciaDelZoom) {
     setProvinciaDelZoom(provinciaSeleccionada)
-    setExtraNiveles([])
-    // El tooltip de hover queda con datos de la provincia que estaba bajo
-    // el cursor ANTES del zoom: como el mouse no se mueve al zoomear, no
-    // se dispara un mouseenter/mouseleave nuevo y el tooltip viejo queda
-    // colgado apuntando a una provincia que ya no está ahí.
     setHover(null)
-    setPinHover(null)
+    setDepartamentoHover(null)
   }
 
-  const zoomStack = baseZoom ? [baseZoom, ...extraNiveles] : []
-  const zoom = zoomStack[zoomStack.length - 1] ?? null
+  const zoom = baseZoom
   const zoomKey = zoom ? `${zoom.cx}:${zoom.cy}:${zoom.scale}` : null
 
   // Marca cuándo el zoom está quieto (nada animando en este momento): parte
   // en `true` (nada se está moviendo al cargar la página) y se apaga apenas
-  // cambia de nivel — entrar, profundizar en un cluster o volver al mapa
-  // nacional —, hasta que el propio evento `transitionend` del `transform`
-  // (ver `onTransitionEnd` en el `<g>` de más abajo) avisa que la animación
-  // realmente terminó. Se usa el evento real en vez de un `setTimeout` de
-  // ZOOM_MS: un timer puede llegar a disparar en un momento distinto al que
-  // el `transform` realmente termina de animar (el navegador reprograma la
-  // transición si `zoomKey` cambia de nuevo antes de que venza, o el timer
-  // de una transición vieja puede quedar pendiente y disparar de más justo
-  // cuando arranca una nueva) — con el evento nativo no hay que adivinar.
+  // cambia de nivel — entrar o volver al mapa nacional —, hasta que el
+  // propio evento `transitionend` del `transform` (ver `onTransitionEnd` en
+  // el `<g>` de más abajo) avisa que la animación realmente terminó. Se usa
+  // el evento real en vez de un `setTimeout` de ZOOM_MS: un timer puede
+  // llegar a disparar en un momento distinto al que el `transform`
+  // realmente termina de animar (el navegador reprograma la transición si
+  // `zoomKey` cambia de nuevo antes de que venza, o el timer de una
+  // transición vieja puede quedar pendiente y disparar de más justo cuando
+  // arranca una nueva) — con el evento nativo no hay que adivinar.
   // Mientras está en `false` (transición en curso) se apagan a propósito
   // varios efectos costosos que el navegador no puede acelerar por GPU
   // junto con la animación del `transform` — cada uno obliga a
   // re-rasterizar contenido complejo en cada frame en vez de solo
   // recomponer una capa ya rasterizada:
-  // 1. Pines por espacio (ver ProvincePins): aparecen recién acá, con un
-  //    fade — si aparecieran de entrada, su contra-escala no coincidiría
-  //    con la escala real durante la transición y además el cálculo de
-  //    miles de puntos (CABA, Buenos Aires) competía por el mismo frame que
-  //    la animación.
-  // 2. Geometría de detalle sin simplificar (ver `geomParaRender` más
+  // 1. Geometría de detalle sin simplificar (ver `geomParaRender` más
   //    abajo): tiene ~5.5x más puntos que la low-poly, sumados en las 24
   //    provincias a la vez (todas cambian, no solo la seleccionada).
-  // 3. La sombra del SVG completo y el halo de la provincia seleccionada
+  // 2. La sombra del SVG completo y el halo de la provincia seleccionada
   //    (ambos con `filter: drop-shadow`, más abajo): un filtro CSS sobre
   //    contenido que se está escalando fuerza al navegador a recalcularlo
-  //    en software en cada frame — medido con Playwright, sacar estos tres
+  //    en software en cada frame — medido con Playwright, sacar estos
   //    filtros durante la transición bajó el promedio de ~37ms a ~19ms por
   //    frame (de ~27fps a ~53fps) en Buenos Aires y Córdoba.
   const [zoomAsentado, setZoomAsentado] = useState(true)
@@ -293,7 +319,6 @@ export function NationalMap() {
   if (zoomKey !== zoomKeyAnterior) {
     setZoomKeyAnterior(zoomKey)
     setZoomAsentado(false)
-    setPinHover(null)
   }
   const onZoomTransitionEnd = (e: TransitionEvent<SVGGElement>) => {
     // El `<g>` no anima ninguna otra propiedad por transición, pero el
@@ -302,20 +327,6 @@ export function NationalMap() {
       setZoomAsentado(true)
     }
   }
-
-  const onCluster = (cx: number, cy: number) => {
-    setExtraNiveles((niveles) => {
-      const top = niveles[niveles.length - 1] ?? baseZoom
-      if (!top) return niveles
-      const nuevaEscala = Math.min(
-        top.scale * CLUSTER_ZOOM_BOOST,
-        MAX_ZOOM_SCALE,
-      )
-      if (nuevaEscala === top.scale) return niveles
-      return [...niveles, { cx, cy, scale: nuevaEscala }]
-    })
-  }
-  const alejarUnNivel = () => setExtraNiveles((niveles) => niveles.slice(0, -1))
 
   // Ojo: a propósito NO se usa `transform-origin` para anclar el zoom al
   // punto (cx, cy). Si el origen cambiara entre el estado zoomeado y el
@@ -522,6 +533,38 @@ export function NationalMap() {
           {/* `key={entradaMapa}`: al cambiar, el grupo se vuelve a montar y
             las provincias repiten su animación de entrada. */}
           <g key={entradaMapa}>
+            {/* Paso 0: Islas Malvinas — ficha gris fija de referencia
+            territorial (`MALVINAS_COLOR`, literal y no un token de tema:
+            los tokens `--color-neutral-*` invierten qué extremo es
+            claro/oscuro según el tema, así que un lado fijo más oscuro que
+            la cara con esos tokens se invertía en modo oscuro). Sin
+            `data-provincia`, sin handlers de mouse/click y con
+            `pointerEvents="none"`: no forma parte del mapa interactivo (no
+            tiene espacios culturales en el dataset), a diferencia de toda
+            otra ficha del mapa. */}
+            <path
+              d={malvinas.d}
+              transform={`translate(0, ${EXTRUDE_DEPTH})`}
+              fill={darken(MALVINAS_COLOR, 0.6)}
+              className="provincia-lado"
+              style={{ animationDelay: malvinas.retrasoEntrada }}
+              pointerEvents="none"
+            />
+            <g
+              className="provincia-cara"
+              style={{ animationDelay: malvinas.retrasoEntrada }}
+            >
+              <path
+                d={malvinas.d}
+                fill={MALVINAS_COLOR}
+                stroke="rgba(10, 10, 10, 0.7)"
+                strokeWidth={1}
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+                pointerEvents="none"
+              />
+            </g>
+
             {fichas.map(
               ({ feature, d, colorLado, rellenoLado, retrasoEntrada }) => (
                 <path
@@ -715,7 +758,7 @@ export function NationalMap() {
                             y={anchorY}
                             textAnchor="middle"
                             dominantBaseline="central"
-                            fontSize={15}
+                            fontSize={19}
                             fontWeight={700}
                             // Fijo, no `var(--color-accent-ink)`: ese token
                             // contrasta contra la superficie de acento fija de
@@ -742,29 +785,30 @@ export function NationalMap() {
             )}
           </g>
 
-          {/* Paso 4: pines por espacio cultural, uno por provincia
-            seleccionada — solo una vez que el zoom llegó a destino. */}
+          {/* Paso 4: choropleth por departamento/partido de la provincia
+            zoomeada — reemplaza visualmente el color plano de su ficha una
+            vez que el zoom llegó a destino. */}
           {provinciaSeleccionada && zoom && (
-            <ProvincePins
+            <DepartamentosChoropleth
               provinciaId={provinciaSeleccionada}
-              projection={projection}
-              zoom={zoom}
+              path={path}
+              capaActiva={capaActiva}
+              scales={departamentoScales}
               visible={zoomAsentado}
-              onCluster={onCluster}
-              onHoverPin={(etiqueta, clientX, clientY) => {
+              onHover={(nombre, clientX, clientY) => {
                 const rect = svgRef.current?.getBoundingClientRect()
                 if (!rect) return
-                setPinHover({
-                  etiqueta,
+                setDepartamentoHover({
+                  nombre,
                   x: clientX - rect.left,
                   y: clientY - rect.top,
                   abajo: tooltipVaDebajo(
                     espacioSobreCursor(clientY),
-                    ALTO_TOOLTIP_PIN_PX,
+                    ALTO_TOOLTIP_DEPARTAMENTO_PX,
                   ),
                 })
               }}
-              onLeavePin={() => setPinHover(null)}
+              onLeave={() => setDepartamentoHover(null)}
             />
           )}
         </g>
@@ -786,38 +830,20 @@ export function NationalMap() {
         </div>
       )}
 
-      {pinHover && (
+      {departamentoHover && (
         <div
           className={`pointer-events-none absolute z-10 -translate-x-1/2 rounded-lg border border-neutral-800 bg-neutral-950/95 px-3 py-2 text-sm shadow-lg ${
-            pinHover.abajo ? '' : '-translate-y-full'
+            departamentoHover.abajo ? '' : '-translate-y-full'
           }`}
           style={{
-            left: pinHover.x,
-            top: pinHover.y + (pinHover.abajo ? 20 : -10),
+            left: departamentoHover.x,
+            top: departamentoHover.y + (departamentoHover.abajo ? 20 : -10),
           }}
         >
           <div className="font-medium text-neutral-100">
-            {pinHover.etiqueta}
+            {departamentoHover.nombre}
           </div>
         </div>
-      )}
-
-      {extraNiveles.length > 0 && (
-        <button
-          type="button"
-          onClick={alejarUnNivel}
-          // `data-mapa-ui`: ProvincePanel cierra el panel (y deselecciona
-          // la provincia) en cualquier click que no sea sobre `[data-provincia]`
-          // ni dentro del panel — sin esto, este botón quedaba atrapado por
-          // esa regla y CADA click acá también deseleccionaba todo, así que
-          // "alejar" un nivel terminaba pareciendo "volver al mapa nacional"
-          // de golpe en vez de retroceder de a un nivel como hace de verdad
-          // `alejarUnNivel` (`niveles.slice(0, -1)`).
-          data-mapa-ui="true"
-          className="absolute bottom-4 left-4 z-10 rounded-full border border-neutral-800 bg-neutral-950/95 px-3 py-1.5 font-mono text-xs text-neutral-300 shadow-lg transition-colors hover:text-neutral-100"
-        >
-          ← alejar
-        </button>
       )}
     </div>
   )

@@ -4,6 +4,7 @@ export interface Espacio {
   categoria: string
   subcategoria: string | null
   provinciaId: string | null
+  departamentoId: string | null
   departamento: string | null
   localidad: string | null
   lat: number | null

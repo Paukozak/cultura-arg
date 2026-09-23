@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  ALTO_TOOLTIP_PIN_PX,
-  ALTO_TOOLTIP_PROVINCIA_PX,
-  tooltipVaDebajo,
-} from './tooltipPosicion'
+import { ALTO_TOOLTIP_PROVINCIA_PX, tooltipVaDebajo } from './tooltipPosicion'
 
 describe('tooltipVaDebajo', () => {
   it('con lugar de sobra arriba del cursor, el tooltip va arriba', () => {
@@ -24,11 +20,5 @@ describe('tooltipVaDebajo', () => {
     const necesario = ALTO_TOOLTIP_PROVINCIA_PX + 10 + 4
     expect(tooltipVaDebajo(necesario, ALTO_TOOLTIP_PROVINCIA_PX)).toBe(false)
     expect(tooltipVaDebajo(necesario - 1, ALTO_TOOLTIP_PROVINCIA_PX)).toBe(true)
-  })
-
-  it('el tooltip de pin, más bajo, necesita menos lugar', () => {
-    const espacio = 60
-    expect(tooltipVaDebajo(espacio, ALTO_TOOLTIP_PROVINCIA_PX)).toBe(true)
-    expect(tooltipVaDebajo(espacio, ALTO_TOOLTIP_PIN_PX)).toBe(false)
   })
 })

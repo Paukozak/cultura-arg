@@ -179,11 +179,13 @@ function ProvinceFullViewContent({
   provinciaId,
   espacioInicialId,
   localidadInicial,
+  departamentoIdInicial,
   onCerrar,
 }: {
   provinciaId: string
   espacioInicialId: string | null
   localidadInicial: string | null
+  departamentoIdInicial: string | null
   onCerrar: () => void
 }) {
   const [espacios, setEspacios] = useState<Espacio[] | null>(null)
@@ -241,6 +243,26 @@ function ProvinceFullViewContent({
       cancelado = true
     }
   }, [provinciaId])
+
+  // Clic en una ficha del choropleth por departamento (ver
+  // DepartamentosChoropleth): a diferencia de `localidadInicial` (una sola
+  // localidad, conocida de entrada), acá hay que esperar a que carguen los
+  // espacios para saber qué localidades caen dentro de ese departamento.
+  // Se aplica UNA sola vez (con `aplicado`, no en `[localidadesActivas]`
+  // entre las dependencias): si no, cada ves que el usuario destildara una
+  // localidad a mano el efecto la volvería a tildar.
+  const departamentoInicialAplicado = useRef(false)
+  useEffect(() => {
+    if (!espacios || !departamentoIdInicial) return
+    if (departamentoInicialAplicado.current) return
+    departamentoInicialAplicado.current = true
+    const localidadesDelDepartamento = new Set(
+      espacios
+        .filter((e) => e.departamentoId === departamentoIdInicial)
+        .map((e) => e.localidad ?? 'sin dato'),
+    )
+    setLocalidadesActivas(localidadesDelDepartamento)
+  }, [espacios, departamentoIdInicial])
 
   // Con la vista completa abierta, el body de atrás no debería poder
   // scrollear: es un overlay de pantalla completa y esa barra de scroll
@@ -798,6 +820,7 @@ export function ProvinceFullView() {
   const vistaCompleta = useMapStore((s) => s.vistaCompleta)
   const espacioFocoId = useMapStore((s) => s.espacioFocoId)
   const localidadFocoId = useMapStore((s) => s.localidadFocoId)
+  const departamentoFocoId = useMapStore((s) => s.departamentoFocoId)
   const setVistaCompleta = useMapStore((s) => s.setVistaCompleta)
 
   return (
@@ -808,6 +831,7 @@ export function ProvinceFullView() {
           provinciaId={provinciaId}
           espacioInicialId={espacioFocoId}
           localidadInicial={localidadFocoId}
+          departamentoIdInicial={departamentoFocoId}
           onCerrar={() => setVistaCompleta(false)}
         />
       )}

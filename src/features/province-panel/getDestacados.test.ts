@@ -9,6 +9,7 @@ function espacio(
     nombre: overrides.id,
     subcategoria: null,
     provinciaId: '99',
+    departamentoId: null,
     departamento: null,
     localidad: null,
     lat: null,

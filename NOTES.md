@@ -12,12 +12,12 @@ simplificar) de cada provincia — no es un bug del zoom ni de los pines: son
 coordenadas del dataset de SInCA que no caen dentro de la provincia que el
 propio registro dice tener.
 
-**Mitigación ya aplicada** (`src/features/map/ProvincePins.tsx`): un pin no
-se dibuja si su coordenada cae a más de ~3km del polígono real de su
-provincia (margen pensado para no descartar casos legítimos cerca de la
-costa, como un club náutico sobre un muelle). Evita pines mostrados en
-cualquier lugar del mapa, pero no corrige el dato — el espacio sigue
-existiendo igual en el listado completo y la ficha, solo no se pinea.
+**Los pines se sacaron del mapa (2026-09-23)** (`ProvincePins.tsx` y su
+mitigación punto-en-polígono ya no existen — el zoom a una provincia sigue
+funcionando, pero ya no dibuja un punto por espacio). El problema de datos de
+abajo sigue siendo real igual, solo que hoy no tiene ningún efecto visible;
+queda documentado por si se reintroduce algo que dibuje espacios
+individuales sobre el mapa.
 
 **Lo que queda pendiente de una limpieza real:**
 
@@ -55,3 +55,15 @@ existiendo igual en el listado completo y la ficha, solo no se pinea.
 Reproducir: point-in-polygon de cada espacio contra
 `src/data/provincias-detalle.json` (la geometría sin simplificar, no la del
 mapa nacional).
+
+## CABA no tiene datos a nivel comuna (2026-09-23)
+
+El choropleth por departamento de la Etapa 9 (zoom a una provincia → colorea
+sus departamentos/partidos por total/densidad) deja las 15 comunas de CABA
+siempre sin datos. No es un bug de agregación: los ~2653 registros de CABA
+en SInCA traen el código de localidad `02000` (la ciudad entera) en vez de
+un código de comuna real (`02007`...`02105`, los que usa Georef) — la fuente
+simplemente no llega a ese nivel de detalle para CABA. Documentado también
+en `docs/data-quality-report.md` (sección "Asignación de departamento por
+registro"). No hay forma de arreglarlo sin otra fuente que sí geocodifique
+por comuna.

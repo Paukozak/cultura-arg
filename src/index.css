@@ -86,25 +86,6 @@ input[type='checkbox'] {
   outline-offset: 2px;
 }
 
-/* Pin individual del mapa (ProvincePins): un punto sutil que combina con el
-   fondo de la página en vez de un círculo de acento sólido, con un aro fino
-   del color de acento. El hover (cursor real, no touch) lo agranda un
-   poco — feedback directo de "esto es clickeable" sin gastar un re-render
-   de React por cada uno de los miles de pines que puede haber. */
-.pin-marker {
-  transition:
-    transform 150ms ease,
-    filter 150ms ease;
-  transform-box: fill-box;
-  transform-origin: center;
-}
-@media (hover: hover) {
-  .pin-marker:hover {
-    transform: scale(1.35);
-    filter: brightness(1.15);
-  }
-}
-
 /* Entrada del mapa (NationalMap): las provincias "brotan" en una ola de norte
    a sur — cada una crece hacia arriba desde su borde de abajo (`clip-path`
    que se abre) mientras sube desde 28 unidades más abajo; sus lados (el

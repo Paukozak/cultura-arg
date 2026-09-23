@@ -19,12 +19,21 @@ interface MapState {
   espacioFocoId: string | null
   abrirVistaCompleta: (espacioId?: string | null) => void
   /** Localidad por la que arranca filtrada la vista completa (buscador
-   * global). Se limpia sola: `abrirVistaCompleta` y
-   * `abrirVistaCompletaPorLocalidad` se pisan mutuamente el foco del otro,
-   * así no queda un filtro de una búsqueda anterior colgado en una
-   * apertura sin relación (p. ej. "ver todos los espacios" del panel). */
+   * global). Se limpia sola: `abrirVistaCompleta`,
+   * `abrirVistaCompletaPorLocalidad` y `abrirVistaCompletaPorDepartamento`
+   * se pisan mutuamente el foco del otro, así no queda un filtro de una
+   * búsqueda anterior colgado en una apertura sin relación (p. ej. "ver
+   * todos los espacios" del panel). */
   localidadFocoId: string | null
   abrirVistaCompletaPorLocalidad: (localidad: string) => void
+  /** Departamento/partido por el que arranca filtrada la vista completa (clic
+   * en una ficha del choropleth por departamento, Etapa 9 — ver
+   * `DepartamentosChoropleth`). A diferencia de `localidadFocoId` (una sola
+   * localidad puntual), un departamento suele contener varias localidades:
+   * `ProvinceFullView` arranca con todas ELLAS tildadas en el filtro de
+   * localidad, no con un filtro de departamento aparte. */
+  departamentoFocoId: string | null
+  abrirVistaCompletaPorDepartamento: (departamentoId: string) => void
   /** Rampa de color del mapa (Legend/NationalMap): violeta por defecto,
    * azul de ColorBrewer si está activado. Se guarda en localStorage —
    * mismo patrón que el tema — para que la elección persista entre
@@ -98,6 +107,7 @@ export const useMapStore = create<MapState>((set) => ({
       vistaCompleta: true,
       espacioFocoId: espacioId,
       localidadFocoId: null,
+      departamentoFocoId: null,
     }),
   localidadFocoId: null,
   abrirVistaCompletaPorLocalidad: (localidad) =>
@@ -105,6 +115,15 @@ export const useMapStore = create<MapState>((set) => ({
       vistaCompleta: true,
       espacioFocoId: null,
       localidadFocoId: localidad,
+      departamentoFocoId: null,
+    }),
+  departamentoFocoId: null,
+  abrirVistaCompletaPorDepartamento: (departamentoId) =>
+    set({
+      vistaCompleta: true,
+      espacioFocoId: null,
+      localidadFocoId: null,
+      departamentoFocoId: departamentoId,
     }),
   modoDaltonico: modoDaltonicoInicial(),
   toggleModoDaltonico: () =>

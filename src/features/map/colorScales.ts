@@ -1,6 +1,14 @@
 import { scaleQuantile } from 'd3-scale'
-import type { ProvinciaProperties } from '../../data/provincias'
 import type { Capa } from '../../store/mapStore'
+
+// Lo mínimo que necesita esta escala de color — tanto `ProvinciaProperties`
+// como `DepartamentoProperties` (src/data/provincias.ts, .../departamentos.ts)
+// cumplen esta forma, así que la misma escala sirve para el mapa nacional y
+// para el choropleth por departamento de una provincia zoomeada.
+export interface ConEstadisticas {
+  totalEspacios: number
+  densidadPor100k: number | null
+}
 
 // Escala secuencial violeta (lavanda clarito -> violeta profundo), la gama
 // principal de la app. Es una rampa a medida (no la rampa secuencial azul
@@ -37,6 +45,11 @@ export const TITULO_CAPA: Record<Capa, string> = {
   total: 'Total de espacios culturales',
 }
 
+export const UNIDAD_CAPA: Record<Capa, string> = {
+  densidad: 'ESPACIOS/100K',
+  total: 'ESPACIOS',
+}
+
 function pasosPara(daltonico: boolean): string[] {
   return daltonico ? DALTONICO_SEQUENTIAL_STEPS : VIOLETA_SEQUENTIAL_STEPS
 }
@@ -53,7 +66,7 @@ function quantileScale(valores: number[], daltonico: boolean) {
 }
 
 export function buildColorScales(
-  features: { properties: ProvinciaProperties }[],
+  features: { properties: ConEstadisticas }[],
   daltonico = false,
 ) {
   const densidades = features
@@ -106,7 +119,7 @@ export function apagarConFondo(color: string, opacidad: number): string {
 }
 
 export function colorForFeature(
-  props: ProvinciaProperties,
+  props: ConEstadisticas,
   capa: Capa,
   scales: ReturnType<typeof buildColorScales>,
 ): string {

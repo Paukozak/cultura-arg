@@ -63,3 +63,10 @@ export const SINCA_RESOURCES = [
 
 export const GEOREF_PROVINCIAS_URL =
   'https://apis.datos.gob.ar/georef/api/provincias.geojson'
+
+// Departamentos/partidos (segundo nivel administrativo, ~529 en todo el
+// país) de la misma API Georef. `campos` recorta a lo que se usa (sin esto
+// trae variantes de nombre e intersección de provincia que no hacen
+// falta); `max=600` es necesario porque el default de la API es 10.
+export const GEOREF_DEPARTAMENTOS_URL =
+  'https://apis.datos.gob.ar/georef/api/departamentos.geojson?campos=id,nombre,nombre_completo,provincia,centroide&max=600'

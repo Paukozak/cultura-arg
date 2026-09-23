@@ -129,6 +129,22 @@ function dropRemoteParts(geometry) {
   }
 }
 
+// Un anillo de 4 puntos (3 vértices + cierre) es un triángulo casi
+// degenerado — ver el comentario largo junto a `MIN_PART_SPAN_DEG` de más
+// arriba: confunde el cálculo de límites esférico de d3-geo y rompe la
+// proyección de TODA la feature, no solo esa parte. `dropRemoteParts` ya
+// filtra por span en grados ANTES de simplificar, pero un islote que pasa
+// ese filtro puede terminar igual como triángulo después de simplificar
+// (confirmado en scripts/extract-malvinas.mjs) — este filtro va DESPUÉS,
+// sobre el resultado ya simplificado.
+function sinTriangulosDegenerados(geometry) {
+  if (geometry.type !== 'MultiPolygon') return geometry
+  return {
+    type: 'MultiPolygon',
+    coordinates: geometry.coordinates.filter((part) => part[0].length > 4),
+  }
+}
+
 // --- Unificación de localidades ----------------------------------------------
 // El campo `localidad` viene de tipeo manual en los CSV fuente y trae varias
 // variantes del mismo lugar por acentos faltantes o mayúsculas inconsistentes
@@ -221,6 +237,37 @@ function unifyLocalidades(espacios) {
   }
 }
 
+// --- Códigos de departamento vencidos ----------------------------------------
+// `departamentoId` (Etapa 9, ver `loadEspacios`) se deriva de `Cod_Loc`, el
+// código de localidad INDEC embebido en el propio CSV de SInCA. Para la
+// enorme mayoría de los ~11 mil registros ese código coincide exactamente
+// con el id de departamento que usa Georef hoy — pero se encontraron dos
+// bolsones donde SInCA trae un código de una nomenclatura vieja, previa a
+// una redivisión administrativa posterior, y Georef (y el Censo 2022) ya
+// usan el nuevo:
+//
+// - Tierra del Fuego: el departamento "Río Grande" se dividió en 2017 (ley
+//   provincial 1186) para crear "Tolhuin" — Georef ya tiene 3 ids (Río
+//   Grande=94008, Tolhuin=94011, Ushuaia=94015) donde SInCA sigue usando 2
+//   (94007, 94014, el esquema previo a la división). No hay forma de saber,
+//   de los registros bajo el viejo 94007, cuáles caerían hoy en Tolhuin —
+//   se remapean todos a Río Grande (94008), el departamento del que
+//   Tolhuin se separó, en vez de inventar una distribución.
+// - Buenos Aires: los 12 registros de Chascomús traen `06217`; el id real
+//   de Georef es `06218`.
+//
+// Verificado 2026-09-23 comparando cada `departamentoId` derivado contra
+// los ids de `data/raw/departamentos.geojson` (Georef) — estos fueron los
+// únicos casos sistemáticos (no puntuales) de códigos que no matchean
+// ningún departamento real. CABA (siempre `02000`) es aparte: no es un
+// código vencido, es que SInCA no llega a nivel comuna para CABA (ver el
+// comentario junto a `porDepartamento` en `main()`).
+const DEPARTAMENTO_ID_LEGACY = {
+  94007: '94008', // Río Grande (pre-división de Tolhuin)
+  94014: '94015', // Ushuaia
+  '06217': '06218', // Chascomús
+}
+
 // --- Correcciones puntuales ---------------------------------------------------
 // Casos individuales, verificados a mano, donde la fila fuente tiene un dato
 // objetivamente erróneo (no es una variante de tipeo — es la provincia
@@ -243,6 +290,7 @@ function aplicarCorreccionesPuntuales(espacios) {
       e.provinciaId = '06'
       e.departamento = 'General San Martín'
       e.localidad = 'General San Martín' // mismo partido que las otras 24 entradas ya cargadas como "General San Martín"
+      e.departamentoId = '06371' // id real de Georef para General San Martín (ver DEPARTAMENTO_ID_LEGACY)
     }
 
     // Único registro de todo el dataset sin localidad (bibliotecas-populares.csv,
@@ -642,8 +690,18 @@ async function loadEspacios() {
 
     rows.forEach((row, i) => {
       const codLocRaw = field(row, config.codLoc)
-      const provinciaId = codLocRaw
-        ? codLocRaw.padStart(8, '0').slice(0, 2)
+      const codLocPadded = codLocRaw ? codLocRaw.padStart(8, '0') : null
+      const provinciaId = codLocPadded ? codLocPadded.slice(0, 2) : null
+      // Mismo código de 8 dígitos (2 provincia + 3 departamento + 3
+      // localidad) del que ya se deriva `provinciaId` — los primeros 5
+      // dígitos son el id de departamento estándar INDEC, el mismo que usa
+      // Georef para `departamentos.geojson`. Se usa el código en vez del
+      // nombre de columna `departamento` (correspondiente a `config.departamento`,
+      // que ni siquiera existe para todas las categorías) porque es
+      // consistente entre categorías y no depende de tipeo/acentos.
+      const departamentoIdCrudo = codLocPadded ? codLocPadded.slice(0, 5) : null
+      const departamentoId = departamentoIdCrudo
+        ? (DEPARTAMENTO_ID_LEGACY[departamentoIdCrudo] ?? departamentoIdCrudo)
         : null
       const anio = config.anio
         ? parseYear(row[config.anio.key], config.anio.format)
@@ -656,6 +714,7 @@ async function loadEspacios() {
         categoria: resource.categoria,
         subcategoria: field(row, config.subcategoria),
         provinciaId,
+        departamentoId,
         departamento: field(row, config.departamento),
         localidad: field(row, config.localidad),
         lat: parseCoord(field(row, config.lat)),
@@ -742,6 +801,12 @@ function buildDataQualityReport(completitud, totalEspacios, totalConAnio) {
     '`provinciaId` se deriva del código de localidad INDEC (`cod_loc`/`cod_localidad`/`localidad_id` según el CSV) y no de la columna explícita de provincia: al comparar ambas fuentes fila por fila, la columna de provincia trae errores de tipeo puntuales (confirmado en `galerias-de-arte.csv`, 3 filas, y `salas-de-teatro.csv`, 1 fila) mientras que el código de localidad es consistente en la enorme mayoría de los casos. Se detectó una única excepción en sentido inverso en `librerias.csv` (1 fila de 1623) donde el código de localidad parece ser el erróneo. Impacto total: menos de 5 registros de 11234 (<0.05%) podrían estar en la provincia equivocada.',
   )
   lines.push('')
+  lines.push('## Asignación de departamento por registro (Etapa 9)')
+  lines.push('')
+  lines.push(
+    '`departamentoId` toma los primeros 5 dígitos del mismo código de localidad (2 de provincia + 3 de departamento), el mismo id que usa Georef para `departamentos.geojson`. Dos bolsones de códigos vencidos (nomenclatura vieja, previa a una redivisión administrativa) se remapean a mano — ver `DEPARTAMENTO_ID_LEGACY` en este script: Tierra del Fuego (102 registros bajo los códigos previos a la creación de Tolhuin en 2017) y Chascomús, Buenos Aires (12 registros). **CABA es aparte y no tiene arreglo posible con este dataset**: sus 2653 registros siempre traen el código placeholder `02000` (la ciudad entera, no una comuna) — SInCA no llega a nivel comuna para CABA, así que el choropleth por comuna de CABA (Etapa 9) queda sin datos en las 15.',
+  )
+  lines.push('')
   return lines.join('\n')
 }
 
@@ -755,6 +820,19 @@ async function main() {
   const { poblacion } = JSON.parse(
     await readFile(
       path.join(ROOT, 'data', 'poblacion-provincias.json'),
+      'utf8',
+    ),
+  )
+
+  console.log('Leyendo geometría de departamentos (Georef)...')
+  const departamentosGeojsonRaw = JSON.parse(
+    await readFile(path.join(RAW_DIR, 'departamentos.geojson'), 'utf8'),
+  )
+
+  console.log('Leyendo población por departamento (Censo 2022)...')
+  const { poblacion: poblacionDepartamentos } = JSON.parse(
+    await readFile(
+      path.join(ROOT, 'data', 'poblacion-departamentos.json'),
       'utf8',
     ),
   )
@@ -800,6 +878,30 @@ async function main() {
       porProvincia.set(e.provinciaId, { total: 0, porCategoria: new Map() })
     }
     const agg = porProvincia.get(e.provinciaId)
+    agg.total++
+    agg.porCategoria.set(
+      e.categoria,
+      (agg.porCategoria.get(e.categoria) ?? 0) + 1,
+    )
+  }
+
+  // --- Agregados por departamento --------------------------------------------
+  // Mismo cálculo que `porProvincia`, a nivel departamento (ver
+  // `departamentoId` en `loadEspacios`). Nota: en CABA el dataset de SInCA
+  // no llega a nivel comuna — todos sus registros traen el mismo código
+  // placeholder `02000` (no una comuna real de las 15 que tiene Georef), así
+  // que el choropleth por comuna de CABA queda sin datos en todas — es una
+  // limitación de la fuente, no un bug de este agregado.
+  const porDepartamento = new Map()
+  for (const e of espacios) {
+    if (!e.departamentoId) continue
+    if (!porDepartamento.has(e.departamentoId)) {
+      porDepartamento.set(e.departamentoId, {
+        total: 0,
+        porCategoria: new Map(),
+      })
+    }
+    const agg = porDepartamento.get(e.departamentoId)
     agg.total++
     agg.porCategoria.set(
       e.categoria,
@@ -870,6 +972,74 @@ async function main() {
     })),
   }
 
+  // --- Departamentos: geometría + propiedades --------------------------------
+  // Sin `simplify()` (a diferencia del mapa nacional): un departamento solo
+  // se ve cuando ya se hizo zoom a SU provincia, a una escala donde el low-
+  // poly de país se notaría groseramente desalineado — mismo criterio que
+  // `provinciasDetalle`. El peso total (ver log más abajo) es comparable al
+  // de esa geometría de detalle, así que no hace falta.
+  //
+  // Se descartan enteros los departamentos que no lleguen a
+  // ANTARCTIC_LAT_CUTOFF (el "Antártida Argentina" de Tierra del Fuego, que
+  // por sí solo llega a -90°, igual que el sector antártico a nivel
+  // provincia) y se les aplica `dropRemoteParts` a los demás (el
+  // departamento "Islas del Atlántico Sur" trae, en un solo MultiPolygon,
+  // las Malvinas Y las Georgias/Sandwich del Sur — a miles de km de
+  // distancia; sin este filtro, encuadrar Tierra del Fuego incluiría ese
+  // archipiélago lejano y el zoom a la provincia quedaría alejadísimo).
+  console.log('Procesando geometría de departamentos...')
+  const departamentosPorProvincia = new Map()
+  let departamentosDescartados = 0
+  for (const f of departamentosGeojsonRaw.features) {
+    const maxLat = Math.max(
+      ...(f.geometry.type === 'MultiPolygon'
+        ? f.geometry.coordinates
+        : [f.geometry.coordinates]
+      ).map((poly) => ringBounds(poly[0]).maxLat),
+    )
+    if (maxLat <= ANTARCTIC_LAT_CUTOFF) {
+      departamentosDescartados++
+      continue
+    }
+
+    const id = f.properties.id
+    const provinciaId = f.properties.provincia.id
+    const agg = porDepartamento.get(id) ?? { total: 0, porCategoria: new Map() }
+    const porCategoriaObj = Object.fromEntries(agg.porCategoria)
+    const maxCount = Math.max(0, ...Object.values(porCategoriaObj))
+    const categoriasPredominantes = Object.entries(porCategoriaObj)
+      .filter(([, count]) => count === maxCount && maxCount > 0)
+      .map(([categoria]) => categoria)
+    const pob = poblacionDepartamentos[id] ?? null
+
+    const geometry = sinTriangulosDegenerados(dropRemoteParts(f.geometry))
+
+    const feature = {
+      type: 'Feature',
+      properties: {
+        id,
+        provinciaId,
+        nombre: f.properties.nombre,
+        poblacion: pob,
+        totalEspacios: agg.total,
+        porCategoria: porCategoriaObj,
+        categoriasPredominantes,
+        densidadPor100k: pob
+          ? Number(((agg.total / pob) * 100000).toFixed(2))
+          : null,
+      },
+      geometry,
+    }
+
+    if (!departamentosPorProvincia.has(provinciaId)) {
+      departamentosPorProvincia.set(provinciaId, [])
+    }
+    departamentosPorProvincia.get(provinciaId).push(feature)
+  }
+  console.log(
+    `${departamentosGeojsonRaw.features.length - departamentosDescartados} departamentos (${departamentosDescartados} descartados por antárticos)`,
+  )
+
   // --- Escritura de salidas --------------------------------------------------
   await mkdir(DATA_DIR, { recursive: true })
   await mkdir(path.join(DATA_DIR, 'espacios'), { recursive: true })
@@ -889,6 +1059,39 @@ async function main() {
   )
   console.log(
     `Escrito src/data/provincias-detalle.json (${features.length} provincias)`,
+  )
+
+  // Un archivo por provincia (igual que `espacios/*.json`): la geometría de
+  // departamento solo hace falta una vez que se hizo zoom a ESA provincia,
+  // nunca a las 24 a la vez — cargarla lazy evita bajar de entrada el peso
+  // completo de las ~529 geometrías.
+  await mkdir(path.join(DATA_DIR, 'departamentos'), { recursive: true })
+  let totalDepartamentos = 0
+  const departamentosLivianos = []
+  for (const [provinciaId, feats] of departamentosPorProvincia) {
+    await writeFile(
+      path.join(DATA_DIR, 'departamentos', `${provinciaId}.json`),
+      JSON.stringify({ type: 'FeatureCollection', features: feats }),
+    )
+    totalDepartamentos += feats.length
+    for (const f of feats) departamentosLivianos.push(f.properties)
+  }
+  console.log(
+    `Escritos src/data/departamentos/*.json (${totalDepartamentos} departamentos, ${departamentosPorProvincia.size} provincias)`,
+  )
+
+  // Versión liviana (solo propiedades, sin geometría) de TODOS los
+  // departamentos del país: la escala de color del choropleth por
+  // departamento (Etapa 9) necesita conocer la distribución completa de
+  // totalEspacios/densidadPor100k ANTES de que se zoomee a ninguna
+  // provincia en particular, para que el color de un departamento no
+  // cambie según qué otra provincia se visitó antes.
+  await writeFile(
+    path.join(DATA_DIR, 'departamentos-resumen.json'),
+    JSON.stringify(departamentosLivianos),
+  )
+  console.log(
+    `Escrito src/data/departamentos-resumen.json (${departamentosLivianos.length} departamentos)`,
   )
 
   const porProvinciaEspacios = new Map()

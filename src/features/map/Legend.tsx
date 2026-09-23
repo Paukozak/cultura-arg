@@ -8,12 +8,8 @@ import {
   pasosActivos,
   SIN_DATOS_COLOR,
   TITULO_CAPA,
+  UNIDAD_CAPA,
 } from './colorScales'
-
-const UNIDAD: Record<'densidad' | 'total', string> = {
-  densidad: 'ESPACIOS/100K',
-  total: 'ESPACIOS',
-}
 
 function formatNumero(n: number) {
   return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 }).format(n)
@@ -59,7 +55,7 @@ export function LegendContenido({ onElegir }: { onElegir?: () => void }) {
     <>
       <section className="flex flex-col gap-2">
         <h3 className="text-xs uppercase tracking-wide text-neutral-500">
-          Escala ({UNIDAD[capaActiva]})
+          Escala ({UNIDAD_CAPA[capaActiva]})
         </h3>
         <div className="flex flex-col gap-1.5">
           {[...escalones].reverse().map((escalon) => (
@@ -246,7 +242,7 @@ export function Legend() {
       >
         <div className="flex flex-col gap-1 sm:gap-1.5">
           <span className="font-mono text-[10px] uppercase tracking-wide text-neutral-500 sm:text-xs">
-            {UNIDAD[capaActiva]}
+            {UNIDAD_CAPA[capaActiva]}
           </span>
           <div className="flex overflow-hidden rounded">
             {pasos.map((color) => (
