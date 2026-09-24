@@ -3,13 +3,13 @@ import { ComoSeHizo } from '../features/about/ComoSeHizo'
 import { GlobalSearch } from '../features/search/GlobalSearch'
 import { useMapStore } from '../store/mapStore'
 import { useMediaQuery } from '../utils/useMediaQuery'
-import { SettingsMenu } from './SettingsMenu'
+import { ThemeToggle } from './ThemeToggle'
 
 function Acciones() {
   return (
     <>
       <ComoSeHizo />
-      <SettingsMenu />
+      <ThemeToggle />
     </>
   )
 }

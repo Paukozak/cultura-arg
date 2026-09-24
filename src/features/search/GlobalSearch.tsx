@@ -32,6 +32,9 @@ export function GlobalSearch() {
   const abrirVistaCompletaPorLocalidad = useMapStore(
     (s) => s.abrirVistaCompletaPorLocalidad,
   )
+  const abrirVistaCompletaPorDepartamento = useMapStore(
+    (s) => s.abrirVistaCompletaPorDepartamento,
+  )
 
   // Precarga apenas monta el buscador (siempre visible en el header), no
   // recién al primer tipeo: para cuando el usuario termina de escribir las
@@ -76,6 +79,9 @@ export function GlobalSearch() {
     // seleccionarProvincia pisa `vistaCompleta` de vuelta a false.
     if (resultado.tipo === 'provincia') {
       seleccionarProvincia(resultado.id)
+    } else if (resultado.tipo === 'departamento') {
+      seleccionarProvincia(resultado.provinciaId)
+      abrirVistaCompletaPorDepartamento(resultado.id)
     } else if (resultado.tipo === 'localidad') {
       seleccionarProvincia(resultado.provinciaId)
       abrirVistaCompletaPorLocalidad(resultado.nombre)
@@ -116,7 +122,7 @@ export function GlobalSearch() {
         }}
         onFocus={() => setAbierto(true)}
         onKeyDown={onKeyDown}
-        placeholder="Buscar provincia, localidad o espacio…"
+        placeholder="Buscar provincia, departamento, localidad o espacio…"
         className="w-full rounded-full border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm text-neutral-200 placeholder:text-neutral-600 focus:border-accent"
         role="combobox"
         aria-autocomplete="list"
@@ -156,9 +162,11 @@ export function GlobalSearch() {
                 const subtitulo =
                   r.tipo === 'provincia'
                     ? 'Provincia'
-                    : r.tipo === 'localidad'
-                      ? `Localidad · ${r.provinciaNombre} · ${r.cantidadEspacios} ${r.cantidadEspacios === 1 ? 'espacio' : 'espacios'}`
-                      : [r.categoria, r.localidad].filter(Boolean).join(' · ')
+                    : r.tipo === 'departamento'
+                      ? `Departamento · ${r.provinciaNombre} · ${r.totalEspacios} ${r.totalEspacios === 1 ? 'espacio' : 'espacios'}`
+                      : r.tipo === 'localidad'
+                        ? `Localidad · ${r.provinciaNombre} · ${r.cantidadEspacios} ${r.cantidadEspacios === 1 ? 'espacio' : 'espacios'}`
+                        : [r.categoria, r.localidad].filter(Boolean).join(' · ')
                 return (
                   <button
                     key={clave}

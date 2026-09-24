@@ -53,6 +53,15 @@ export interface FiltrosEspacios {
    * que `categoriasActivas`: un Set (aunque esté vacío) filtra a esas
    * localidades puntuales, permitiendo elegir más de una a la vez. */
   localidadesActivas?: Set<string> | null
+  /** Filtra por `departamentoId` en vez de localidad — hoy solo lo usa CABA
+   * (ver ProvinceFullView): ahí todos los espacios comparten una única
+   * localidad ("Ciudad Autónoma de Buenos Aires", ver `forzarLocalidadCaba`
+   * en process-data.mjs), así que filtrar por localidad no distingue nada
+   * — se reemplaza por comuna. Mutuamente excluyente con
+   * `localidadesActivas` en la práctica (ProvinceFullView solo pasa uno de
+   * los dos), pero acá no se hace cumplir: son dos filtros independientes
+   * que, si vinieran los dos, se combinan con AND como cualquier otro par. */
+  departamentosActivos?: Set<string> | null
 }
 
 export function filtrarEspacios(
@@ -83,6 +92,11 @@ export function filtrarEspacios(
       filtros.localidadesActivas!.has(e.localidad ?? 'sin dato'),
     )
   }
+  if (filtros.departamentosActivos) {
+    resultado = resultado.filter((e) =>
+      filtros.departamentosActivos!.has(e.departamentoId ?? 'sin dato'),
+    )
+  }
   return resultado
 }
 
@@ -95,7 +109,8 @@ export function hayFiltrosAplicados(filtros: FiltrosEspacios): boolean {
     (filtros.busqueda ?? '').trim() !== '' ||
     filtros.categoriasActivas != null ||
     filtros.gestionesActivas != null ||
-    filtros.localidadesActivas != null
+    filtros.localidadesActivas != null ||
+    filtros.departamentosActivos != null
   )
 }
 

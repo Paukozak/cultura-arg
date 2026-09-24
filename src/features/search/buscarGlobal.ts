@@ -1,3 +1,4 @@
+import { departamentosResumen } from '../../data/departamentos'
 import { provinciasGeo } from '../../data/provincias'
 import { normalizar } from '../../utils/texto'
 import { nombreMostradoPara } from '../province-panel/curaduriaDestacados'
@@ -54,6 +55,14 @@ const ALIAS_PROVINCIA: Record<string, string[]> = {
 export type ResultadoBusqueda =
   | { tipo: 'provincia'; id: string; nombre: string }
   | {
+      tipo: 'departamento'
+      id: string
+      nombre: string
+      provinciaId: string
+      provinciaNombre: string
+      totalEspacios: number
+    }
+  | {
       tipo: 'localidad'
       nombre: string
       provinciaId: string
@@ -70,6 +79,7 @@ export type ResultadoBusqueda =
     }
 
 const MAX_PROVINCIAS = 4
+const MAX_DEPARTAMENTOS = 5
 const MAX_LOCALIDADES = 5
 const MAX_ESPACIOS = 8
 
@@ -103,6 +113,29 @@ export function buscarGlobal(query: string): ResultadoBusqueda[] {
     if (rank > 0) provincias.push([{ tipo: 'provincia', id, nombre }, rank])
   }
   provincias.sort(porRelevancia)
+
+  // `departamentosResumen` ya está cargado eager (lo usa el choropleth de
+  // NationalMap.tsx antes de zoomear a ninguna provincia), a diferencia de
+  // los índices de localidad/espacio de abajo: no hace falta esperar
+  // `precargarIndiceBusqueda` para que aparezcan resultados.
+  const departamentos: [ResultadoBusqueda, number][] = []
+  for (const d of departamentosResumen) {
+    const rank = coincidencia(d.nombre, q)
+    if (rank > 0) {
+      departamentos.push([
+        {
+          tipo: 'departamento',
+          id: d.id,
+          nombre: d.nombre,
+          provinciaId: d.provinciaId,
+          provinciaNombre: NOMBRE_PROVINCIA_POR_ID.get(d.provinciaId) ?? '',
+          totalEspacios: d.totalEspacios,
+        },
+        rank,
+      ])
+    }
+  }
+  departamentos.sort(porRelevancia)
 
   const localidades: [ResultadoBusqueda, number][] = []
   for (const l of indiceLocalidades ?? []) {
@@ -152,6 +185,7 @@ export function buscarGlobal(query: string): ResultadoBusqueda[] {
 
   return [
     ...provincias.slice(0, MAX_PROVINCIAS).map(([r]) => r),
+    ...departamentos.slice(0, MAX_DEPARTAMENTOS).map(([r]) => r),
     ...localidades.slice(0, MAX_LOCALIDADES).map(([r]) => r),
     ...espacios.slice(0, MAX_ESPACIOS).map(([r]) => r),
   ]

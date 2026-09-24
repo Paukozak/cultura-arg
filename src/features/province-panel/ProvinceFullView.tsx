@@ -2,10 +2,17 @@ import { ChevronDown, SlidersHorizontal } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { List, type RowComponentProps } from 'react-window'
+import { departamentosResumen } from '../../data/departamentos'
 import { cargarEspacios, type Espacio } from '../../data/espacios'
 import { provinciasGeo } from '../../data/provincias'
 import { useMapStore } from '../../store/mapStore'
-import { normalizar } from '../../utils/texto'
+import {
+  claveAgrupador,
+  espaciosDeAgrupador as espaciosDeAgrupadorPuro,
+  opcionesAgrupador as opcionesAgrupadorPuro,
+  opcionesMostradas as opcionesMostradasPuro,
+  resumenAgrupador as resumenAgrupadorPuro,
+} from './agruparEspacios'
 import { ICONOS_POR_CATEGORIA, ICONO_POR_DEFECTO } from './categoriaIcons'
 import { nombreMostradoPara } from './curaduriaDestacados'
 import { EspacioFoto } from './EspacioFoto'
@@ -19,6 +26,13 @@ import {
   type Orden,
 } from './filtrarEspacios'
 import { GoogleMapsEmbed } from './GoogleMapsEmbed'
+
+/** Nombre de comuna/departamento por id (p. ej. "02007" -> "Comuna 1") — para
+ * CABA, donde el filtro de localidad se reemplaza por comuna (ver
+ * `ProvinceFullViewContent`, `esCaba`). */
+const NOMBRE_DEPARTAMENTO_POR_ID = new Map(
+  departamentosResumen.map((d) => [d.id, d.nombre]),
+)
 
 /** Nombre a mostrar: el editorial curado (ver destacados-curados.json) si
  * existe, si no el de la fuente. Antes esto solo se aplicaba en el panel de
@@ -188,6 +202,14 @@ function ProvinceFullViewContent({
   departamentoIdInicial: string | null
   onCerrar: () => void
 }) {
+  // CABA es un caso aparte: SInCA no distingue localidades ahí (todos sus
+  // espacios comparten una sola, "Ciudad Autónoma de Buenos Aires" — ver
+  // `forzarLocalidadCaba` en process-data.mjs), así que filtrar por
+  // localidad no sirve para nada. Se reemplaza por comuna (`departamentoId`,
+  // ya asignado por geocodificación real — ver `asignarComunasCaba`), que sí
+  // distingue. El resto de las provincias sigue filtrando por localidad.
+  const esCaba = provinciaId === '02'
+
   const [espacios, setEspacios] = useState<Espacio[] | null>(null)
   const [busqueda, setBusqueda] = useState('')
   const [orden, setOrden] = useState<Orden>('alfabetico')
@@ -197,23 +219,24 @@ function ProvinceFullViewContent({
     null,
   )
   // Igual que categoriasActivas/gestionesActivas: `null` = todas, un Set
-  // (aunque vacío) filtra a esas localidades puntuales. Si se llega acá
-  // desde el buscador global con una localidad puntual, arranca con esa
-  // sola marcada en vez de "todas".
-  const [localidadesActivas, setLocalidadesActivas] =
-    useState<Set<string> | null>(
-      localidadInicial ? new Set([localidadInicial]) : null,
-    )
-  // Filtra la propia lista de localidades del selector (no la lista de
+  // (aunque vacío) filtra a esas localidades/comunas puntuales. Si se llega
+  // acá desde el buscador global con una localidad puntual, arranca con esa
+  // sola marcada en vez de "todas" — salvo en CABA, donde este filtro pasa a
+  // ser por comuna y una localidad puntual (siempre la misma, ver arriba) no
+  // tiene sentido como valor inicial.
+  const [agrupadorActivo, setAgrupadorActivo] = useState<Set<string> | null>(
+    localidadInicial && !esCaba ? new Set([localidadInicial]) : null,
+  )
+  // Filtra la propia lista de opciones del selector (no la lista de
   // espacios: eso lo hace `busqueda`) — con cientos de localidades por
   // provincia, tipear para encontrar la que se busca es más rápido que
   // scrollear una lista larga de checkboxes.
-  const [busquedaLocalidad, setBusquedaLocalidad] = useState('')
-  // El picker de localidad arranca plegado — es una lista que puede tener
-  // cientos de filas, así que solo se arma/muestra al hacer clic en su
-  // gatillo (mismo patrón de click-afuera-cierra que GlobalSearch.tsx).
-  const [localidadAbierta, setLocalidadAbierta] = useState(false)
-  const localidadRef = useRef<HTMLDivElement>(null)
+  const [busquedaAgrupador, setBusquedaAgrupador] = useState('')
+  // El picker arranca plegado — es una lista que puede tener cientos de
+  // filas, así que solo se arma/muestra al hacer clic en su gatillo (mismo
+  // patrón de click-afuera-cierra que GlobalSearch.tsx).
+  const [agrupadorAbierto, setAgrupadorAbierto] = useState(false)
+  const agrupadorRef = useRef<HTMLDivElement>(null)
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(
     espacioInicialId,
   )
@@ -245,24 +268,27 @@ function ProvinceFullViewContent({
   }, [provinciaId])
 
   // Clic en una ficha del choropleth por departamento (ver
-  // DepartamentosChoropleth): a diferencia de `localidadInicial` (una sola
-  // localidad, conocida de entrada), acá hay que esperar a que carguen los
-  // espacios para saber qué localidades caen dentro de ese departamento.
-  // Se aplica UNA sola vez (con `aplicado`, no en `[localidadesActivas]`
-  // entre las dependencias): si no, cada ves que el usuario destildara una
-  // localidad a mano el efecto la volvería a tildar.
+  // DepartamentosChoropleth): en CABA el departamento clickeado ES la propia
+  // clave del filtro (comuna), se tilda directo. En el resto de las
+  // provincias el filtro sigue siendo por localidad, así que hay que
+  // esperar a que carguen los espacios para resolver qué localidades caen
+  // dentro de ese departamento. Se aplica UNA sola vez (con `aplicado`, no
+  // en `[agrupadorActivo]` entre las dependencias): si no, cada vez que el
+  // usuario destildara una opción a mano el efecto la volvería a tildar.
   const departamentoInicialAplicado = useRef(false)
   useEffect(() => {
     if (!espacios || !departamentoIdInicial) return
     if (departamentoInicialAplicado.current) return
     departamentoInicialAplicado.current = true
-    const localidadesDelDepartamento = new Set(
-      espacios
-        .filter((e) => e.departamentoId === departamentoIdInicial)
-        .map((e) => e.localidad ?? 'sin dato'),
-    )
-    setLocalidadesActivas(localidadesDelDepartamento)
-  }, [espacios, departamentoIdInicial])
+    const clavesIniciales = esCaba
+      ? new Set([departamentoIdInicial])
+      : new Set(
+          espacios
+            .filter((e) => e.departamentoId === departamentoIdInicial)
+            .map((e) => claveAgrupador(e, false)),
+        )
+    setAgrupadorActivo(clavesIniciales)
+  }, [espacios, departamentoIdInicial, esCaba])
 
   // Con la vista completa abierta, el body de atrás no debería poder
   // scrollear: es un overlay de pantalla completa y esa barra de scroll
@@ -276,108 +302,103 @@ function ProvinceFullViewContent({
   }, [])
 
   useEffect(() => {
-    if (!localidadAbierta) return
+    if (!agrupadorAbierto) return
     function onPointerDown(e: PointerEvent) {
-      if (!localidadRef.current?.contains(e.target as Node)) {
-        setLocalidadAbierta(false)
+      if (!agrupadorRef.current?.contains(e.target as Node)) {
+        setAgrupadorAbierto(false)
       }
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [localidadAbierta])
+  }, [agrupadorAbierto])
 
   const provincia = provinciasGeo.features.find(
     (f) => f.properties.id === provinciaId,
   )
 
   // Base para los números de categoría/gestión: los espacios de la
-  // provincia recortados por la(s) localidad(es) elegida(s) (si hay), para
-  // que esos conteos —y qué chips aparecen— correspondan a esa localidad en
-  // vez de a la provincia entera. Ojo: es la única otra cosa que los
-  // recorta a propósito; categoría y gestión no se recortan entre sí (si
-  // no, tildar una categoría achicaría la lista de gestiones y viceversa).
-  const espaciosDeLocalidad = useMemo(() => {
-    if (!espacios) return []
-    if (!localidadesActivas) return espacios
-    return espacios.filter((e) =>
-      localidadesActivas.has(e.localidad ?? 'sin dato'),
-    )
-  }, [espacios, localidadesActivas])
+  // provincia recortados por la(s) localidad(es)/comuna(s) elegida(s) (si
+  // hay), para que esos conteos —y qué chips aparecen— correspondan a esa
+  // selección en vez de a la provincia entera. Ojo: es la única otra cosa
+  // que los recorta a propósito; categoría y gestión no se recortan entre sí
+  // (si no, tildar una categoría achicaría la lista de gestiones y
+  // viceversa). Lógica en agruparEspacios.ts (testeada ahí sin montar el
+  // componente).
+  const espaciosDeAgrupador = useMemo(
+    () => espaciosDeAgrupadorPuro(espacios ?? [], agrupadorActivo, esCaba),
+    [espacios, agrupadorActivo, esCaba],
+  )
 
   const categorias = useMemo(() => {
     const conteo = new Map<string, number>()
-    for (const e of espaciosDeLocalidad)
+    for (const e of espaciosDeAgrupador)
       conteo.set(e.categoria, (conteo.get(e.categoria) ?? 0) + 1)
     return [...conteo.entries()].sort((a, b) => b[1] - a[1])
-  }, [espaciosDeLocalidad])
+  }, [espaciosDeAgrupador])
 
   const gestiones = useMemo(() => {
     const conteo = new Map<string, number>()
-    for (const e of espaciosDeLocalidad) {
+    for (const e of espaciosDeAgrupador) {
       const clave = e.gestion ?? 'sin dato'
       conteo.set(clave, (conteo.get(clave) ?? 0) + 1)
     }
     return [...conteo.entries()]
-  }, [espaciosDeLocalidad])
+  }, [espaciosDeAgrupador])
 
-  // La localidad puede tener cientos de valores distintos (Buenos Aires,
-  // CABA) — a diferencia de categoría/gestión, no entra como chips sueltos:
-  // va en una lista de checkboxes con buscador propio, ordenada
-  // alfabéticamente, con conteos.
-  const localidades = useMemo(() => {
-    if (!espacios) return []
-    const conteo = new Map<string, number>()
-    for (const e of espacios) {
-      const clave = e.localidad ?? 'sin dato'
-      conteo.set(clave, (conteo.get(clave) ?? 0) + 1)
-    }
-    return [...conteo.entries()].sort((a, b) => a[0].localeCompare(b[0], 'es'))
-  }, [espacios])
+  // La localidad/comuna puede tener cientos de valores distintos (Buenos
+  // Aires) — a diferencia de categoría/gestión, no entra como chips sueltos:
+  // va en una lista de checkboxes con buscador propio, con conteos. `clave`
+  // es lo que se guarda en `agrupadorActivo` (id de comuna o nombre de
+  // localidad); `etiqueta` es lo que se muestra — en CABA son distintos (id
+  // -> "Comuna 1"), en el resto son el mismo string.
+  const opcionesAgrupador = useMemo(
+    () =>
+      opcionesAgrupadorPuro(espacios ?? [], esCaba, NOMBRE_DEPARTAMENTO_POR_ID),
+    [espacios, esCaba],
+  )
 
   // Texto del gatillo del picker (plegado): qué está eligiendo sin tener
   // que abrirlo. Mismo criterio de "todas" que categoría/gestión — un Set
   // que terminó incluyendo a todas cuenta como "todas", no como "3 de 3".
-  const resumenLocalidad = useMemo(() => {
-    if (!localidadesActivas) return `Todas (${localidades.length})`
-    if (localidadesActivas.size === 0) return 'Ninguna'
-    if (localidadesActivas.size === localidades.length)
-      return `Todas (${localidades.length})`
-    const [primera] = localidadesActivas
-    return localidadesActivas.size === 1
-      ? primera
-      : `${primera} +${localidadesActivas.size - 1}`
-  }, [localidadesActivas, localidades])
+  const resumenAgrupador = useMemo(
+    () => resumenAgrupadorPuro(agrupadorActivo, opcionesAgrupador),
+    [agrupadorActivo, opcionesAgrupador],
+  )
 
-  const localidadesMostradas = useMemo(() => {
-    const q = normalizar(busquedaLocalidad.trim())
-    if (!q) return localidades
-    return localidades.filter(([localidad]) =>
-      normalizar(localidad).includes(q),
-    )
-  }, [localidades, busquedaLocalidad])
+  const opcionesMostradas = useMemo(
+    () => opcionesMostradasPuro(opcionesAgrupador, busquedaAgrupador),
+    [opcionesAgrupador, busquedaAgrupador],
+  )
+
+  const filtrosActuales = esCaba
+    ? {
+        busqueda,
+        categoriasActivas,
+        gestionesActivas,
+        departamentosActivos: agrupadorActivo,
+      }
+    : {
+        busqueda,
+        categoriasActivas,
+        gestionesActivas,
+        localidadesActivas: agrupadorActivo,
+      }
 
   const filtrados = useMemo(() => {
     if (!espacios) return []
-    return filtrarYOrdenarEspacios(
-      espacios,
-      { busqueda, categoriasActivas, gestionesActivas, localidadesActivas },
-      orden,
-    )
+    return filtrarYOrdenarEspacios(espacios, filtrosActuales, orden)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     espacios,
     busqueda,
     categoriasActivas,
     gestionesActivas,
-    localidadesActivas,
+    agrupadorActivo,
+    esCaba,
     orden,
   ])
 
-  const conFiltrosAplicados = hayFiltrosAplicados({
-    busqueda,
-    categoriasActivas,
-    gestionesActivas,
-    localidadesActivas,
-  })
+  const conFiltrosAplicados = hayFiltrosAplicados(filtrosActuales)
 
   // Por default se muestra la ficha del primero de la lista filtrada; si el
   // usuario eligió uno que sigue en el filtro actual, se respeta esa elección.
@@ -397,8 +418,8 @@ function ProvinceFullViewContent({
     setGestionesActivas((prev) => alternarValorFiltro(prev, gestion))
   }
 
-  function toggleLocalidad(localidad: string) {
-    setLocalidadesActivas((prev) => alternarValorFiltro(prev, localidad))
+  function toggleAgrupador(clave: string) {
+    setAgrupadorActivo((prev) => alternarValorFiltro(prev, clave))
   }
 
   function toggleTodasCategoria() {
@@ -409,8 +430,8 @@ function ProvinceFullViewContent({
     setGestionesActivas(alternarTodos)
   }
 
-  function toggleTodasLocalidad() {
-    setLocalidadesActivas(alternarTodos)
+  function toggleTodosAgrupador() {
+    setAgrupadorActivo(alternarTodos)
   }
 
   return (
@@ -544,52 +565,53 @@ function ProvinceFullViewContent({
                   </select>
                 </div>
 
-                <div ref={localidadRef} className="relative">
+                <div ref={agrupadorRef} className="relative">
                   <span className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-neutral-500">
-                    Localidad
+                    {esCaba ? 'Comuna' : 'Localidad'}
                   </span>
-                  {/* Gatillo: la lista de localidades (buscador + checkboxes)
-                      solo se arma y se muestra al abrirlo, no ocupa lugar de
-                      entrada. */}
+                  {/* Gatillo: la lista (buscador + checkboxes) solo se arma
+                      y se muestra al abrirlo, no ocupa lugar de entrada. */}
                   <button
                     type="button"
-                    onClick={() => setLocalidadAbierta((abierta) => !abierta)}
-                    aria-expanded={localidadAbierta}
-                    aria-controls="localidad-picker"
+                    onClick={() => setAgrupadorAbierto((abierta) => !abierta)}
+                    aria-expanded={agrupadorAbierto}
+                    aria-controls="agrupador-picker"
                     className="flex w-full items-center justify-between gap-2 rounded-md border border-neutral-800 bg-neutral-900 px-2 py-1.5 text-xs text-neutral-200"
                   >
                     <span className="min-w-0 flex-1 truncate text-left">
-                      {resumenLocalidad}
+                      {resumenAgrupador}
                     </span>
                     <ChevronDown
                       aria-hidden="true"
                       className={`h-3.5 w-3.5 shrink-0 text-neutral-500 transition-transform ${
-                        localidadAbierta ? 'rotate-180' : ''
+                        agrupadorAbierto ? 'rotate-180' : ''
                       }`}
                     />
                   </button>
-                  {localidadAbierta && (
+                  {agrupadorAbierto && (
                     <div
-                      id="localidad-picker"
+                      id="agrupador-picker"
                       className="absolute left-0 right-0 top-full z-10 mt-1.5 rounded-md border border-neutral-800 bg-neutral-950 p-1.5 shadow-lg shadow-black/40"
                     >
                       <input
                         type="search"
                         autoFocus
-                        value={busquedaLocalidad}
-                        onChange={(e) => setBusquedaLocalidad(e.target.value)}
-                        placeholder="Buscar localidad…"
+                        value={busquedaAgrupador}
+                        onChange={(e) => setBusquedaAgrupador(e.target.value)}
+                        placeholder={
+                          esCaba ? 'Buscar comuna…' : 'Buscar localidad…'
+                        }
                         className="mb-1.5 w-full rounded-md border border-neutral-800 bg-neutral-900 px-2 py-1.5 text-xs text-neutral-200 placeholder:text-neutral-600"
                       />
                       <div className="max-h-52 overflow-y-auto rounded-md border border-neutral-800">
                         {/* "Todas" fija arriba de la lista (no se filtra con
                             el buscador): excluyente con el resto, igual que
-                            en Categoría/Gestión — ver toggleLocalidad. */}
+                            en Categoría/Gestión — ver toggleAgrupador. */}
                         <label className="flex cursor-pointer items-center gap-2 border-b border-neutral-800 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-900">
                           <input
                             type="checkbox"
-                            checked={localidadesActivas === null}
-                            onChange={toggleTodasLocalidad}
+                            checked={agrupadorActivo === null}
+                            onChange={toggleTodosAgrupador}
                             className="accent-accent"
                           />
                           <span className="min-w-0 flex-1 truncate">Todas</span>
@@ -597,35 +619,37 @@ function ProvinceFullViewContent({
                             {espacios.length}
                           </span>
                         </label>
-                        {localidadesMostradas.length === 0 ? (
+                        {opcionesMostradas.length === 0 ? (
                           <p className="px-2 py-1.5 text-xs text-neutral-500">
                             Sin resultados.
                           </p>
                         ) : (
-                          localidadesMostradas.map(([localidad, count]) => {
-                            const activa = localidadesActivas
-                              ? localidadesActivas.has(localidad)
-                              : false
-                            return (
-                              <label
-                                key={localidad}
-                                className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-900"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={activa}
-                                  onChange={() => toggleLocalidad(localidad)}
-                                  className="accent-accent"
-                                />
-                                <span className="min-w-0 flex-1 truncate">
-                                  {localidad}
-                                </span>
-                                <span className="shrink-0 text-neutral-500">
-                                  {count}
-                                </span>
-                              </label>
-                            )
-                          })
+                          opcionesMostradas.map(
+                            ({ clave, etiqueta, count }) => {
+                              const activa = agrupadorActivo
+                                ? agrupadorActivo.has(clave)
+                                : false
+                              return (
+                                <label
+                                  key={clave}
+                                  className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-900"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={activa}
+                                    onChange={() => toggleAgrupador(clave)}
+                                    className="accent-accent"
+                                  />
+                                  <span className="min-w-0 flex-1 truncate">
+                                    {etiqueta}
+                                  </span>
+                                  <span className="shrink-0 text-neutral-500">
+                                    {count}
+                                  </span>
+                                </label>
+                              )
+                            },
+                          )
                         )}
                       </div>
                     </div>
@@ -650,7 +674,7 @@ function ProvinceFullViewContent({
                           : 'border-neutral-800 text-neutral-500'
                       }`}
                     >
-                      Todas ({espaciosDeLocalidad.length})
+                      Todas ({espaciosDeAgrupador.length})
                     </button>
                     {categorias.map(([categoria, count]) => {
                       const activa = categoriasActivas
@@ -691,7 +715,7 @@ function ProvinceFullViewContent({
                             : 'border-neutral-800 text-neutral-500'
                         }`}
                       >
-                        Todas ({espaciosDeLocalidad.length})
+                        Todas ({espaciosDeAgrupador.length})
                       </button>
                       {gestiones.map(([gestion, count]) => {
                         const activa = gestionesActivas

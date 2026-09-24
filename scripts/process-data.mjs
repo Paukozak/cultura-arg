@@ -260,8 +260,9 @@ function unifyLocalidades(espacios) {
 // los ids de `data/raw/departamentos.geojson` (Georef) — estos fueron los
 // únicos casos sistemáticos (no puntuales) de códigos que no matchean
 // ningún departamento real. CABA (siempre `02000`) es aparte: no es un
-// código vencido, es que SInCA no llega a nivel comuna para CABA (ver el
-// comentario junto a `porDepartamento` en `main()`).
+// código vencido, es que SInCA no llega a nivel comuna para CABA — se
+// resuelve por geocodificación (point-in-polygon con lat/lon), no acá, ver
+// `asignarComunasCaba`.
 const DEPARTAMENTO_ID_LEGACY = {
   94007: '94008', // Río Grande (pre-división de Tolhuin)
   94014: '94015', // Ushuaia
@@ -302,6 +303,68 @@ function aplicarCorreccionesPuntuales(espacios) {
       e.localidad = 'Olavarría'
     }
   }
+}
+
+// --- Comuna real de CABA por point-in-polygon ---------------------------------
+// SInCA no llega a nivel comuna para CABA: sus ~2650 registros siempre traen
+// el código placeholder `02000` (la ciudad entera, no una de las 15 comunas
+// reales de Georef) — ver el comentario histórico junto a
+// `DEPARTAMENTO_ID_LEGACY`. Pero el dataset SÍ trae lat/lon por registro, y
+// Georef (`departamentos.geojson`) ya tiene la geometría real de las 15
+// comunas — cruzando ambos con un point-in-polygon manual (sin agregar
+// @turf/boolean-point-in-polygon como dependencia nueva solo para este uso
+// puntual de build) se puede derivar la comuna real de la enorme mayoría de
+// los registros, sin inventar nada: es geocodificación exacta contra el
+// límite real, no una estimación.
+function puntoEnAnillo(lon, lat, anillo) {
+  let dentro = false
+  for (let i = 0, j = anillo.length - 1; i < anillo.length; j = i++) {
+    const [loni, lati] = anillo[i]
+    const [lonj, latj] = anillo[j]
+    const cruza =
+      lati > lat !== latj > lat &&
+      lon < ((lonj - loni) * (lat - lati)) / (latj - lati) + loni
+    if (cruza) dentro = !dentro
+  }
+  return dentro
+}
+
+// Even-odd sobre TODOS los anillos de un `Polygon` (el primero, exterior; el
+// resto, huecos) da el resultado correcto sin tratar los huecos aparte: un
+// punto en un hueco cruza el anillo exterior y el del hueco una vez cada
+// uno, así que el conteo par lo deja afuera. Para `MultiPolygon` alcanza con
+// que el punto caiga dentro de UNO de los polígonos.
+function puntoEnGeometria(lon, lat, geometry) {
+  const poligonos =
+    geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates
+  return poligonos.some((anillos) =>
+    anillos.reduce(
+      (dentro, anillo) => dentro !== puntoEnAnillo(lon, lat, anillo),
+      false,
+    ),
+  )
+}
+
+function asignarComunasCaba(espacios, departamentosGeojson) {
+  const comunas = departamentosGeojson.features.filter((f) =>
+    f.properties.id.startsWith('02'),
+  )
+  let asignados = 0
+  let sinMatch = 0
+  for (const e of espacios) {
+    if (e.provinciaId !== '02' || e.departamentoId !== '02000') continue
+    const comuna =
+      e.lat !== null && e.lon !== null
+        ? comunas.find((c) => puntoEnGeometria(e.lon, e.lat, c.geometry))
+        : undefined
+    if (comuna) {
+      e.departamentoId = comuna.properties.id
+      asignados++
+    } else {
+      sinMatch++
+    }
+  }
+  return { asignados, sinMatch }
 }
 
 // --- Localidad faltante en "Monumentos y Lugares Históricos" -----------------
@@ -743,7 +806,12 @@ async function loadEspacios() {
   return { espacios, completitud }
 }
 
-function buildDataQualityReport(completitud, totalEspacios, totalConAnio) {
+function buildDataQualityReport(
+  completitud,
+  totalEspacios,
+  totalConAnio,
+  comunasCaba,
+) {
   const lines = []
   lines.push('# Reporte de calidad de datos')
   lines.push('')
@@ -804,7 +872,7 @@ function buildDataQualityReport(completitud, totalEspacios, totalConAnio) {
   lines.push('## Asignación de departamento por registro (Etapa 9)')
   lines.push('')
   lines.push(
-    '`departamentoId` toma los primeros 5 dígitos del mismo código de localidad (2 de provincia + 3 de departamento), el mismo id que usa Georef para `departamentos.geojson`. Dos bolsones de códigos vencidos (nomenclatura vieja, previa a una redivisión administrativa) se remapean a mano — ver `DEPARTAMENTO_ID_LEGACY` en este script: Tierra del Fuego (102 registros bajo los códigos previos a la creación de Tolhuin en 2017) y Chascomús, Buenos Aires (12 registros). **CABA es aparte y no tiene arreglo posible con este dataset**: sus 2653 registros siempre traen el código placeholder `02000` (la ciudad entera, no una comuna) — SInCA no llega a nivel comuna para CABA, así que el choropleth por comuna de CABA (Etapa 9) queda sin datos en las 15.',
+    `\`departamentoId\` toma los primeros 5 dígitos del mismo código de localidad (2 de provincia + 3 de departamento), el mismo id que usa Georef para \`departamentos.geojson\`. Dos bolsones de códigos vencidos (nomenclatura vieja, previa a una redivisión administrativa) se remapean a mano — ver \`DEPARTAMENTO_ID_LEGACY\` en este script: Tierra del Fuego (102 registros bajo los códigos previos a la creación de Tolhuin en 2017) y Chascomús, Buenos Aires (12 registros). **CABA es aparte**: sus registros siempre traen el código placeholder \`02000\` (la ciudad entera, no una comuna) porque SInCA no llega a nivel comuna — se resuelve por geocodificación (point-in-polygon de lat/lon contra las 15 comunas reales de Georef, ver \`asignarComunasCaba\`): ${comunasCaba.asignados} registros asignados a su comuna real, ${comunasCaba.sinMatch} sin coordenadas o fuera de los límites de las 15 comunas (quedan bajo \`02000\`, sin comuna en el choropleth).`,
   )
   lines.push('')
   return lines.join('\n')
@@ -842,6 +910,14 @@ async function main() {
 
   console.log('Aplicando correcciones puntuales...')
   aplicarCorreccionesPuntuales(espacios)
+
+  console.log(
+    'CABA: asignando comuna real por point-in-polygon (SInCA no la provee)...',
+  )
+  const comunasCaba = asignarComunasCaba(espacios, departamentosGeojsonRaw)
+  console.log(
+    `CABA: ${comunasCaba.asignados} registros asignados a su comuna real, ${comunasCaba.sinMatch} sin coordenadas o fuera de las 15 comunas`,
+  )
 
   console.log(
     'Infiriendo localidad faltante en Monumentos y Lugares Históricos...',
@@ -887,11 +963,10 @@ async function main() {
 
   // --- Agregados por departamento --------------------------------------------
   // Mismo cálculo que `porProvincia`, a nivel departamento (ver
-  // `departamentoId` en `loadEspacios`). Nota: en CABA el dataset de SInCA
-  // no llega a nivel comuna — todos sus registros traen el mismo código
-  // placeholder `02000` (no una comuna real de las 15 que tiene Georef), así
-  // que el choropleth por comuna de CABA queda sin datos en todas — es una
-  // limitación de la fuente, no un bug de este agregado.
+  // `departamentoId` en `loadEspacios`). Para CABA, `e.departamentoId` ya
+  // viene reescrito a su comuna real por `asignarComunasCaba` (llamado más
+  // arriba) — sin eso, todos sus registros agregarían bajo el mismo
+  // placeholder `02000` y el choropleth por comuna quedaría sin datos.
   const porDepartamento = new Map()
   for (const e of espacios) {
     if (!e.departamentoId) continue
@@ -1171,6 +1246,7 @@ async function main() {
     completitud,
     totalEspacios,
     totalConAnio,
+    comunasCaba,
   )
   await writeFile(path.join(DOCS_DIR, 'data-quality-report.md'), report)
   console.log('Escrito docs/data-quality-report.md')

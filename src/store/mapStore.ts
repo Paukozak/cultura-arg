@@ -34,15 +34,6 @@ interface MapState {
    * localidad, no con un filtro de departamento aparte. */
   departamentoFocoId: string | null
   abrirVistaCompletaPorDepartamento: (departamentoId: string) => void
-  /** Rampa de color del mapa (Legend/NationalMap): violeta por defecto,
-   * azul de ColorBrewer si está activado. Se guarda en localStorage —
-   * mismo patrón que el tema — para que la elección persista entre
-   * visitas. También se refleja en `data-daltonico` sobre `<html>` (ver
-   * `index.css`) para que el color de acento de TODA la interfaz —no solo
-   * el mapa— pase a azul: un acento violeta al lado de un mapa azul se leía
-   * como dos paletas sueltas en vez de un solo modo coherente. */
-  modoDaltonico: boolean
-  toggleModoDaltonico: () => void
   /** Cambia cada vez que hay que volver a hacer la animación de entrada del
    * mapa (las provincias "brotan"): NationalMap lo usa de `key` de ese
    * grupo. Hoy lo pide la bienvenida de mobile al cerrarse — la animación
@@ -61,22 +52,12 @@ interface MapState {
    * `document.documentElement.dataset.theme`; esto solo lee ese valor para
    * que el resto de la app (p. ej. la sombra del mapa en NationalMap.tsx,
    * pensada para fondo oscuro) pueda reaccionar sin tener que leer el DOM
-   * directamente. `SettingsMenu` es quien lo cambia. */
+   * directamente. `ThemeToggle` es quien lo cambia. */
   tema: 'dark' | 'light'
   toggleTema: () => void
 }
 
-const MODO_DALTONICO_KEY = 'cca-daltonico'
 const TEMA_KEY = 'cca-tema'
-
-function modoDaltonicoInicial(): boolean {
-  if (typeof localStorage === 'undefined') return false
-  const activo = localStorage.getItem(MODO_DALTONICO_KEY) === '1'
-  if (typeof document !== 'undefined') {
-    document.documentElement.dataset.daltonico = activo ? 'true' : 'false'
-  }
-  return activo
-}
 
 function temaInicial(): 'dark' | 'light' {
   if (typeof document === 'undefined') return 'dark'
@@ -124,14 +105,6 @@ export const useMapStore = create<MapState>((set) => ({
       espacioFocoId: null,
       localidadFocoId: null,
       departamentoFocoId: departamentoId,
-    }),
-  modoDaltonico: modoDaltonicoInicial(),
-  toggleModoDaltonico: () =>
-    set((state) => {
-      const siguiente = !state.modoDaltonico
-      document.documentElement.dataset.daltonico = siguiente ? 'true' : 'false'
-      localStorage.setItem(MODO_DALTONICO_KEY, siguiente ? '1' : '0')
-      return { modoDaltonico: siguiente }
     }),
   entradaMapa: 0,
   reiniciarEntradaMapa: () =>

@@ -163,6 +163,23 @@ describe('filtrarEspacios', () => {
     ).toEqual([])
   })
 
+  it('departamentosActivos filtra por departamentoId en vez de localidad', () => {
+    const conDepartamento: Espacio[] = [
+      espacio({ id: 'd1', categoria: 'Museos', departamentoId: '02007' }),
+      espacio({ id: 'd2', categoria: 'Museos', departamentoId: '02014' }),
+    ]
+    const resultado = filtrarEspacios(conDepartamento, {
+      departamentosActivos: new Set(['02007']),
+    })
+    expect(resultado.map((e) => e.id)).toEqual(['d1'])
+  })
+
+  it('departamentosActivos como Set vacío filtra todo (a propósito, "Ninguna")', () => {
+    expect(
+      filtrarEspacios(espacios, { departamentosActivos: new Set() }),
+    ).toEqual([])
+  })
+
   it('combina búsqueda, categoría y localidad a la vez', () => {
     const resultado = filtrarEspacios(espacios, {
       busqueda: 'museo',
@@ -170,6 +187,34 @@ describe('filtrarEspacios', () => {
       localidadesActivas: new Set(['Rosario']),
     })
     expect(resultado.map((e) => e.id)).toEqual(['a'])
+  })
+
+  it('combina categoría y departamento a la vez (caso CABA)', () => {
+    const conDepartamento: Espacio[] = [
+      espacio({
+        id: 'd1',
+        categoria: 'Museos',
+        nombre: 'Museo Roca',
+        departamentoId: '02007',
+      }),
+      espacio({
+        id: 'd2',
+        categoria: 'Cines',
+        nombre: 'Cine Roca',
+        departamentoId: '02007',
+      }),
+      espacio({
+        id: 'd3',
+        categoria: 'Museos',
+        nombre: 'Museo Lezama',
+        departamentoId: '02014',
+      }),
+    ]
+    const resultado = filtrarEspacios(conDepartamento, {
+      categoriasActivas: new Set(['Museos']),
+      departamentosActivos: new Set(['02007']),
+    })
+    expect(resultado.map((e) => e.id)).toEqual(['d1'])
   })
 })
 
@@ -209,6 +254,13 @@ describe('hayFiltrosAplicados', () => {
     expect(hayFiltrosAplicados({ localidadesActivas: new Set() })).toBe(true)
   })
 
+  it('uno o más departamentos elegidos cuentan', () => {
+    expect(
+      hayFiltrosAplicados({ departamentosActivos: new Set(['02007']) }),
+    ).toBe(true)
+    expect(hayFiltrosAplicados({ departamentosActivos: new Set() })).toBe(true)
+  })
+
   it('coincide con filtrarEspacios: si dice que no hay filtros, no recorta nada', () => {
     const espacios: Espacio[] = [
       espacio({ id: 'a', categoria: 'Museos' }),
@@ -221,6 +273,7 @@ describe('hayFiltrosAplicados', () => {
         categoriasActivas: null,
         gestionesActivas: null,
         localidadesActivas: null,
+        departamentosActivos: null,
       },
     ]
     for (const filtros of sinFiltro) {

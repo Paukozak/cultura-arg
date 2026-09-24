@@ -10,27 +10,12 @@ export interface ConEstadisticas {
   densidadPor100k: number | null
 }
 
-// Escala secuencial violeta (lavanda clarito -> violeta profundo), la gama
-// principal de la app. Es una rampa a medida (no la rampa secuencial azul
-// del sistema por defecto): la validez de una rampa secuencial se juega en
-// la monotonicidad de luminancia, no en separación CVD entre pasos
-// adyacentes (eso es un check categórico, no aplica acá). Luminancia
-// relativa verificada: 0.79 → 0.51 → 0.25 → 0.12 → 0.04.
-const VIOLETA_SEQUENTIAL_STEPS = [
-  '#e8e3f5', // baja
-  '#c9b3e8',
-  '#a077d4',
-  '#7645b8',
-  '#4a1e82', // alta
-]
-
-// Alternativa "apto daltónicos": esquema secuencial de azules de
-// ColorBrewer (5-class Blues), una de las rampas más usadas y verificadas
-// para lectura de mapas con cualquier tipo de daltonismo — a diferencia de
-// una rampa violeta/roja, el azul se distingue con claridad en los tres
-// tipos de daltonismo más comunes (protanopia, deuteranopia, tritanopia).
-// Luminancia relativa verificada: 0.90 → 0.65 → 0.38 → 0.20 → 0.08.
-const DALTONICO_SEQUENTIAL_STEPS = [
+// Escala secuencial de azules (celeste clarito -> azul profundo), la gama
+// principal de la app — esquema de ColorBrewer (5-class Blues), una de las
+// rampas más usadas y verificadas para lectura de mapas con cualquier tipo
+// de daltonismo (protanopia, deuteranopia, tritanopia). Luminancia relativa
+// verificada: 0.90 → 0.65 → 0.38 → 0.20 → 0.08.
+const SEQUENTIAL_STEPS = [
   '#eff3ff', // baja
   '#bdd7e7',
   '#6baed6',
@@ -50,10 +35,6 @@ export const UNIDAD_CAPA: Record<Capa, string> = {
   total: 'ESPACIOS',
 }
 
-function pasosPara(daltonico: boolean): string[] {
-  return daltonico ? DALTONICO_SEQUENTIAL_STEPS : VIOLETA_SEQUENTIAL_STEPS
-}
-
 // scaleQuantile (en vez de scaleQuantize con dominio [0, max]) porque "total
 // de espacios" está muy sesgado por CABA y Buenos Aires (miles de espacios)
 // contra el resto de las provincias (decenas a cientos): con una escala
@@ -61,21 +42,18 @@ function pasosPara(daltonico: boolean): string[] {
 // veía practicamente de un solo color. scaleQuantile arma los escalones por
 // cantidad de provincias (percentiles de la propia distribución), no por
 // rango absoluto, así que siempre hay variedad de color visible.
-function quantileScale(valores: number[], daltonico: boolean) {
-  return scaleQuantile<string>().domain(valores).range(pasosPara(daltonico))
+function quantileScale(valores: number[]) {
+  return scaleQuantile<string>().domain(valores).range(SEQUENTIAL_STEPS)
 }
 
-export function buildColorScales(
-  features: { properties: ConEstadisticas }[],
-  daltonico = false,
-) {
+export function buildColorScales(features: { properties: ConEstadisticas }[]) {
   const densidades = features
     .map((f) => f.properties.densidadPor100k)
     .filter((v): v is number => v !== null)
   const totales = features.map((f) => f.properties.totalEspacios)
 
-  const densidadScale = quantileScale(densidades, daltonico)
-  const totalScale = quantileScale(totales, daltonico)
+  const densidadScale = quantileScale(densidades)
+  const totalScale = quantileScale(totales)
 
   return { densidadScale, totalScale }
 }
@@ -131,10 +109,10 @@ export function colorForFeature(
   return scales.totalScale(props.totalEspacios)
 }
 
-/** Pasos de color de la rampa activa (violeta o apto daltónicos), en orden
- * de menor a mayor — para la leyenda y su panel de detalle. */
-export function pasosActivos(daltonico: boolean): string[] {
-  return pasosPara(daltonico)
+/** Pasos de color de la rampa activa, en orden de menor a mayor — para la
+ * leyenda y su panel de detalle. */
+export function pasosActivos(): string[] {
+  return SEQUENTIAL_STEPS
 }
 
 export interface EscalonLeyenda {

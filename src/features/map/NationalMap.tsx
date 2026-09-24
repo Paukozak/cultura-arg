@@ -41,19 +41,18 @@ const WIDTH = 800
 // componente (ver `HEIGHT` ahí) porque depende del viewport — ver el
 // comentario junto a esa variable.
 
-// Provincias cuyo bounding box proyectado sea más chico que esto (en px, en
-// cualquiera de los dos ejes) no se dibujan como ficha: a esta escala su
-// polígono real es apenas unos pocos px y, simplificado como está en los
-// datos, agrandarlo no se lee como su forma — queda un bloque irregular
-// cualquiera. Se resuelven en cambio como un llamado (globo con etiqueta +
-// línea guía hasta su ubicación real), la forma habitual de marcar un
-// territorio demasiado chico para dibujarse en un mapa a esta escala. Hoy
-// la única que cae acá es CABA.
-const MIN_TILE_PX = 12
-const ETIQUETA_CORTA: Record<string, string> = { '02': 'CABA' }
 // Gris propio de las Malvinas, no `SIN_DATOS_COLOR` (compartido con
 // provincias sin datos): más claro para que la ficha no se lea tan apagada.
 const MALVINAS_COLOR = '#78716c'
+
+// Provincias cuyo bounding box proyectado sea más chico que esto (en px, en
+// cualquiera de los dos ejes) se dibujan igual que cualquier otra ficha
+// (color, click-to-zoom, todo lo de Paso 1/2), pero además se les suma una
+// etiqueta (línea guía + globo con nombre) apuntando a su ubicación real: a
+// esta escala su ficha real mide unos pocos px, muy chica para leerla o
+// clickearla con comodidad. Hoy la única que cae acá es CABA.
+const MIN_TILE_PX = 12
+const ETIQUETA_CORTA: Record<string, string> = { '02': 'CABA' }
 const CALLOUT_DX = 95
 const CALLOUT_DY = -10
 const CALLOUT_PILL_W = 70
@@ -68,8 +67,8 @@ const EXTRUDE_DEPTH = 6
 const HOVER_LIFT = 4
 
 // Zoom animado hacia la provincia clickeada (Etapa 6): al seleccionar una
-// provincia, todo el mapa (fichas + llamados) se escala/traslada como una
-// sola unidad hacia el área real de esa provincia.
+// provincia, todo el mapa se escala/traslada como una sola unidad hacia el
+// área real de esa provincia.
 const ZOOM_MS = 450
 // Entrada del mapa (ver `.provincia-cara`/`.provincia-lado` en index.css): las
 // provincias aparecen en una ola de norte a sur — la de más arriba arranca de
@@ -81,7 +80,6 @@ const ENTRADA_ONDA_MS = 650
 // largo (vuelve de golpe a escala 1).
 const ZOOM_EASING = 'cubic-bezier(0.16, 1, 0.3, 1)'
 const ZOOM_FILL_RATIO = 0.7
-const MIN_ZOOM_BBOX_PX = 40
 
 // `main` (App.tsx) ocupa el alto del viewport menos el header y centra el
 // mapa dentro de ESE espacio, no del viewport completo: el centro del mapa
@@ -101,8 +99,13 @@ function bboxZoom(
   height: number,
 ): ZoomState {
   const bounds = path.bounds(geometria)
-  const w = Math.max(bounds[1][0] - bounds[0][0], MIN_ZOOM_BBOX_PX)
-  const h = Math.max(bounds[1][1] - bounds[0][1], MIN_ZOOM_BBOX_PX)
+  // Sin piso mínimo: el scale es puramente proporcional al tamaño real de
+  // la provincia (chica o grande, siempre llena el ZOOM_FILL_RATIO de la
+  // pantalla) — un piso fijo achataba a las provincias más chicas (CABA) a
+  // un zoom mucho menor del que les tocaría por tamaño real. `MAX_ZOOM_SCALE`
+  // ya alcanza como techo de seguridad para un bbox casi nulo.
+  const w = bounds[1][0] - bounds[0][0]
+  const h = bounds[1][1] - bounds[0][1]
   const cx = (bounds[0][0] + bounds[1][0]) / 2
   const cy = (bounds[0][1] + bounds[1][1]) / 2
   const scale = Math.min(
@@ -129,7 +132,6 @@ function metricaTooltip(feature: ProvinciaFeature, capa: Capa) {
 
 export function NationalMap() {
   const capaActiva = useMapStore((s) => s.capaActiva)
-  const modoDaltonico = useMapStore((s) => s.modoDaltonico)
   const tema = useMapStore((s) => s.tema)
   const headerHeight = useMapStore((s) => s.headerHeight)
   const entradaMapa = useMapStore((s) => s.entradaMapa)
@@ -172,10 +174,7 @@ export function NationalMap() {
   )
   const path = useMemo(() => geoPath(projection), [projection])
 
-  const scales = useMemo(
-    () => buildColorScales(provinciasGeo.features, modoDaltonico),
-    [modoDaltonico],
-  )
+  const scales = useMemo(() => buildColorScales(provinciasGeo.features), [])
 
   // Escala de color del choropleth por departamento (Etapa 9), calculada
   // sobre los ~529 departamentos del país entero (no solo los de la
@@ -186,9 +185,8 @@ export function NationalMap() {
     () =>
       buildColorScales(
         departamentosResumen.map((properties) => ({ properties })),
-        modoDaltonico,
       ),
-    [modoDaltonico],
+    [],
   )
 
   // Path SVG (`d`) y centroide de cada provincia, precalculados UNA SOLA
@@ -206,7 +204,7 @@ export function NationalMap() {
   const geomLowPoly = useMemo(() => {
     const m = new Map<
       string,
-      { d?: string; centroid: [number, number]; necesitaLlamado: boolean }
+      { d?: string; centroid: [number, number]; necesitaEtiqueta: boolean }
     >()
     for (const f of provinciasGeo.features) {
       const bounds = path.bounds(f)
@@ -215,7 +213,7 @@ export function NationalMap() {
       m.set(f.properties.id, {
         d: path(f) ?? undefined,
         centroid: path.centroid(f),
-        necesitaLlamado: Math.max(w, h) < MIN_TILE_PX,
+        necesitaEtiqueta: Math.max(w, h) < MIN_TILE_PX,
       })
     }
     return m
@@ -400,10 +398,7 @@ export function NationalMap() {
         // como si invadiera el territorio de la provincia zoomeada.
         // Mientras la transición todavía está corriendo (`!zoomAsentado`) se
         // sigue usando la low-poly a propósito — ver el comentario junto a
-        // `zoomAsentado`. La clasificación ficha/llamado, en cambio, siempre
-        // se calcula sobre la low-poly: es una decisión de layout de la
-        // vista sin zoom y no debe cambiar solo porque el bounding box de
-        // detalle sea distinto.
+        // `zoomAsentado`.
         const hayZoom = zoom !== null
         const activo = hayZoom && zoomAsentado ? geomDetalle.get(id) : undefined
         const d = activo?.d ?? low.d
@@ -434,7 +429,10 @@ export function NationalMap() {
           // en cada frame mientras el zoom anima — un color ya oscurecido es
           // gratis de escalar/trasladar (parte del mismo cálculo del `color`).
           colorLado: darken(color, 0.6),
-          necesitaLlamado: low.necesitaLlamado,
+          // Siempre sobre la low-poly (no la de detalle): es una decisión de
+          // layout de la vista sin zoom y no debe cambiar solo porque el
+          // bounding box de detalle sea distinto.
+          necesitaEtiqueta: low.necesitaEtiqueta,
           // Siempre del centroide de la low-poly (no el de detalle): el
           // retraso es de la entrada de la vista sin zoom, que no debe
           // cambiar porque después se acerque a una provincia.
@@ -450,10 +448,6 @@ export function NationalMap() {
             hover?.feature.properties.id === id ||
             (!provinciaSeleccionada && provinciaResaltada === id),
           isSelected,
-          // Ver `atenuacion` arriba: `opacity` solo lo usan los llamados (CABA),
-          // que van sobre el fondo y no tienen nada debajo que se transparente;
-          // las provincias dibujadas usan `relleno`/`rellenoLado`.
-          opacity: atenuacion,
           relleno: atenuacion < 1 ? apagarConFondo(color, atenuacion) : color,
           rellenoLado:
             atenuacion < 1
@@ -475,8 +469,10 @@ export function NationalMap() {
     ],
   )
 
-  const fichas = drawn.filter((d) => !d.necesitaLlamado)
-  const llamados = drawn.filter((d) => d.necesitaLlamado)
+  // Solo las provincias marcadas arriba (hoy, CABA): la etiqueta es un
+  // agregado sobre la ficha normal, no un reemplazo — `drawn` ya las dibuja
+  // a todas por igual en los pasos 1/2.
+  const etiquetas = drawn.filter((d) => d.necesitaEtiqueta)
 
   return (
     <div
@@ -523,7 +519,7 @@ export function NationalMap() {
           setHover((prev) => (prev ? { ...prev, x, y, abajo } : prev))
         }}
       >
-        {/* Grupo con zoom: envuelve fichas + llamados + pines para que todo
+        {/* Grupo con zoom: envuelve fichas + etiquetas + pines para que todo
             se escale/traslade como una sola unidad al entrar a una
             provincia (Etapa 6). `vectorEffect="non-scaling-stroke"` en los
             trazos evita que se vean gigantes una vez escalados. */}
@@ -565,7 +561,7 @@ export function NationalMap() {
               />
             </g>
 
-            {fichas.map(
+            {drawn.map(
               ({ feature, d, colorLado, rellenoLado, retrasoEntrada }) => (
                 <path
                   key={`side-${feature.properties.id}`}
@@ -589,7 +585,7 @@ export function NationalMap() {
             veía de varios tonos — eso contradice la leyenda, donde cada color
             es un rango exacto de valores. El relieve lo dan los lados
             extruidos del paso 1, que no tocan el color de la cara. */}
-            {fichas.map(
+            {drawn.map(
               ({
                 feature,
                 d,
@@ -650,19 +646,18 @@ export function NationalMap() {
               },
             )}
 
-            {/* Paso 3: llamados para provincias demasiado chicas para dibujarse
-            (CABA) — línea guía desde su ubicación real hasta una etiqueta
-            legible en el espacio vacío del mapa. El punto (en la ubicación
-            real) y la etiqueta forman un solo target clickeable/hoverable;
-            solo la línea guía es decorativa. */}
-            {llamados.map(
+            {/* Paso 3: etiqueta (línea guía + globo con nombre) para las
+            provincias marcadas arriba (hoy, CABA) — la ficha ya se dibujó
+            en el paso 2 a su tamaño/forma real; esto es solo una ayuda para
+            encontrarla y un target más grande para clickearla, porque a
+            esta escala su ficha real mide unos pocos px. */}
+            {etiquetas.map(
               ({
                 feature,
                 color,
                 isHovered,
                 isSelected,
                 centroid: [cx, cy],
-                opacity,
                 retrasoEntrada,
               }) => {
                 const stroke =
@@ -674,10 +669,13 @@ export function NationalMap() {
                 const etiqueta =
                   ETIQUETA_CORTA[feature.properties.id] ??
                   feature.properties.nombre
-                // Una vez zoomeada esta provincia, el llamado (línea guía + globo
-                // con etiqueta) deja de tener sentido: a esta escala ya se ve su
-                // ubicación real con pines. Solo queda el punto como referencia.
+                // Una vez zoomeada esta provincia, la etiqueta deja de tener
+                // sentido: a esta escala ya se ve su ficha real con pines. Se
+                // oculta del todo (la ficha del paso 2 sigue ahí, a su
+                // tamaño real, dibujada por el choropleth por departamento
+                // del paso 4 una vez asentado el zoom).
                 const zoomeada = isSelected && zoom !== null
+                if (zoomeada) return null
                 const onClick = () =>
                   seleccionarProvincia(
                     provinciaSeleccionada === feature.properties.id
@@ -686,32 +684,26 @@ export function NationalMap() {
                   )
                 return (
                   <g
-                    key={`llamado-${feature.properties.id}`}
-                    className="provincia-lado"
-                    style={{
-                      opacity,
-                      transition: 'opacity 250ms ease',
-                      animationDelay: retrasoEntrada,
-                    }}
+                    key={`etiqueta-${feature.properties.id}`}
+                    className="provincia-llamado"
+                    style={{ animationDelay: retrasoEntrada }}
                   >
-                    {!zoomeada && (
-                      <line
-                        x1={cx}
-                        y1={cy}
-                        x2={anchorX - CALLOUT_PILL_W / 2}
-                        y2={anchorY}
-                        // `--color-neutral-500` (no un rgba fijo): un gris
-                        // claro casi invisible sobre el fondo claro del modo
-                        // día — este token sí se invierte con el tema, y un
-                        // gris medio da contraste parecido contra fondo claro
-                        // u oscuro.
-                        stroke="var(--color-neutral-500)"
-                        strokeOpacity={0.6}
-                        strokeWidth={1.75}
-                        vectorEffect="non-scaling-stroke"
-                        pointerEvents="none"
-                      />
-                    )}
+                    <line
+                      x1={cx}
+                      y1={cy}
+                      x2={anchorX - CALLOUT_PILL_W / 2}
+                      y2={anchorY}
+                      // `--color-neutral-500` (no un rgba fijo): un gris
+                      // claro casi invisible sobre el fondo claro del modo
+                      // día — este token sí se invierte con el tema, y un
+                      // gris medio da contraste parecido contra fondo claro
+                      // u oscuro.
+                      stroke="var(--color-neutral-500)"
+                      strokeOpacity={0.6}
+                      strokeWidth={1.75}
+                      vectorEffect="non-scaling-stroke"
+                      pointerEvents="none"
+                    />
                     <g
                       data-provincia={feature.properties.id}
                       onMouseEnter={handleEnter(feature)}
@@ -719,65 +711,44 @@ export function NationalMap() {
                       onClick={onClick}
                       style={{ cursor: 'pointer' }}
                     >
-                      {/* Círculo invisible más grande que el punto visual, para
-                    que hoverear/clickear la ubicación real no requiera
-                    apuntar a un punto de 3px exactos. */}
-                      <circle cx={cx} cy={cy} r={8} fill="transparent" />
-                      <circle
-                        cx={cx}
-                        cy={cy}
-                        r={isHovered || isSelected ? 4 : 3}
+                      <rect
+                        x={anchorX - CALLOUT_PILL_W / 2}
+                        y={anchorY - CALLOUT_PILL_H / 2}
+                        width={CALLOUT_PILL_W}
+                        height={CALLOUT_PILL_H}
+                        rx={CALLOUT_PILL_H / 2}
                         fill={color}
                         stroke={stroke}
-                        strokeWidth={1.25}
+                        strokeWidth={isHovered || isSelected ? 1.5 : 1}
                         vectorEffect="non-scaling-stroke"
                         style={{
-                          transition: 'r 150ms ease, stroke 150ms ease',
+                          filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6))',
+                          transition: 'stroke 150ms ease, fill 150ms ease',
                         }}
                       />
-                      {!zoomeada && (
-                        <>
-                          <rect
-                            x={anchorX - CALLOUT_PILL_W / 2}
-                            y={anchorY - CALLOUT_PILL_H / 2}
-                            width={CALLOUT_PILL_W}
-                            height={CALLOUT_PILL_H}
-                            rx={CALLOUT_PILL_H / 2}
-                            fill={color}
-                            stroke={stroke}
-                            strokeWidth={isHovered || isSelected ? 1.5 : 1}
-                            vectorEffect="non-scaling-stroke"
-                            style={{
-                              filter:
-                                'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6))',
-                              transition: 'stroke 150ms ease, fill 150ms ease',
-                            }}
-                          />
-                          <text
-                            x={anchorX}
-                            y={anchorY}
-                            textAnchor="middle"
-                            dominantBaseline="central"
-                            fontSize={19}
-                            fontWeight={700}
-                            // Fijo, no `var(--color-accent-ink)`: ese token
-                            // contrasta contra la superficie de acento fija de
-                            // la marca, pero acá el fondo del globo (`color`)
-                            // es un paso de la escala secuencial de densidad —
-                            // casi siempre oscuro — sin relación con el tema.
-                            // `accent-ink` se vuelve casi negro en modo oscuro,
-                            // ilegible sobre ese fondo oscuro.
-                            fill="#f5f2ea"
-                            style={{
-                              fontFamily: 'var(--font-mono)',
-                              letterSpacing: '0.02em',
-                            }}
-                            pointerEvents="none"
-                          >
-                            {etiqueta}
-                          </text>
-                        </>
-                      )}
+                      <text
+                        x={anchorX}
+                        y={anchorY}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fontSize={19}
+                        fontWeight={700}
+                        // Fijo, no `var(--color-accent-ink)`: ese token
+                        // contrasta contra la superficie de acento fija de
+                        // la marca, pero acá el fondo del globo (`color`) es
+                        // un paso de la escala secuencial de densidad — casi
+                        // siempre oscuro — sin relación con el tema.
+                        // `accent-ink` se vuelve casi negro en modo oscuro,
+                        // ilegible sobre ese fondo oscuro.
+                        fill="#f5f2ea"
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          letterSpacing: '0.02em',
+                        }}
+                        pointerEvents="none"
+                      >
+                        {etiqueta}
+                      </text>
                     </g>
                   </g>
                 )

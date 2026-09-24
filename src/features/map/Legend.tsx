@@ -21,14 +21,10 @@ function formatNumero(n: number) {
  * lo muestra siempre a la vista en vez de detrás de un botón. */
 export function LegendContenido({ onElegir }: { onElegir?: () => void }) {
   const capaActiva = useMapStore((s) => s.capaActiva)
-  const modoDaltonico = useMapStore((s) => s.modoDaltonico)
   const resaltarProvincia = useMapStore((s) => s.resaltarProvincia)
   const seleccionarProvincia = useMapStore((s) => s.seleccionarProvincia)
 
-  const scales = useMemo(
-    () => buildColorScales(provinciasGeo.features, modoDaltonico),
-    [modoDaltonico],
-  )
+  const scales = useMemo(() => buildColorScales(provinciasGeo.features), [])
   const scale =
     capaActiva === 'densidad' ? scales.densidadScale : scales.totalScale
   const escalones = useMemo(() => desglosarEscala(scale), [scale])
@@ -217,20 +213,16 @@ function LegendDetail({ onCerrar }: { onCerrar: () => void }) {
 
 export function Legend() {
   const capaActiva = useMapStore((s) => s.capaActiva)
-  const modoDaltonico = useMapStore((s) => s.modoDaltonico)
   const [abierto, setAbierto] = useState(false)
 
-  const scales = useMemo(
-    () => buildColorScales(provinciasGeo.features, modoDaltonico),
-    [modoDaltonico],
-  )
+  const scales = useMemo(() => buildColorScales(provinciasGeo.features), [])
 
   const scale =
     capaActiva === 'densidad' ? scales.densidadScale : scales.totalScale
   const valores = scale.domain()
   const min = valores[0]
   const max = valores[valores.length - 1]
-  const pasos = pasosActivos(modoDaltonico)
+  const pasos = pasosActivos()
 
   return (
     <>

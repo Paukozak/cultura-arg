@@ -1,6 +1,5 @@
 // Memoria de "ya vio la bienvenida de mobile" (MapIntroMobil.tsx). Mismo patrón
-// que el tema y el modo daltónico (`cca-tema`, `cca-daltonico` en
-// mapStore.ts): una clave en localStorage.
+// que el tema (`cca-tema` en mapStore.ts): una clave en localStorage.
 export const INTRO_VISTA_KEY = 'cca-intro-vista'
 
 /** ¿Ya se vio la bienvenida en este dispositivo? Con `?intro` en la URL

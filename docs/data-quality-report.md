@@ -1,6 +1,6 @@
 # Reporte de calidad de datos
 
-Generado el 2026-09-23 a partir de los CSV de SInCA descargados de datos.cultura.gob.ar.
+Generado el 2026-09-24 a partir de los CSV de SInCA descargados de datos.cultura.gob.ar.
 
 ## Completitud de `anioInauguracion`
 
@@ -35,4 +35,4 @@ En total, **4669 de 11234** registros (41.6%) tienen un año documentado y váli
 
 ## Asignación de departamento por registro (Etapa 9)
 
-`departamentoId` toma los primeros 5 dígitos del mismo código de localidad (2 de provincia + 3 de departamento), el mismo id que usa Georef para `departamentos.geojson`. Dos bolsones de códigos vencidos (nomenclatura vieja, previa a una redivisión administrativa) se remapean a mano — ver `DEPARTAMENTO_ID_LEGACY` en este script: Tierra del Fuego (102 registros bajo los códigos previos a la creación de Tolhuin en 2017) y Chascomús, Buenos Aires (12 registros). **CABA es aparte y no tiene arreglo posible con este dataset**: sus 2653 registros siempre traen el código placeholder `02000` (la ciudad entera, no una comuna) — SInCA no llega a nivel comuna para CABA, así que el choropleth por comuna de CABA (Etapa 9) queda sin datos en las 15.
+`departamentoId` toma los primeros 5 dígitos del mismo código de localidad (2 de provincia + 3 de departamento), el mismo id que usa Georef para `departamentos.geojson`. Dos bolsones de códigos vencidos (nomenclatura vieja, previa a una redivisión administrativa) se remapean a mano — ver `DEPARTAMENTO_ID_LEGACY` en este script: Tierra del Fuego (102 registros bajo los códigos previos a la creación de Tolhuin en 2017) y Chascomús, Buenos Aires (12 registros). **CABA es aparte**: sus registros siempre traen el código placeholder `02000` (la ciudad entera, no una comuna) porque SInCA no llega a nivel comuna — se resuelve por geocodificación (point-in-polygon de lat/lon contra las 15 comunas reales de Georef, ver `asignarComunasCaba`): 2625 registros asignados a su comuna real, 28 sin coordenadas o fuera de los límites de las 15 comunas (quedan bajo `02000`, sin comuna en el choropleth).
