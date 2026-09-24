@@ -515,8 +515,6 @@ export function NationalMap() {
       if (depFeature) {
         setHover(null)
         setDepartamentoHover({
-          id: depFeature.properties.id,
-          nombre: depFeature.properties.nombre,
           ...depFeature.properties,
           x: clientX - rect.left,
           y: clientY - rect.top,
