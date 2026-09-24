@@ -1,9 +1,9 @@
 // Altos aproximados de los tooltips del mapa (padding + líneas de texto +
 // borde). No hace falta medirlos: solo deciden de qué lado del cursor caben.
 export const ALTO_TOOLTIP_PROVINCIA_PX = 56
-// Una sola línea (el nombre del departamento, sin métrica) — mismo alto que
-// tenía el tooltip de pin, antes de sacar los pines del mapa.
-export const ALTO_TOOLTIP_DEPARTAMENTO_PX = 36
+// Mismo layout de dos líneas (nombre + métrica) y mismo padding/borde que el
+// de provincia — de ahí el mismo alto.
+export const ALTO_TOOLTIP_DEPARTAMENTO_PX = 56
 
 // Aire entre el cursor y el tooltip (el mismo que usa el offset de arriba) más
 // un pequeño colchón para que no quede pegado al borde recortado.

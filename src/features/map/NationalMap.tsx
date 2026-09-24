@@ -5,6 +5,7 @@ import {
   useState,
   type CSSProperties,
   type MouseEvent,
+  type TouchEvent,
   type TransitionEvent,
 } from 'react'
 import { geoMercator, geoPath, type GeoPermissibleObjects } from 'd3-geo'
@@ -15,6 +16,7 @@ import {
   provinciasGeo,
   type ProvinciaFeature,
 } from '../../data/provincias'
+import { useDepartamentos } from '../../data/useDepartamentos'
 import { useMapStore, type Capa } from '../../store/mapStore'
 import { useMediaQuery } from '../../utils/useMediaQuery'
 import {
@@ -67,6 +69,16 @@ const CALLOUT_PILL_H = 32
 // despegara del mapa.
 const EXTRUDE_DEPTH = 6
 const HOVER_LIFT = 4
+
+// Mobile no tiene mouseenter/mousemove por ficha: mantener presionado
+// reproduce el hover de desktop (ver `onTouchStart`/`onTouchMove` más abajo)
+// — bastante más que un tap accidental (evita que arrancar a deslizar el
+// dedo se lea como "empezar a explorar") pero corto para sentirse
+// responsive. La tolerancia de movimiento es la distancia que puede
+// moverse el dedo mientras se espera este umbral sin que cuente como
+// arrastre (dedos no quedan perfectamente quietos).
+const TOQUE_LARGO_MS = 350
+const TOQUE_TOLERANCIA_PX = 10
 
 // Zoom animado hacia la provincia clickeada (Etapa 6): al seleccionar una
 // provincia, todo el mapa se escala/traslada como una sola unidad hacia el
@@ -188,6 +200,7 @@ export function NationalMap() {
   } | null>(null)
   const [departamentoHover, setDepartamentoHover] = useState<
     | ({
+        id: string
         nombre: string
         x: number
         y: number
@@ -195,6 +208,13 @@ export function NationalMap() {
       } & ConEstadisticas)
     | null
   >(null)
+
+  // Levantado de `useDepartamentos` (antes vivía dentro de
+  // DepartamentosChoropleth): el hit-test táctil (ver más abajo) necesita
+  // buscar qué departamento hay bajo el dedo por su id, y esos datos solo
+  // existen acá si se cargan en este nivel — de paso, un único punto de
+  // carga en vez de dos hooks separados pidiendo lo mismo.
+  const departamentosData = useDepartamentos(provinciaSeleccionada)
 
   // Argentina, proyectada, mide (en las unidades del viewBox) mucho más de
   // alto que de ancho — su bounding box real dentro de un viewBox de
@@ -447,6 +467,136 @@ export function NationalMap() {
     return clientY - bordeSuperior
   }
 
+  // Estado del gesto de "mantener presionado" en mobile — en un ref (no
+  // estado de React) porque cambia en cada touchmove del arrastre y no debe
+  // disparar un re-render por sí mismo, solo mientras corre el timer que
+  // decide si el toque se convierte en exploración.
+  const toqueRef = useRef<{
+    timer: ReturnType<typeof setTimeout> | null
+    x: number
+    y: number
+    activo: boolean
+  }>({ timer: null, x: 0, y: 0, activo: false })
+
+  useEffect(() => {
+    return () => {
+      if (toqueRef.current.timer !== null) clearTimeout(toqueRef.current.timer)
+    }
+  }, [])
+
+  const limpiarToque = () => {
+    if (toqueRef.current.timer !== null) clearTimeout(toqueRef.current.timer)
+    toqueRef.current = { timer: null, x: 0, y: 0, activo: false }
+  }
+
+  // Hit-test manual con `elementFromPoint`: a diferencia del mouse, un
+  // `touchmove` no dispara mouseenter/mouseleave por cada ficha que el dedo
+  // va recorriendo (el evento siempre apunta a donde arrancó el toque) — hay
+  // que ir preguntando "qué hay bajo el dedo ahora" a mano en cada posición,
+  // y prender el mismo estado de hover/tooltip que ya usa el mouse (así la
+  // ficha se resalta y levanta exactamente igual que en desktop).
+  const hitTestToque = (clientX: number, clientY: number) => {
+    const rect = svgRef.current?.getBoundingClientRect()
+    const el = document.elementFromPoint(clientX, clientY)
+    if (!rect || !el) {
+      setHover(null)
+      setDepartamentoHover(null)
+      return
+    }
+    const abajoBase = espacioSobreCursor(clientY)
+
+    if (provinciaSeleccionada) {
+      const depId = el
+        .closest('[data-departamento]')
+        ?.getAttribute('data-departamento')
+      const depFeature = departamentosData?.features.find(
+        (f) => f.properties.id === depId,
+      )
+      if (depFeature) {
+        setHover(null)
+        setDepartamentoHover({
+          id: depFeature.properties.id,
+          nombre: depFeature.properties.nombre,
+          ...depFeature.properties,
+          x: clientX - rect.left,
+          y: clientY - rect.top,
+          abajo: tooltipVaDebajo(abajoBase, ALTO_TOOLTIP_DEPARTAMENTO_PX),
+        })
+        return
+      }
+      setDepartamentoHover(null)
+      return
+    }
+
+    const provId = el
+      .closest('[data-provincia]')
+      ?.getAttribute('data-provincia')
+    const feature = provinciasGeo.features.find(
+      (f) => f.properties.id === provId,
+    )
+    if (feature) {
+      setHover({
+        feature,
+        x: clientX - rect.left,
+        y: clientY - rect.top,
+        abajo: tooltipVaDebajo(abajoBase, ALTO_TOOLTIP_PROVINCIA_PX),
+      })
+      return
+    }
+    setHover(null)
+  }
+
+  const onTouchStart = (e: TouchEvent<SVGSVGElement>) => {
+    if (e.touches.length !== 1) return
+    const touch = e.touches[0]
+    limpiarToque()
+    toqueRef.current.x = touch.clientX
+    toqueRef.current.y = touch.clientY
+    toqueRef.current.timer = setTimeout(() => {
+      toqueRef.current.activo = true
+      hitTestToque(toqueRef.current.x, toqueRef.current.y)
+    }, TOQUE_LARGO_MS)
+  }
+
+  const onTouchMove = (e: TouchEvent<SVGSVGElement>) => {
+    const touch = e.touches[0]
+    if (!touch) return
+    if (!toqueRef.current.activo) {
+      // Todavía esperando el umbral de "mantener presionado": si el dedo se
+      // corrió de más, esto era un scroll/gesto normal, no una intención de
+      // explorar — se cancela el timer y el toque sigue su curso normal
+      // (p. ej. termina en un tap-click si suelta sobre la misma ficha).
+      const dx = touch.clientX - toqueRef.current.x
+      const dy = touch.clientY - toqueRef.current.y
+      if (Math.hypot(dx, dy) > TOQUE_TOLERANCIA_PX) limpiarToque()
+      return
+    }
+    hitTestToque(touch.clientX, touch.clientY)
+  }
+
+  const onTouchEnd = (e: TouchEvent<SVGSVGElement>) => {
+    if (toqueRef.current.activo) {
+      // Sin esto, soltar el dedo dispara el click sintético del navegador
+      // sobre lo que haya debajo en ese momento — abriendo/seleccionando
+      // una ficha solo porque el recorrido de exploración terminó ahí. El
+      // gesto es de solo-lectura (como el hover de mouse): seleccionar
+      // sigue siendo un tap normal y corto, sin pasar por este camino.
+      e.preventDefault()
+      setHover(null)
+      setDepartamentoHover(null)
+    }
+    limpiarToque()
+  }
+
+  const gestosToque = esMobil
+    ? {
+        onTouchStart,
+        onTouchMove,
+        onTouchEnd,
+        onTouchCancel: onTouchEnd,
+      }
+    : {}
+
   // Solo lectura de los mapas precalculados de arriba + cálculo de color —
   // nada acá recorre geometría, así que recalcular esto en cada hover o
   // cambio de selección es barato.
@@ -573,6 +723,15 @@ export function NationalMap() {
             zoomAsentado && tema === 'dark'
               ? 'drop-shadow(0 18px 32px rgba(0, 0, 0, 0.65))'
               : 'none',
+          // Sin esto, mantener presionado dispara el callout/lupa nativo de
+          // selección de texto de iOS/Android (compitiendo con el gesto de
+          // "mantener presionado" propio, ver `gestosToque`) y un arrastre
+          // largo puede leerse como pan/zoom del navegador en vez de como
+          // el recorrido por el mapa.
+          touchAction: esMobil ? 'none' : undefined,
+          WebkitTouchCallout: esMobil ? 'none' : undefined,
+          WebkitUserSelect: esMobil ? 'none' : undefined,
+          userSelect: esMobil ? 'none' : undefined,
         }}
         role="img"
         aria-label="Mapa de la Argentina por provincia"
@@ -586,6 +745,7 @@ export function NationalMap() {
           )
           setHover((prev) => (prev ? { ...prev, x, y, abajo } : prev))
         }}
+        {...gestosToque}
       >
         {/* Grupo con zoom: envuelve fichas + etiquetas + pines para que todo
             se escale/traslade como una sola unidad al entrar a una
@@ -848,10 +1008,13 @@ export function NationalMap() {
               capaActiva={capaActiva}
               scales={departamentoScales}
               visible={zoomAsentado}
-              onHover={(nombre, estadisticas, clientX, clientY) => {
+              datos={departamentosData}
+              hoveredId={departamentoHover?.id ?? null}
+              onHover={(id, nombre, estadisticas, clientX, clientY) => {
                 const rect = svgRef.current?.getBoundingClientRect()
                 if (!rect) return
                 setDepartamentoHover({
+                  id,
                   nombre,
                   ...estadisticas,
                   x: clientX - rect.left,

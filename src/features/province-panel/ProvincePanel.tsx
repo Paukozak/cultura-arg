@@ -354,9 +354,9 @@ function ProvincePanelContent({
             onClick={() => setSeccion('departamentos')}
             disabled={seccion === 'departamentos'}
             aria-label={`Ver la lista completa de departamentos de ${nombre}, con su color y cantidad`}
-            className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide text-neutral-500 transition-colors hover:text-neutral-300 disabled:pointer-events-none disabled:opacity-50"
+            className="flex items-center gap-1.5 whitespace-nowrap font-mono text-[10px] uppercase tracking-wide text-neutral-500 transition-colors hover:text-neutral-300 disabled:pointer-events-none disabled:opacity-50 md:text-xs"
           >
-            <List className="h-3.5 w-3.5" aria-hidden="true" />
+            <List className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             Departamentos · {UNIDAD_CAPA[capaActiva]}
           </button>
           {/* Layer toggle propio: con la provincia abierta, `LayerToggle` de

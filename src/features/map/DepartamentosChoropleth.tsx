@@ -1,6 +1,7 @@
 import type { geoPath } from 'd3-geo'
-import { useState, type MouseEvent } from 'react'
-import { useDepartamentos } from '../../data/useDepartamentos'
+import type { FeatureCollection, Geometry } from 'geojson'
+import type { MouseEvent } from 'react'
+import type { DepartamentoProperties } from '../../data/departamentos'
 import { useMapStore, type Capa } from '../../store/mapStore'
 import {
   apagarConFondo,
@@ -17,7 +18,15 @@ interface Props {
   capaActiva: Capa
   scales: ReturnType<typeof buildColorScales>
   visible: boolean
+  datos: FeatureCollection<Geometry, DepartamentoProperties> | null
+  // Controlado desde NationalMap (no un `useState` local acá): en mobile, el
+  // arrastre táctil que recorre el mapa (ver el efecto "mantener presionado"
+  // en NationalMap.tsx) hace su propio hit-test con `elementFromPoint` fuera
+  // de este componente y necesita poder marcar un departamento como resaltado
+  // sin pasar por sus eventos de mouse, que el touch nunca dispara.
+  hoveredId: string | null
   onHover: (
+    id: string,
     nombre: string,
     estadisticas: ConEstadisticas,
     clientX: number,
@@ -41,6 +50,8 @@ export function DepartamentosChoropleth({
   capaActiva,
   scales,
   visible,
+  datos,
+  hoveredId,
   onHover,
   onLeave,
 }: Props) {
@@ -48,8 +59,6 @@ export function DepartamentosChoropleth({
     (s) => s.abrirVistaCompletaPorDepartamento,
   )
   const departamentoResaltado = useMapStore((s) => s.departamentoResaltado)
-  const datos = useDepartamentos(provinciaId)
-  const [hoveredId, setHoveredId] = useState<string | null>(null)
   if (!datos) return null
 
   return (
@@ -80,6 +89,7 @@ export function DepartamentosChoropleth({
         return (
           <path
             key={id}
+            data-departamento={id}
             d={d}
             fill={atenuado ? apagarConFondo(color, 0.45) : color}
             stroke={
@@ -98,17 +108,25 @@ export function DepartamentosChoropleth({
               transition:
                 'filter 150ms ease, stroke 150ms ease, fill 150ms ease',
             }}
-            onMouseEnter={(e: MouseEvent) => {
-              setHoveredId(id)
-              onHover(f.properties.nombre, f.properties, e.clientX, e.clientY)
-            }}
-            onMouseMove={(e: MouseEvent) =>
-              onHover(f.properties.nombre, f.properties, e.clientX, e.clientY)
+            onMouseEnter={(e: MouseEvent) =>
+              onHover(
+                id,
+                f.properties.nombre,
+                f.properties,
+                e.clientX,
+                e.clientY,
+              )
             }
-            onMouseLeave={() => {
-              setHoveredId(null)
-              onLeave()
-            }}
+            onMouseMove={(e: MouseEvent) =>
+              onHover(
+                id,
+                f.properties.nombre,
+                f.properties,
+                e.clientX,
+                e.clientY,
+              )
+            }
+            onMouseLeave={() => onLeave()}
             onClick={() => abrirVistaCompletaPorDepartamento(id)}
           />
         )

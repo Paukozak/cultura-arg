@@ -33,6 +33,16 @@ export function useHistorialPaneles() {
   // o botón atrás): el navegador ya movió el historial solo, no hay que
   // compensarlo llamando a `history.go` de nuevo.
   const cerrandoPorGesto = useRef(false)
+  // Marca que el `popstate` que está por llegar es el que dispara el propio
+  // `history.go` de acá abajo (corrigiendo una entrada fantasma porque un
+  // panel se cerró por su botón, p. ej. el "volver" de ProvinceFullView, no
+  // por un gesto real) — `history.go` despacha ese `popstate` de forma
+  // asíncrona, así que sin esta marca `onPopState` lo procesaba como un
+  // "atrás" real y cerraba UN NIVEL DE MÁS del que el botón ya había
+  // cerrado (p. ej. cerrar la vista completa terminaba también
+  // deseleccionando la provincia, en vez de dejar el panel de la provincia
+  // abierto detrás).
+  const corrigiendoHistorial = useRef(false)
 
   useEffect(() => {
     if (profundidad > entradasEmpujadas.current) {
@@ -46,6 +56,7 @@ export function useHistorialPaneles() {
       if (cerrandoPorGesto.current) {
         cerrandoPorGesto.current = false
       } else {
+        corrigiendoHistorial.current = true
         history.go(-diferencia)
       }
     }
@@ -53,6 +64,10 @@ export function useHistorialPaneles() {
 
   useEffect(() => {
     function onPopState() {
+      if (corrigiendoHistorial.current) {
+        corrigiendoHistorial.current = false
+        return
+      }
       cerrandoPorGesto.current = true
       if (vistaCompleta) {
         setVistaCompleta(false)
