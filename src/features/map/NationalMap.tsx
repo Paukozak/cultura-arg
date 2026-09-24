@@ -187,7 +187,13 @@ export function NationalMap() {
     abajo: boolean
   } | null>(null)
   const [departamentoHover, setDepartamentoHover] = useState<
-    ({ nombre: string; x: number; y: number; abajo: boolean } & ConEstadisticas) | null
+    | ({
+        nombre: string
+        x: number
+        y: number
+        abajo: boolean
+      } & ConEstadisticas)
+    | null
   >(null)
 
   // Argentina, proyectada, mide (en las unidades del viewBox) mucho más de
@@ -290,9 +296,7 @@ export function NationalMap() {
   // cuando aparece/desaparece la hoja inferior (ver `coverFit` arriba). Solo
   // hace falta en mobile: en desktop el ancho/alto del viewBox ya se acerca
   // bastante a la forma real de `main` y no hubo reporte de sobra ahí.
-  const [boxSize, setBoxSize] = useState<{ w: number; h: number } | null>(
-    null,
-  )
+  const [boxSize, setBoxSize] = useState<{ w: number; h: number } | null>(null)
   useEffect(() => {
     if (!esMobil) return
     const el = svgRef.current

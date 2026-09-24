@@ -198,7 +198,9 @@ function ProvincePanelContent({
   // realmente tiene.
   const valoresDepartamentos = departamentosResumen
     .filter((d) => d.provinciaId === provinciaId)
-    .map((d) => (capaActiva === 'densidad' ? d.densidadPor100k : d.totalEspacios))
+    .map((d) =>
+      capaActiva === 'densidad' ? d.densidadPor100k : d.totalEspacios,
+    )
     .filter((v): v is number => v !== null)
   const minDepartamentos = valoresDepartamentos.length
     ? Math.min(...valoresDepartamentos)
