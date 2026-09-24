@@ -12,6 +12,13 @@ interface MapState {
    * NationalMap la dibuja como si el cursor estuviera sobre ella. */
   provinciaResaltada: string | null
   resaltarProvincia: (provinciaId: string | null) => void
+  /** Departamento resaltado en el choropleth desde FUERA de él: pasar el
+   * mouse (o el foco de teclado) por su fila en la lista de departamentos del
+   * panel de provincia (ver DepartamentosLista.tsx). DepartamentosChoropleth
+   * la dibuja como si el cursor estuviera sobre ella — mismo patrón que
+   * `provinciaResaltada`/`resaltarProvincia` para las provincias. */
+  departamentoResaltado: string | null
+  resaltarDepartamento: (departamentoId: string | null) => void
   vistaCompleta: boolean
   setVistaCompleta: (valor: boolean) => void
   /** Espacio a preseleccionar la próxima vez que se abra la vista completa
@@ -77,9 +84,13 @@ export const useMapStore = create<MapState>((set) => ({
       provinciaSeleccionada: provinciaId,
       vistaCompleta: false,
       provinciaResaltada: null,
+      departamentoResaltado: null,
     }),
   provinciaResaltada: null,
   resaltarProvincia: (provinciaId) => set({ provinciaResaltada: provinciaId }),
+  departamentoResaltado: null,
+  resaltarDepartamento: (departamentoId) =>
+    set({ departamentoResaltado: departamentoId }),
   vistaCompleta: false,
   setVistaCompleta: (valor) => set({ vistaCompleta: valor }),
   espacioFocoId: null,

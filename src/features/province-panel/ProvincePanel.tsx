@@ -5,7 +5,6 @@ import {
   useDragControls,
   useMotionValue,
   type PanInfo,
-  type Variants,
 } from 'motion/react'
 import {
   useEffect,
@@ -14,10 +13,9 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { List } from 'lucide-react'
+import { ArrowLeft, List } from 'lucide-react'
 import { ContadorAnimado } from '../../components/ContadorAnimado'
 import { departamentosResumen } from '../../data/departamentos'
-import type { Espacio } from '../../data/espacios'
 import { provinciasGeo } from '../../data/provincias'
 import { useEspacios } from '../../data/useEspacios'
 import { useMapStore } from '../../store/mapStore'
@@ -25,10 +23,9 @@ import { useMediaQuery } from '../../utils/useMediaQuery'
 import { useWindowHeight } from '../../utils/useWindowHeight'
 import { pasosActivos, UNIDAD_CAPA } from '../map/colorScales'
 import { LayerToggle } from '../map/LayerToggle'
-import { ICONOS_POR_CATEGORIA, ICONO_POR_DEFECTO } from './categoriaIcons'
-import { EspacioFoto } from './EspacioFoto'
+import { DepartamentosLista } from './DepartamentosLista'
+import { DestacadosSeccion } from './DestacadosSeccion'
 import { getDestacados } from './getDestacados'
-import { GoogleMapsEmbed } from './GoogleMapsEmbed'
 import {
   alturaHojaPx as calcularAlturaHojaPx,
   altoPeekPx,
@@ -37,23 +34,6 @@ import {
 
 function formatNumero(n: number) {
   return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 }).format(n)
-}
-
-// Las tarjetas de destacados entran una tras otra (fundido + subida) al
-// abrirse el panel. La animación va en un contenedor aparte de cada tarjeta,
-// no en la tarjeta misma: esa ya usa `transform` para su elevación en hover
-// (`hover:-translate-y-1`) y las dos se pisarían.
-const listaDestacados: Variants = {
-  oculto: {},
-  visible: { transition: { staggerChildren: 0.08, delayChildren: 0.2 } },
-}
-const itemDestacado: Variants = {
-  oculto: { opacity: 0, y: 18 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] },
-  },
 }
 
 // Resorte de la hoja de mobile (entrar, expandir, colapsar y volver a su lugar
@@ -65,54 +45,6 @@ const TRANSICION_HOJA = {
   damping: 38,
   mass: 0.9,
 } as const
-
-function DestacadoCard({
-  espacio,
-  onAbrirFicha,
-}: {
-  espacio: Espacio
-  onAbrirFicha: (espacio: Espacio) => void
-}) {
-  const Icono = ICONOS_POR_CATEGORIA[espacio.categoria] ?? ICONO_POR_DEFECTO
-  return (
-    <div className="flex flex-col gap-3 rounded-xl border border-neutral-800 bg-neutral-900/60 p-4 transition-all duration-200 hover:-translate-y-1 hover:border-accent/60 hover:shadow-lg hover:shadow-accent/10">
-      <EspacioFoto
-        espacio={espacio}
-        className="h-36 w-full"
-        onClick={() => onAbrirFicha(espacio)}
-      />
-      <div className="flex items-start gap-3">
-        <Icono className="h-5 w-5 shrink-0 text-accent" aria-hidden="true" />
-        <div className="min-w-0">
-          <button
-            type="button"
-            onClick={() => onAbrirFicha(espacio)}
-            className="text-left text-sm font-medium leading-tight text-neutral-100 hover:text-accent hover:underline"
-          >
-            {espacio.nombre}
-          </button>
-          <div className="mt-0.5 font-mono text-xs text-neutral-500">
-            {espacio.categoria}
-            {espacio.anioInauguracion ? ` · ${espacio.anioInauguracion}` : ''}
-          </div>
-          {espacio.localidad && (
-            <div className="text-xs text-neutral-500">{espacio.localidad}</div>
-          )}
-        </div>
-      </div>
-      {espacio.direccion && (
-        <div className="text-xs text-neutral-400">📍 {espacio.direccion}</div>
-      )}
-      <GoogleMapsEmbed
-        nombre={espacio.nombre ?? espacio.categoria}
-        direccion={espacio.direccion}
-        localidad={espacio.localidad}
-        lat={espacio.lat}
-        lon={espacio.lon}
-      />
-    </div>
-  )
-}
 
 function ProvincePanelContent({
   provinciaId,
@@ -129,6 +61,12 @@ function ProvincePanelContent({
   const esMobil = useMediaQuery('(max-width: 767px)')
   const panelRef = useRef<HTMLDivElement>(null)
   const [expandida, setExpandida] = useState(false)
+  // Qué se ve en el contenido del panel: los destacados (default) o la
+  // lista de departamentos — no un modal aparte, para no tapar el resto del
+  // panel (header, escala, botón de "ver todos") con una capa por encima.
+  const [seccion, setSeccion] = useState<'destacados' | 'departamentos'>(
+    'destacados',
+  )
   const dragControls = useDragControls()
   // Con mouse (no con el dedo), al soltar un arrastre el navegador dispara
   // además un `click` sobre lo que quedó bajo el cursor — la agarradera o la
@@ -196,8 +134,10 @@ function ProvincePanelContent({
   // mostrar acá ese mínimo/máximo nacional confundía — decía "865" en TODAS
   // las provincias por igual, sin relación con lo que esa provincia
   // realmente tiene.
-  const valoresDepartamentos = departamentosResumen
-    .filter((d) => d.provinciaId === provinciaId)
+  const departamentosProvincia = departamentosResumen.filter(
+    (d) => d.provinciaId === provinciaId,
+  )
+  const valoresDepartamentos = departamentosProvincia
     .map((d) =>
       capaActiva === 'densidad' ? d.densidadPor100k : d.totalEspacios,
     )
@@ -403,9 +343,22 @@ function ProvincePanelContent({
 
       <div className="border-b border-neutral-800 px-5 py-3">
         <div className="flex items-center justify-between gap-2">
-          <span className="font-mono text-xs uppercase tracking-wide text-neutral-500">
+          {/* Cambia el contenido de abajo a la lista de departamentos —
+              mismo color, nombre y cantidad que se ven pintados en el mapa —
+              en vez de abrir un modal por encima que tape el resto del
+              panel. El icono `List` es el mismo que el botón "Todos" de más
+              arriba, para que se lea como el mismo gesto (ver-como-lista).
+              Sin acción si ya se está viendo esa sección. */}
+          <button
+            type="button"
+            onClick={() => setSeccion('departamentos')}
+            disabled={seccion === 'departamentos'}
+            aria-label={`Ver la lista completa de departamentos de ${nombre}, con su color y cantidad`}
+            className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide text-neutral-500 transition-colors hover:text-neutral-300 disabled:pointer-events-none disabled:opacity-50"
+          >
+            <List className="h-3.5 w-3.5" aria-hidden="true" />
             Departamentos · {UNIDAD_CAPA[capaActiva]}
-          </span>
+          </button>
           {/* Layer toggle propio: con la provincia abierta, `LayerToggle` de
               MapInfoPanel/mobile queda tapado o desmontado — antes no había
               forma de cambiar de capa sin cerrar el panel. `layoutId`
@@ -434,31 +387,30 @@ function ProvincePanelContent({
       </div>
 
       <div className="flex-1 overflow-y-auto p-5">
-        <h3 className="mb-3 font-mono text-xs uppercase tracking-wide text-neutral-500">
-          Destacados
-        </h3>
-        {!espacios ? (
-          <p className="text-sm text-neutral-500">Cargando espacios…</p>
-        ) : destacados.length === 0 ? (
-          <p className="text-sm text-neutral-500">
-            No hay espacios registrados en esta provincia.
-          </p>
+        {seccion === 'destacados' ? (
+          <DestacadosSeccion
+            espacios={espacios}
+            destacados={destacados}
+            onAbrirFicha={(e) => abrirVistaCompleta(e.id)}
+          />
         ) : (
-          <motion.div
-            variants={listaDestacados}
-            initial="oculto"
-            animate="visible"
-            className="flex flex-col gap-3"
-          >
-            {destacados.map((espacio) => (
-              <motion.div key={espacio.id} variants={itemDestacado}>
-                <DestacadoCard
-                  espacio={espacio}
-                  onAbrirFicha={(e) => abrirVistaCompleta(e.id)}
-                />
-              </motion.div>
-            ))}
-          </motion.div>
+          <>
+            {/* Vuelve a destacados en el mismo lugar, sin cerrar ni
+                navegar afuera del panel — la contraparte del botón de arriba
+                que trajo hasta acá. */}
+            <button
+              type="button"
+              onClick={() => setSeccion('destacados')}
+              className="mb-3 flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide text-neutral-500 transition-colors hover:text-neutral-300"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+              Volver a destacados
+            </button>
+            <h3 className="mb-3 font-mono text-xs uppercase tracking-wide text-neutral-500">
+              Los {departamentosProvincia.length} departamentos
+            </h3>
+            <DepartamentosLista provinciaId={provinciaId} />
+          </>
         )}
       </div>
 

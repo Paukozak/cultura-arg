@@ -30,6 +30,7 @@ export function LayerToggle({
 } = {}) {
   const capaActiva = useMapStore((s) => s.capaActiva)
   const setCapaActiva = useMapStore((s) => s.setCapaActiva)
+  const tema = useMapStore((s) => s.tema)
 
   return (
     <div
@@ -38,7 +39,11 @@ export function LayerToggle({
       className={`flex gap-0.5 rounded-full ${
         sutil
           ? 'bg-neutral-900'
-          : 'border border-neutral-800 bg-neutral-950/90 shadow-lg shadow-black/50 backdrop-blur'
+          : // La sombra está pensada para hacer flotar el control sobre un
+            // fondo oscuro; sobre fondo claro se ve como un halo negro
+            // pegado al control en vez de una sombra de profundidad (mismo
+            // criterio que el filtro de sombra del mapa en NationalMap.tsx).
+            `border border-neutral-800 bg-neutral-950/90 backdrop-blur ${tema === 'dark' ? 'shadow-lg shadow-black/50' : ''}`
       } ${compacto ? 'p-0.5' : 'p-0.5 sm:gap-1 sm:p-1'}`}
     >
       {OPCIONES.map((opcion) => {

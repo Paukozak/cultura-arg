@@ -213,6 +213,7 @@ function LegendDetail({ onCerrar }: { onCerrar: () => void }) {
 
 export function Legend() {
   const capaActiva = useMapStore((s) => s.capaActiva)
+  const tema = useMapStore((s) => s.tema)
   const [abierto, setAbierto] = useState(false)
 
   const scales = useMemo(() => buildColorScales(provinciasGeo.features), [])
@@ -230,7 +231,11 @@ export function Legend() {
         type="button"
         onClick={() => setAbierto(true)}
         aria-label="Ver el panorama completo de la escala de color"
-        className="rounded-2xl border border-neutral-800 bg-neutral-950/90 px-2.5 py-2 text-left text-sm shadow-lg shadow-black/50 backdrop-blur transition-colors hover:border-neutral-700 sm:px-4 sm:py-3"
+        // Sombra solo en modo oscuro — pensada para hacer flotar el botón
+        // sobre el mapa; en modo claro se ve como un halo negro pegado a él
+        // (mismo criterio que el filtro de sombra del mapa en
+        // NationalMap.tsx y el toggle de capa en LayerToggle.tsx).
+        className={`rounded-2xl border border-neutral-800 bg-neutral-950/90 px-2.5 py-2 text-left text-sm backdrop-blur transition-colors hover:border-neutral-700 sm:px-4 sm:py-3 ${tema === 'dark' ? 'shadow-lg shadow-black/50' : ''}`}
       >
         <div className="flex flex-col gap-1 sm:gap-1.5">
           <span className="font-mono text-[10px] uppercase tracking-wide text-neutral-500 sm:text-xs">

@@ -10,6 +10,7 @@ import { ProvinceFullView } from './features/province-panel/ProvinceFullView'
 import { ProvincePanel } from './features/province-panel/ProvincePanel'
 import { altoPeekPx } from './features/province-panel/hojaLayout'
 import { useMapStore } from './store/mapStore'
+import { useHistorialPaneles } from './utils/useHistorialPaneles'
 import { useMediaQuery } from './utils/useMediaQuery'
 import { useWindowHeight } from './utils/useWindowHeight'
 
@@ -22,6 +23,10 @@ const ANCHO_PANEL_PX = 448
 function App() {
   const provinciaSeleccionada = useMapStore((s) => s.provinciaSeleccionada)
   const headerHeight = useMapStore((s) => s.headerHeight)
+  // El gesto de "atrás" (deslizar desde el borde en mobile, botón atrás del
+  // navegador) cierra el panel de provincia o la vista completa en vez de
+  // sacar a la persona de la página — ver useHistorialPaneles.ts.
+  useHistorialPaneles()
   const esMobil = useMediaQuery('(max-width: 767px)')
   // El intro a la izquierda le resta otro ancho de columna al mapa: solo entra en
   // pantallas anchas. Más angostas, el mapa se queda con el layout de antes
@@ -137,7 +142,7 @@ function App() {
             {!provinciaSeleccionada && (
               <div
                 ref={legendRowRef}
-                className="flex shrink-0 items-start justify-between gap-2 px-2 pb-2 pt-2"
+                className="flex shrink-0 items-start justify-between gap-2 px-3 pb-2 pt-2"
               >
                 <LayerToggle />
                 <Legend />

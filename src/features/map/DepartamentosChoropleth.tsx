@@ -3,6 +3,7 @@ import { useState, type MouseEvent } from 'react'
 import { useDepartamentos } from '../../data/useDepartamentos'
 import { useMapStore, type Capa } from '../../store/mapStore'
 import {
+  apagarConFondo,
   buildColorScales,
   colorForFeature,
   darken,
@@ -46,6 +47,7 @@ export function DepartamentosChoropleth({
   const abrirVistaCompletaPorDepartamento = useMapStore(
     (s) => s.abrirVistaCompletaPorDepartamento,
   )
+  const departamentoResaltado = useMapStore((s) => s.departamentoResaltado)
   const datos = useDepartamentos(provinciaId)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   if (!datos) return null
@@ -62,25 +64,39 @@ export function DepartamentosChoropleth({
           deseleccionaba la provincia ANTES de que este `onClick` llegara a
           correr (el listener de ProvincePanel escucha en `pointerdown`,
           que dispara antes que el `click` sintético de React). */}
+      {/* Con un departamento resaltado (hover del mapa o de su fila en la
+          lista, ver DepartamentosLista.tsx), el resto se atenúa para que se
+          destaque — mismo criterio que las provincias del mapa nacional
+          cuando se resalta una desde el ranking (ver NationalMap.tsx). */}
       {datos.features.map((f) => {
         const d = path(f)
         if (!d) return null
         const id = f.properties.id
-        const isHovered = hoveredId === id
+        const idResaltado = hoveredId ?? departamentoResaltado
+        const isHovered = id === idResaltado
+        const atenuado = idResaltado !== null && !isHovered
         const color = colorForFeature(f.properties, capaActiva, scales)
+        const bordeBase = darken(color, 0.35)
         return (
           <path
             key={id}
             d={d}
-            fill={color}
-            stroke={isHovered ? highlightStroke(color) : darken(color, 0.35)}
+            fill={atenuado ? apagarConFondo(color, 0.45) : color}
+            stroke={
+              isHovered
+                ? highlightStroke(color)
+                : atenuado
+                  ? apagarConFondo(bordeBase, 0.45)
+                  : bordeBase
+            }
             strokeWidth={isHovered ? 1.75 : 1}
             strokeLinejoin="round"
             vectorEffect="non-scaling-stroke"
             style={{
               cursor: 'pointer',
               filter: isHovered ? 'brightness(1.15)' : 'none',
-              transition: 'filter 150ms ease, stroke 150ms ease',
+              transition:
+                'filter 150ms ease, stroke 150ms ease, fill 150ms ease',
             }}
             onMouseEnter={(e: MouseEvent) => {
               setHoveredId(id)
