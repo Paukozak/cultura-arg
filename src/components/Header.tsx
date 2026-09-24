@@ -45,8 +45,9 @@ export function Header() {
         className="flex flex-col gap-3 border-b border-neutral-800 bg-neutral-950 px-4 py-3"
       >
         <div className="flex items-center justify-between gap-3">
-          <h1 className="shrink-0 text-base font-semibold tracking-tight text-neutral-100">
-            Cultura Argentina
+          <h1 className="flex shrink-0 items-center gap-2 text-base font-semibold tracking-tight text-neutral-100">
+            <img src="/favicon.png" alt="" className="h-6 w-6" />
+            CulturArg
           </h1>
           <div className="flex shrink-0 items-center gap-2">
             <Acciones />
@@ -67,8 +68,9 @@ export function Header() {
       ref={headerRef}
       className="flex h-16 shrink-0 items-center gap-4 border-b border-neutral-800 bg-neutral-950 px-6"
     >
-      <h1 className="shrink-0 text-lg font-semibold tracking-tight text-neutral-100">
-        Cultura Argentina
+      <h1 className="flex shrink-0 items-center gap-2 text-lg font-semibold tracking-tight text-neutral-100">
+        <img src="/favicon.png" alt="" className="h-7 w-7" />
+        CulturArg
       </h1>
       <div className="flex flex-1 items-center justify-end gap-3">
         <GlobalSearch />

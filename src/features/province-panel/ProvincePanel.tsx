@@ -14,13 +14,17 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
+import { List } from 'lucide-react'
 import { ContadorAnimado } from '../../components/ContadorAnimado'
+import { departamentosResumen } from '../../data/departamentos'
 import type { Espacio } from '../../data/espacios'
 import { provinciasGeo } from '../../data/provincias'
 import { useEspacios } from '../../data/useEspacios'
 import { useMapStore } from '../../store/mapStore'
 import { useMediaQuery } from '../../utils/useMediaQuery'
 import { useWindowHeight } from '../../utils/useWindowHeight'
+import { pasosActivos, UNIDAD_CAPA } from '../map/colorScales'
+import { LayerToggle } from '../map/LayerToggle'
 import { ICONOS_POR_CATEGORIA, ICONO_POR_DEFECTO } from './categoriaIcons'
 import { EspacioFoto } from './EspacioFoto'
 import { getDestacados } from './getDestacados'
@@ -121,6 +125,7 @@ function ProvincePanelContent({
   const abrirVistaCompleta = useMapStore((s) => s.abrirVistaCompleta)
   const vistaCompleta = useMapStore((s) => s.vistaCompleta)
   const headerHeight = useMapStore((s) => s.headerHeight)
+  const capaActiva = useMapStore((s) => s.capaActiva)
   const esMobil = useMediaQuery('(max-width: 767px)')
   const panelRef = useRef<HTMLDivElement>(null)
   const [expandida, setExpandida] = useState(false)
@@ -185,6 +190,22 @@ function ProvincePanelContent({
   if (!provincia) return null
   const { nombre, totalEspacios, densidadPor100k } = provincia.properties
   const destacados = espacios ? getDestacados(provinciaId, espacios) : []
+  // Rango de ESTA provincia (no el de los ~529 departamentos del país): la
+  // escala de color del choropleth sí es global a propósito (mismo tono en
+  // todo el país para el mismo valor, ver DepartamentosChoropleth.tsx), pero
+  // mostrar acá ese mínimo/máximo nacional confundía — decía "865" en TODAS
+  // las provincias por igual, sin relación con lo que esa provincia
+  // realmente tiene.
+  const valoresDepartamentos = departamentosResumen
+    .filter((d) => d.provinciaId === provinciaId)
+    .map((d) => (capaActiva === 'densidad' ? d.densidadPor100k : d.totalEspacios))
+    .filter((v): v is number => v !== null)
+  const minDepartamentos = valoresDepartamentos.length
+    ? Math.min(...valoresDepartamentos)
+    : 0
+  const maxDepartamentos = valoresDepartamentos.length
+    ? Math.max(...valoresDepartamentos)
+    : 0
 
   // Qué hace cada gesto (expandir, colapsar o cerrar) lo decide
   // `destinoTrasArrastre` (hojaLayout.ts), donde tiene sus tests.
@@ -340,7 +361,7 @@ function ProvincePanelContent({
             />
           </svg>
         </button>
-        <div>
+        <div className="min-w-0 flex-1">
           <h2 className="text-lg font-semibold text-neutral-100">{nombre}</h2>
           <dl className="mt-1 flex gap-4 font-mono text-xs text-neutral-400">
             <div>
@@ -358,6 +379,55 @@ function ProvincePanelContent({
               </dd>
             </div>
           </dl>
+        </div>
+        {/* Atajo al mismo destino que el botón de abajo del todo — que en
+            mobile, en reposo (peek), vive fuera de la porción visible de la
+            hoja (ver PEEK_FRACCION en hojaLayout.ts) y solo se alcanza
+            expandiendo o scrolleando. Se oculta al expandir: ahí ya entra el
+            de abajo, y no tiene sentido duplicarlo. */}
+        {esMobil && !expandida && (
+          <button
+            type="button"
+            onClick={() => abrirVistaCompleta()}
+            disabled={!espacios}
+            aria-label={`Ver todos los espacios${espacios ? ` (${formatNumero(totalEspacios)})` : ''}`}
+            className="mt-1 flex shrink-0 items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            <List className="h-3.5 w-3.5" aria-hidden="true" />
+            Todos
+          </button>
+        )}
+      </div>
+
+      <div className="border-b border-neutral-800 px-5 py-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-mono text-xs uppercase tracking-wide text-neutral-500">
+            Departamentos · {UNIDAD_CAPA[capaActiva]}
+          </span>
+          {/* Layer toggle propio: con la provincia abierta, `LayerToggle` de
+              MapInfoPanel/mobile queda tapado o desmontado — antes no había
+              forma de cambiar de capa sin cerrar el panel. `layoutId`
+              distinto (ver LayerToggle.tsx) para no cruzar la animación de
+              la pastilla con esa otra instancia, que sigue montada detrás.
+              `compacto` + `sutil`: más chico y en gris (no el azul de marca)
+              que el toggle grande de MapInfoPanel — acá es una opción
+              secundaria del bloque de departamentos, no el control principal
+              de capa, y con los mismos colores competía con la barra de
+              gradiente de abajo en vez de acompañarla. */}
+          <LayerToggle layoutId="capa-activa-fondo-provincia" compacto sutil />
+        </div>
+        <div className="mt-3 flex overflow-hidden rounded">
+          {pasosActivos().map((color) => (
+            <span
+              key={color}
+              className="h-2 flex-1"
+              style={{ backgroundColor: color }}
+            />
+          ))}
+        </div>
+        <div className="mt-1 flex justify-between font-mono text-[10px] text-neutral-500">
+          <span>{formatNumero(minDepartamentos)}</span>
+          <span>{formatNumero(maxDepartamentos)}</span>
         </div>
       </div>
 

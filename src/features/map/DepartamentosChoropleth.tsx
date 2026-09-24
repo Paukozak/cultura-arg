@@ -7,6 +7,7 @@ import {
   colorForFeature,
   darken,
   highlightStroke,
+  type ConEstadisticas,
 } from './colorScales'
 
 interface Props {
@@ -15,7 +16,12 @@ interface Props {
   capaActiva: Capa
   scales: ReturnType<typeof buildColorScales>
   visible: boolean
-  onHover: (nombre: string, clientX: number, clientY: number) => void
+  onHover: (
+    nombre: string,
+    estadisticas: ConEstadisticas,
+    clientX: number,
+    clientY: number,
+  ) => void
   onLeave: () => void
 }
 
@@ -78,10 +84,10 @@ export function DepartamentosChoropleth({
             }}
             onMouseEnter={(e: MouseEvent) => {
               setHoveredId(id)
-              onHover(f.properties.nombre, e.clientX, e.clientY)
+              onHover(f.properties.nombre, f.properties, e.clientX, e.clientY)
             }}
             onMouseMove={(e: MouseEvent) =>
-              onHover(f.properties.nombre, e.clientX, e.clientY)
+              onHover(f.properties.nombre, f.properties, e.clientX, e.clientY)
             }
             onMouseLeave={() => {
               setHoveredId(null)

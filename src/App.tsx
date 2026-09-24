@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { Header } from './components/Header'
 import { Legend } from './features/map/Legend'
 import { LayerToggle } from './features/map/LayerToggle'
@@ -34,6 +35,28 @@ function App() {
   // zoomeado y la hoja, con la provincia pegada arriba en vez de centrada
   // en el espacio real disponible.
   const altoHojaMobilPx = altoPeekPx(alturaVentana, headerHeight)
+
+  // Sin provincia elegida, el mapa (a esta altura de viewBox ya usa casi
+  // toda su caja, ver el comentario de `HEIGHT` en NationalMap.tsx) queda
+  // pegado contra la fila de Densidad/Total + leyenda de arriba y con casi
+  // nada de aire debajo — no centrado en el alto real disponible. Se mide
+  // esa fila (en vez de un valor fijo, que se desincroniza apenas cambia su
+  // contenido o el tamaño de fuente) y se le da al mapa la misma reserva
+  // abajo, así su caja queda centrada en `main` en vez de pegada arriba.
+  const legendRowRef = useRef<HTMLDivElement>(null)
+  const [legendRowHeight, setLegendRowHeight] = useState(0)
+  useEffect(() => {
+    const el = legendRowRef.current
+    if (!el) return
+    const observer = new ResizeObserver(([entry]) => {
+      setLegendRowHeight(entry.contentRect.height)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+    // La fila se monta/desmonta con `provinciaSeleccionada` (y solo existe
+    // en mobile) — hay que reenganchar el observer cada vez que puede
+    // haber cambiado de nodo.
+  }, [esMobil, provinciaSeleccionada])
 
   return (
     // `h-dvh overflow-hidden` (no `min-h-screen` ni `h-screen`): altura
@@ -112,12 +135,25 @@ function App() {
           // no superpuestos como en desktop.
           <div className="flex h-full w-full max-w-3xl flex-col">
             {!provinciaSeleccionada && (
-              <div className="flex shrink-0 items-start justify-between gap-2 px-2 pb-2 pt-2">
+              <div
+                ref={legendRowRef}
+                className="flex shrink-0 items-start justify-between gap-2 px-2 pb-2 pt-2"
+              >
                 <LayerToggle />
                 <Legend />
               </div>
             )}
-            <div className="relative min-h-0 flex-1 pb-3">
+            <div
+              className="relative min-h-0 flex-1 pb-3"
+              style={
+                !provinciaSeleccionada
+                  ? {
+                      paddingBottom: 12 + legendRowHeight,
+                      transition: 'padding-bottom 200ms ease',
+                    }
+                  : undefined
+              }
+            >
               <NationalMap />
             </div>
           </div>

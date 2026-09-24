@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -22,6 +23,7 @@ import {
   colorForFeature,
   darken,
   highlightStroke,
+  type ConEstadisticas,
 } from './colorScales'
 import { DepartamentosChoropleth } from './DepartamentosChoropleth'
 import {
@@ -91,12 +93,29 @@ const ZOOM_FILL_RATIO = 0.7
 // una constante fija (`headerHeight` del store, medido con ResizeObserver
 // en Header.tsx): en mobile pasa a dos filas y mide más que en desktop.
 const MAX_ZOOM_SCALE = 400
+// En mobile se corrige el mismatch de aspecto contra el cuadro real (ver
+// `coverFit` más abajo), así que el margen de sobra de ZOOM_FILL_RATIO ya no
+// tiene que absorber ese error de más — se puede acercar mucho más al 100%.
+const ZOOM_FILL_RATIO_MOBIL = 0.92
+// Corrimiento hacia abajo del centrado (ver `margenArribaExtra` en
+// `bboxZoom`): algunas provincias, con el fill de arriba ya muy ajustado,
+// quedaban pegadas contra el borde superior — un margen parejo
+// arriba/abajo no alcanzaba porque la forma real de la provincia no
+// siempre está centrada dentro de su propio bounding box.
+const MARGEN_ARRIBA_MOBIL_RATIO = 0.045
 
 function bboxZoom(
   geometria: GeoPermissibleObjects,
   path: ReturnType<typeof geoPath>,
   width: number,
   height: number,
+  fillRatio: number = ZOOM_FILL_RATIO,
+  // En unidades del viewBox, no de la fórmula de `fillRatio` (que reparte
+  // el margen libre por igual arriba/abajo): se lo resta solo del lado de
+  // arriba, corriendo el centrado hacia abajo, para las provincias que con
+  // el fill ajustado de mobile quedaban pegadas al borde superior — sin
+  // sacarle margen a los costados/abajo, que ya estaban bien.
+  margenArribaExtra = 0,
 ): ZoomState {
   const bounds = path.bounds(geometria)
   // Sin piso mínimo: el scale es puramente proporcional al tamaño real de
@@ -109,19 +128,40 @@ function bboxZoom(
   const cx = (bounds[0][0] + bounds[1][0]) / 2
   const cy = (bounds[0][1] + bounds[1][1]) / 2
   const scale = Math.min(
-    (width * ZOOM_FILL_RATIO) / w,
-    (height * ZOOM_FILL_RATIO) / h,
+    (width * fillRatio) / w,
+    (height * fillRatio) / h,
     MAX_ZOOM_SCALE,
   )
-  return { cx, cy, scale }
+  return { cx, cy: cy - margenArribaExtra / scale, scale }
+}
+
+// El viewBox (WIDTH x HEIGHT) tiene una forma fija, pensada para la vista
+// país entera — pero el cuadro real donde se dibuja el SVG cambia de forma
+// en mobile apenas se abre una provincia (aparece la hoja inferior, que le
+// come alto). Como `preserveAspectRatio` (default) encaja el viewBox
+// COMPLETO dentro de ese cuadro sin recortarlo, un mismatch de aspecto deja
+// franjas vacías a los costados o arriba/abajo — y el `ZOOM_FILL_RATIO`,
+// calculado contra el viewBox y no contra el cuadro real, termina dejando
+// la provincia bastante más chica de lo que el cuadro real permitiría.
+// Esto calcula un WIDTH/HEIGHT "efectivo" (mismas unidades del viewBox) que
+// tiene la forma exacta del cuadro real — el opuesto de `preserveAspectRatio`
+// (que encoge para que el viewBox ENTRE en el cuadro, "contain"), acá se
+// agranda para que el cuadro ENTRE en el viewBox efectivo ("cover") — así
+// `bboxZoom` calcula el scale contra el espacio de verdad disponible.
+function coverFit(boxW: number, boxH: number, viewW: number, viewH: number) {
+  const boxAspecto = boxW / boxH
+  const viewAspecto = viewW / viewH
+  return boxAspecto > viewAspecto
+    ? { width: viewH * boxAspecto, height: viewH }
+    : { width: viewW, height: viewW / boxAspecto }
 }
 
 function formatNumero(n: number) {
   return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 }).format(n)
 }
 
-function metricaTooltip(feature: ProvinciaFeature, capa: Capa) {
-  const { densidadPor100k, totalEspacios } = feature.properties
+function metricaTooltip(propiedades: ConEstadisticas, capa: Capa) {
+  const { densidadPor100k, totalEspacios } = propiedades
   if (capa === 'densidad') {
     return densidadPor100k === null
       ? 'sin datos de densidad'
@@ -146,12 +186,9 @@ export function NationalMap() {
     y: number
     abajo: boolean
   } | null>(null)
-  const [departamentoHover, setDepartamentoHover] = useState<{
-    nombre: string
-    x: number
-    y: number
-    abajo: boolean
-  } | null>(null)
+  const [departamentoHover, setDepartamentoHover] = useState<
+    ({ nombre: string; x: number; y: number; abajo: boolean } & ConEstadisticas) | null
+  >(null)
 
   // Argentina, proyectada, mide (en las unidades del viewBox) mucho más de
   // alto que de ancho — su bounding box real dentro de un viewBox de
@@ -249,6 +286,25 @@ export function NationalMap() {
 
   const svgRef = useRef<SVGSVGElement>(null)
 
+  // Cuadro real (en px) donde el SVG se dibuja — cambia de forma en mobile
+  // cuando aparece/desaparece la hoja inferior (ver `coverFit` arriba). Solo
+  // hace falta en mobile: en desktop el ancho/alto del viewBox ya se acerca
+  // bastante a la forma real de `main` y no hubo reporte de sobra ahí.
+  const [boxSize, setBoxSize] = useState<{ w: number; h: number } | null>(
+    null,
+  )
+  useEffect(() => {
+    if (!esMobil) return
+    const el = svgRef.current
+    if (!el) return
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      if (width > 0 && height > 0) setBoxSize({ w: width, h: height })
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [esMobil])
+
   // El nivel base de zoom (ajuste a la provincia entera) es una función pura
   // de la provincia seleccionada — no hace falta un efecto para calcularlo.
   const baseZoom = useMemo(() => {
@@ -260,13 +316,20 @@ export function NationalMap() {
     // La geometría de detalle (si existe para esta provincia) da un
     // bounding box más fiel a la frontera real que el low-poly del mapa
     // nacional — importante para que el zoom encuadre bien la provincia.
-    return bboxZoom(
-      geometriaDetalle(provinciaSeleccionada) ?? feature,
-      path,
-      WIDTH,
-      HEIGHT,
-    )
-  }, [provinciaSeleccionada, path, HEIGHT])
+    const geometria = geometriaDetalle(provinciaSeleccionada) ?? feature
+    if (esMobil && boxSize) {
+      const efectivo = coverFit(boxSize.w, boxSize.h, WIDTH, HEIGHT)
+      return bboxZoom(
+        geometria,
+        path,
+        efectivo.width,
+        efectivo.height,
+        ZOOM_FILL_RATIO_MOBIL,
+        HEIGHT * MARGEN_ARRIBA_MOBIL_RATIO,
+      )
+    }
+    return bboxZoom(geometria, path, WIDTH, HEIGHT)
+  }, [provinciaSeleccionada, path, HEIGHT, esMobil, boxSize])
 
   // Se resetea el tooltip de hover al cambiar de provincia ajustando el
   // estado durante el render (patrón "adjust state during rendering" de
@@ -448,6 +511,7 @@ export function NationalMap() {
             hover?.feature.properties.id === id ||
             (!provinciaSeleccionada && provinciaResaltada === id),
           isSelected,
+          atenuacion,
           relleno: atenuacion < 1 ? apagarConFondo(color, atenuacion) : color,
           rellenoLado:
             atenuacion < 1
@@ -655,11 +719,23 @@ export function NationalMap() {
               ({
                 feature,
                 color,
+                atenuacion,
                 isHovered,
                 isSelected,
                 centroid: [cx, cy],
                 retrasoEntrada,
               }) => {
+                // Mismo apagado que el resto de las provincias (Paso 2, más
+                // arriba): sin esto, el globo con el nombre de CABA quedaba a
+                // pleno brillo mientras el país entero se atenuaba alrededor
+                // de la provincia zoomeada — la única mancha de color fuerte
+                // en un mapa apagado.
+                const relleno =
+                  atenuacion < 1 ? apagarConFondo(color, atenuacion) : color
+                const textoRelleno =
+                  atenuacion < 1
+                    ? apagarConFondo('#f5f2ea', atenuacion)
+                    : '#f5f2ea'
                 const stroke =
                   isHovered || isSelected
                     ? highlightStroke(color)
@@ -717,7 +793,7 @@ export function NationalMap() {
                         width={CALLOUT_PILL_W}
                         height={CALLOUT_PILL_H}
                         rx={CALLOUT_PILL_H / 2}
-                        fill={color}
+                        fill={relleno}
                         stroke={stroke}
                         strokeWidth={isHovered || isSelected ? 1.5 : 1}
                         vectorEffect="non-scaling-stroke"
@@ -739,8 +815,10 @@ export function NationalMap() {
                         // un paso de la escala secuencial de densidad — casi
                         // siempre oscuro — sin relación con el tema.
                         // `accent-ink` se vuelve casi negro en modo oscuro,
-                        // ilegible sobre ese fondo oscuro.
-                        fill="#f5f2ea"
+                        // ilegible sobre ese fondo oscuro. Mezclado con el
+                        // fondo (`textoRelleno`) cuando el globo está
+                        // apagado, igual que `relleno` arriba.
+                        fill={textoRelleno}
                         style={{
                           fontFamily: 'var(--font-mono)',
                           letterSpacing: '0.02em',
@@ -766,11 +844,12 @@ export function NationalMap() {
               capaActiva={capaActiva}
               scales={departamentoScales}
               visible={zoomAsentado}
-              onHover={(nombre, clientX, clientY) => {
+              onHover={(nombre, estadisticas, clientX, clientY) => {
                 const rect = svgRef.current?.getBoundingClientRect()
                 if (!rect) return
                 setDepartamentoHover({
                   nombre,
+                  ...estadisticas,
                   x: clientX - rect.left,
                   y: clientY - rect.top,
                   abajo: tooltipVaDebajo(
@@ -796,7 +875,7 @@ export function NationalMap() {
             {hover.feature.properties.nombre}
           </div>
           <div className="font-mono text-xs text-neutral-400">
-            {metricaTooltip(hover.feature, capaActiva)}
+            {metricaTooltip(hover.feature.properties, capaActiva)}
           </div>
         </div>
       )}
@@ -813,6 +892,9 @@ export function NationalMap() {
         >
           <div className="font-medium text-neutral-100">
             {departamentoHover.nombre}
+          </div>
+          <div className="font-mono text-xs text-neutral-400">
+            {metricaTooltip(departamentoHover, capaActiva)}
           </div>
         </div>
       )}

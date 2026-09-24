@@ -123,7 +123,7 @@ export function GlobalSearch() {
         onFocus={() => setAbierto(true)}
         onKeyDown={onKeyDown}
         placeholder="Buscar provincia, departamento, localidad o espacio…"
-        className="w-full rounded-full border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm text-neutral-200 placeholder:text-neutral-600 focus:border-accent"
+        className="w-full rounded-full border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-accent"
         role="combobox"
         aria-autocomplete="list"
         aria-expanded={abierto && hayQuery}
