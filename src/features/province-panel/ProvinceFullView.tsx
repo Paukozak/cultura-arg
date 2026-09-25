@@ -237,6 +237,7 @@ function ProvinceFullViewContent({
   // patrón de click-afuera-cierra que GlobalSearch.tsx).
   const [agrupadorAbierto, setAgrupadorAbierto] = useState(false)
   const agrupadorRef = useRef<HTMLDivElement>(null)
+  const botonAgrupadorRef = useRef<HTMLButtonElement>(null)
   const [seleccionadoId, setSeleccionadoId] = useState<string | null>(
     espacioInicialId,
   )
@@ -303,13 +304,22 @@ function ProvinceFullViewContent({
 
   useEffect(() => {
     if (!agrupadorAbierto) return
+    function cerrar() {
+      setAgrupadorAbierto(false)
+      botonAgrupadorRef.current?.focus()
+    }
     function onPointerDown(e: PointerEvent) {
-      if (!agrupadorRef.current?.contains(e.target as Node)) {
-        setAgrupadorAbierto(false)
-      }
+      if (!agrupadorRef.current?.contains(e.target as Node)) cerrar()
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') cerrar()
     }
     document.addEventListener('pointerdown', onPointerDown)
-    return () => document.removeEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
   }, [agrupadorAbierto])
 
   const provincia = provinciasGeo.features.find(
@@ -572,6 +582,7 @@ function ProvinceFullViewContent({
                   {/* Gatillo: la lista (buscador + checkboxes) solo se arma
                       y se muestra al abrirlo, no ocupa lugar de entrada. */}
                   <button
+                    ref={botonAgrupadorRef}
                     type="button"
                     onClick={() => setAgrupadorAbierto((abierta) => !abierta)}
                     aria-expanded={agrupadorAbierto}

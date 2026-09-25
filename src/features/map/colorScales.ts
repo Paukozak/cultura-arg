@@ -59,7 +59,7 @@ export function buildColorScales(features: { properties: ConEstadisticas }[]) {
 }
 
 function canales(hex: string): [number, number, number] {
-  const num = parseInt(hex.slice(1), 16)
+  const num = Number.parseInt(hex.slice(1), 16)
   return [(num >> 16) & 0xff, (num >> 8) & 0xff, num & 0xff]
 }
 

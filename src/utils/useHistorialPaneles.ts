@@ -11,7 +11,8 @@ import { normalizar } from './texto'
 function slugParaProvincia(nombre: string): string {
   return normalizar(nombre)
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '')
 }
 
 const SLUG_POR_ID = new Map(

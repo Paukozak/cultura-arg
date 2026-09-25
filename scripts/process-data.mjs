@@ -408,7 +408,7 @@ function inferirLocalidadesMonumentos(espacios) {
       continue
     }
 
-    const estacion = e.nombre.match(/Estaci[oó]n\s*[-–]?\s*(.+)$/i)
+    const estacion = e.nombre.match(/Estaci[oó]n[\s–-]*(.+)$/i)
     if (estacion) e.localidad = estacion[1].trim()
   }
 }
@@ -529,7 +529,7 @@ function parseYear(raw, format) {
 // fuera un valor real: se veía literalmente "☎ s/d" o un link a "s/d" en la
 // ficha. Se trata como campo vacío en cualquier columna, no como un dato.
 function esMarcadorSinDato(v) {
-  return /^s\.?\s*\/?\s*d\.?$/i.test(v)
+  return /^s\.?[\s/]*d\.?$/i.test(v)
 }
 
 function field(row, key) {
