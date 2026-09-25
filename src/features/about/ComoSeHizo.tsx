@@ -255,8 +255,9 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
               <li>
                 Al hacer zoom a una provincia, el choropleth de sus
                 departamentos usa la misma rampa pero calculada sobre los
-                departamentos de todo el país, no solo los de esa provincia, así el mismo color significa lo mismo en cualquier provincia que
-                se visite, sin depender de qué otra se miró antes.
+                departamentos de todo el país, no solo los de esa provincia, así
+                el mismo color significa lo mismo en cualquier provincia que se
+                visite, sin depender de qué otra se miró antes.
               </li>
             </ul>
           </section>

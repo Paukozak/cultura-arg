@@ -113,11 +113,10 @@ function TutorialContent({ onCerrar }: { onCerrar: () => void }) {
                   nombre en la lista del costado).
                 </>
               )}{' '}
-              Se hace zoom y cambia
-              la vista a un mapa más chico, solo de esa provincia, pintado por
-              departamento. Además, se abre un panel con el nombre de la
-              provincia, cuántos espacios culturales tiene en total y su
-              densidad.
+              Se hace zoom y cambia la vista a un mapa más chico, solo de esa
+              provincia, pintado por departamento. Además, se abre un panel con
+              el nombre de la provincia, cuántos espacios culturales tiene en
+              total y su densidad.
             </p>
             {esMobil && (
               <p>
@@ -146,10 +145,10 @@ function TutorialContent({ onCerrar }: { onCerrar: () => void }) {
               Mirá los departamentos
             </h3>
             <p>
-              Arriba de los destacados hay un botón "Departamentos" que permite acceder a la lista de Departamentos. Sirve para
-              ver qué zonas de la provincia concentran más espacios culturales
-              que otras. Un botón para "Volver a destacados" te regresa a la
-              vista anterior.
+              Arriba de los destacados hay un botón "Departamentos" que permite
+              acceder a la lista de Departamentos. Sirve para ver qué zonas de
+              la provincia concentran más espacios culturales que otras. Un
+              botón para "Volver a destacados" te regresa a la vista anterior.
             </p>
           </section>
 
