@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { Loader2 } from 'lucide-react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Header } from './components/Header'
 import { Legend } from './features/map/Legend'
 import { LayerToggle } from './features/map/LayerToggle'
@@ -6,7 +7,6 @@ import { MapInfoPanel } from './features/map/MapInfoPanel'
 import { MapIntro } from './features/map/MapIntro'
 import { MapIntroMobil } from './features/map/MapIntroMobil'
 import { NationalMap } from './features/map/NationalMap'
-import { ProvinceFullView } from './features/province-panel/ProvinceFullView'
 import { ProvincePanel } from './features/province-panel/ProvincePanel'
 import { altoPeekPx } from './features/province-panel/hojaLayout'
 import { useMapStore } from './store/mapStore'
@@ -19,6 +19,34 @@ import { useWindowHeight } from './utils/useWindowHeight'
 // (fixed, fuera del flujo) no le tape una porción, y el mismo a la izquierda
 // mientras se ve MapIntro, así queda centrado en la pantalla.
 const ANCHO_PANEL_PX = 448
+
+// Vista completa de una provincia: react-window + motion + el embed de Google
+// Maps, todo código que no hace falta en la primera pantalla (nadie la ve
+// hasta elegir una provincia y pedir "ver todo"). `lazy` lo saca del bundle
+// principal a su propio chunk.
+const ProvinceFullView = lazy(() =>
+  import('./features/province-panel/ProvinceFullView').then((m) => ({
+    default: m.ProvinceFullView,
+  })),
+)
+
+// `ProvinceFullView` está siempre montado (así `AnimatePresence`, adentro de
+// él, puede animar su apertura/cierre) — sin este chequeo, el fallback de
+// abajo se vería en CADA carga de la página mientras se baja el chunk, así
+// no haya ninguna provincia abierta. Lee el mismo estado que ese componente
+// usa internamente para decidir si mostrarse, y solo entonces pinta el
+// spinner (mismo fondo oscuro que el resto de la UI); el resto del tiempo
+// no renderiza nada, igual que `ProvinceFullView` ya haría una vez cargado.
+function ProvinceFullViewFallback() {
+  const provinciaId = useMapStore((s) => s.provinciaSeleccionada)
+  const vistaCompleta = useMapStore((s) => s.vistaCompleta)
+  if (!provinciaId || !vistaCompleta) return null
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-neutral-950">
+      <Loader2 className="h-8 w-8 animate-spin text-accent" />
+    </div>
+  )
+}
 
 function App() {
   const provinciaSeleccionada = useMapStore((s) => s.provinciaSeleccionada)
@@ -177,7 +205,9 @@ function App() {
       {/* Mobile: pantalla de bienvenida, una sola vez por dispositivo. */}
       {esMobil && <MapIntroMobil />}
       <ProvincePanel />
-      <ProvinceFullView />
+      <Suspense fallback={<ProvinceFullViewFallback />}>
+        <ProvinceFullView />
+      </Suspense>
     </div>
   )
 }

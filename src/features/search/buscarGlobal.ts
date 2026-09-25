@@ -17,7 +17,29 @@ interface EntradaIndiceLocalidad {
   cantidadEspacios: number
 }
 
-// `indice-busqueda.json` pesa ~1.8MB (uno de los campos por cada uno de los
+// Filas tal como las emite `process-data.mjs`: tuplas posicionales en vez de
+// objetos, para no repetir los nombres de campo (id/nombre/categoria/...) en
+// cada una de las ~11 mil entradas — eso solo, en JSON, pesa varios cientos
+// de KB. `categoria` además va como índice a `categorias` (11 valores
+// posibles) en vez del string repetido entero.
+type FilaIndiceEspacio = [
+  id: string,
+  nombre: string,
+  categoriaIdx: number,
+  localidad: string | null,
+  provinciaId: string,
+]
+type FilaIndiceLocalidad = [
+  localidad: string,
+  provinciaId: string,
+  cantidadEspacios: number,
+]
+interface IndiceBusquedaJSON {
+  categorias: string[]
+  espacios: FilaIndiceEspacio[]
+}
+
+// `indice-busqueda.json` pesa ~1MB (uno de los campos por cada uno de los
 // ~11 mil espacios del país) — importado de forma estática like antes, se
 // sumaba entero al bundle principal, algo que descargar y parsear ANTES de
 // poder pintar la página, para un buscador que ni siquiera se usa hasta que
@@ -34,8 +56,26 @@ export function precargarIndiceBusqueda(): Promise<void> {
       import('../../data/indice-busqueda.json'),
       import('../../data/indice-localidades.json'),
     ]).then(([espaciosMod, localidadesMod]) => {
-      indiceEspacios = espaciosMod.default as EntradaIndiceEspacio[]
-      indiceLocalidades = localidadesMod.default as EntradaIndiceLocalidad[]
+      const { categorias, espacios } =
+        espaciosMod.default as unknown as IndiceBusquedaJSON
+      indiceEspacios = espacios.map(
+        ([id, nombre, categoriaIdx, localidad, provinciaId]) => ({
+          id,
+          nombre,
+          categoria: categorias[categoriaIdx],
+          localidad,
+          provinciaId,
+        }),
+      )
+      const localidadesFilas =
+        localidadesMod.default as unknown as FilaIndiceLocalidad[]
+      indiceLocalidades = localidadesFilas.map(
+        ([localidad, provinciaId, cantidadEspacios]) => ({
+          localidad,
+          provinciaId,
+          cantidadEspacios,
+        }),
+      )
     })
   }
   return cargaEnCurso

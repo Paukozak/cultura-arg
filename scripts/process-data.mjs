@@ -1169,16 +1169,74 @@ async function main() {
     `Escrito src/data/departamentos-resumen.json (${departamentosLivianos.length} departamentos)`,
   )
 
+  // Tabla de lookup por valor distinto (mismo approach que `indiceBusqueda`
+  // más abajo): `idx(valor)` devuelve, creándolo si hace falta, el índice de
+  // `valor` en `valores` — incluyendo `null` como un valor más, así no hace
+  // falta un sentinel aparte para "sin dato".
+  function crearTabla() {
+    const valores = []
+    const indice = new Map()
+    return {
+      idx(valor) {
+        if (!indice.has(valor)) {
+          indice.set(valor, valores.length)
+          valores.push(valor)
+        }
+        return indice.get(valor)
+      },
+      valores,
+    }
+  }
+
   const porProvinciaEspacios = new Map()
   for (const e of espacios) {
     const key = e.provinciaId ?? 'sin-provincia'
     if (!porProvinciaEspacios.has(key)) porProvinciaEspacios.set(key, [])
     porProvinciaEspacios.get(key).push(e)
   }
+  // Tuplas posicionales en vez de objetos: cada archivo tiene ~cientos a
+  // ~2500 espacios, todos repitiendo los 16 nombres de campo de `Espacio`
+  // completos. `categoria`/`subcategoria`/`gestion`/`departamento`/
+  // `localidad` además van como índice a una tabla de valores distintos (muy
+  // pocos frente a la cantidad de filas: p. ej. Buenos Aires tiene 2500
+  // espacios pero solo 11 categorías y 180 departamentos distintos).
+  // `provinciaId` ni se guarda por fila: es el mismo para todo el archivo, lo
+  // repone `cargarEspacios()` desde el nombre de archivo que ya recibe.
+  // `cargarEspacios()` en src/data/espacios.ts reconstruye los objetos
+  // `Espacio` al vuelo a partir de estas tuplas.
   for (const [provinciaId, lista] of porProvinciaEspacios) {
+    const categorias = crearTabla()
+    const subcategorias = crearTabla()
+    const gestiones = crearTabla()
+    const departamentos = crearTabla()
+    const localidades = crearTabla()
+    const filas = lista.map((e) => [
+      e.id,
+      e.nombre,
+      categorias.idx(e.categoria),
+      subcategorias.idx(e.subcategoria),
+      e.departamentoId,
+      departamentos.idx(e.departamento),
+      localidades.idx(e.localidad),
+      e.lat,
+      e.lon,
+      e.anioInauguracion,
+      gestiones.idx(e.gestion),
+      e.direccion,
+      e.telefono,
+      e.mail,
+      e.web,
+    ])
     await writeFile(
       path.join(DATA_DIR, 'espacios', `${provinciaId}.json`),
-      JSON.stringify(lista),
+      JSON.stringify({
+        categorias: categorias.valores,
+        subcategorias: subcategorias.valores,
+        gestiones: gestiones.valores,
+        departamentos: departamentos.valores,
+        localidades: localidades.valores,
+        espacios: filas,
+      }),
     )
   }
   console.log(
@@ -1191,21 +1249,31 @@ async function main() {
   // necesita para mostrar resultados y navegar — el resto de la ficha se
   // carga recién al seleccionar uno, con el mecanismo que ya existe
   // (cargarEspacios por provincia).
-  const indiceBusqueda = espacios
+  // Tuplas posicionales en vez de objetos: evita repetir los nombres de
+  // campo (id/nombre/categoria/...) en cada una de las ~11 mil entradas, y
+  // `categoria` va como índice a `categorias` (~11 valores posibles) en vez
+  // del string repetido entero. Reduce el JSON a poco más de la mitad.
+  // `buscarGlobal.ts` reconstruye los objetos al cargar el índice.
+  const categoriasIndice = [...new Set(espacios.map((e) => e.categoria))]
+  const categoriaIndiceIdx = new Map(categoriasIndice.map((c, i) => [c, i]))
+  const indiceBusquedaEspacios = espacios
     .filter((e) => e.provinciaId && (e.nombre || e.categoria))
-    .map((e) => ({
-      id: e.id,
-      nombre: e.nombre ?? e.categoria,
-      categoria: e.categoria,
-      localidad: e.localidad,
-      provinciaId: e.provinciaId,
-    }))
+    .map((e) => [
+      e.id,
+      e.nombre ?? e.categoria,
+      categoriaIndiceIdx.get(e.categoria),
+      e.localidad,
+      e.provinciaId,
+    ])
   await writeFile(
     path.join(DATA_DIR, 'indice-busqueda.json'),
-    JSON.stringify(indiceBusqueda),
+    JSON.stringify({
+      categorias: categoriasIndice,
+      espacios: indiceBusquedaEspacios,
+    }),
   )
   console.log(
-    `Escrito src/data/indice-busqueda.json (${indiceBusqueda.length} espacios)`,
+    `Escrito src/data/indice-busqueda.json (${indiceBusquedaEspacios.length} espacios)`,
   )
 
   // Índice de localidades para el buscador global: buscar "Villa Carlos Paz"
@@ -1226,13 +1294,14 @@ async function main() {
     const porLocalidad = conteoLocalidades.get(e.provinciaId)
     porLocalidad.set(e.localidad, (porLocalidad.get(e.localidad) ?? 0) + 1)
   }
+  // Tuplas posicionales, mismo motivo que `indiceBusqueda` arriba.
   const indiceLocalidades = [...conteoLocalidades.entries()].flatMap(
     ([provinciaId, porLocalidad]) =>
-      [...porLocalidad.entries()].map(([localidad, cantidadEspacios]) => ({
+      [...porLocalidad.entries()].map(([localidad, cantidadEspacios]) => [
         localidad,
         provinciaId,
         cantidadEspacios,
-      })),
+      ]),
   )
   await writeFile(
     path.join(DATA_DIR, 'indice-localidades.json'),

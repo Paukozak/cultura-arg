@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="es-AR">
   <head>
     <meta charset="UTF-8" />
     <!-- Aplica el tema guardado (o el del sistema) antes del primer pintado:
@@ -21,6 +21,39 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="CulturArg mapea museos, teatros, bibliotecas, cines y más espacios culturales de las 24 provincias argentinas, con datos oficiales de SInCA, Georef e INDEC."
+    />
+    <link rel="canonical" href="https://culturaarg.vercel.app/" />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:title"
+      content="CulturArg — Cartografía Cultural Argentina"
+    />
+    <meta
+      property="og:description"
+      content="CulturArg mapea museos, teatros, bibliotecas, cines y más espacios culturales de las 24 provincias argentinas, con datos oficiales de SInCA, Georef e INDEC."
+    />
+    <meta
+      property="og:image"
+      content="https://culturaarg.vercel.app/og-image.png"
+    />
+    <meta property="og:url" content="https://culturaarg.vercel.app/" />
+    <meta property="og:locale" content="es_AR" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="CulturArg — Cartografía Cultural Argentina"
+    />
+    <meta
+      name="twitter:description"
+      content="CulturArg mapea museos, teatros, bibliotecas, cines y más espacios culturales de las 24 provincias argentinas, con datos oficiales de SInCA, Georef e INDEC."
+    />
+    <meta
+      name="twitter:image"
+      content="https://culturaarg.vercel.app/og-image.png"
+    />
     <!-- Arranca antes la conexión (DNS+TLS) al mapa de Google embebido que
          se usa al abrir el panel de una provincia — así, cuando el código
          realmente lo pide, la conexión ya está lista en vez de arrancar de
@@ -33,6 +66,36 @@
       rel="stylesheet"
     />
     <title>CulturArg</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Dataset",
+        "name": "CulturArg — Cartografía Cultural Argentina",
+        "description": "CulturArg mapea museos, teatros, bibliotecas, cines y más espacios culturales de las 24 provincias argentinas, con datos oficiales de SInCA, Georef e INDEC.",
+        "url": "https://culturaarg.vercel.app/",
+        "inLanguage": "es-AR",
+        "creator": [
+          {
+            "@type": "Organization",
+            "name": "Sistema de Información Cultural de la Argentina (SInCA)",
+            "url": "https://datos.cultura.gob.ar"
+          },
+          {
+            "@type": "Organization",
+            "name": "API Georef Argentina — Ministerio de Economía",
+            "url": "https://apis.datos.gob.ar/georef/api/provincias.geojson"
+          },
+          {
+            "@type": "GovernmentOrganization",
+            "name": "Censo Nacional de Población, Hogares y Viviendas 2022 (INDEC)"
+          }
+        ],
+        "isBasedOn": [
+          "https://datos.cultura.gob.ar",
+          "https://apis.datos.gob.ar/georef/api/provincias.geojson"
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

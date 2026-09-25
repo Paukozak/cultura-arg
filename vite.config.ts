@@ -41,6 +41,25 @@ function fotosDestacadosPlugin(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss(), fotosDestacadosPlugin()],
+  build: {
+    rollupOptions: {
+      output: {
+        // Separa las librerías grandes en sus propios chunks (cacheables
+        // aparte, no reempaquetados en cada build del código de la app) en
+        // vez de dejar que engrosen el chunk principal.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('node_modules/motion')) return 'vendor-motion'
+          if (
+            /node_modules\/d3-(geo|scale|array|interpolate|color|format|time)\//.test(
+              id,
+            )
+          )
+            return 'vendor-d3'
+        },
+      },
+    },
+  },
   test: {
     environment: 'node',
   },
