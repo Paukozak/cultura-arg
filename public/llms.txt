@@ -4,13 +4,13 @@ CulturArg (https://culturaarg.vercel.app/) es un mapa interactivo de los espacio
 culturales de Argentina: museos, teatros, bibliotecas populares y especializadas,
 cines, centros culturales, galerías de arte, librerías, monumentos y lugares
 históricos, sitios Patrimonio UNESCO y Casas del Bicentenario, distribuidos en
-las 24 provincias del país.
+las provincias del país.
 
 ## Qué datos contiene
 
 - Cerca de 11 mil espacios culturales, cada uno con nombre, categoría,
   localidad y provincia.
-- Geometría de las 24 provincias argentinas para el mapa.
+- Geometría de las provincias argentinas para el mapa.
 - Población por provincia y por departamento, usada para calcular densidad de
   espacios culturales cada 100 mil habitantes.
 

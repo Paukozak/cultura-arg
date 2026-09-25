@@ -97,7 +97,7 @@ export function MapIntroMobil() {
                 className="text-justify text-lg leading-relaxed text-neutral-400"
               >
                 Museos, teatros, bibliotecas, cines, galerías y más, repartidos
-                por las 24 provincias. El color te muestra dónde hay más.
+                por las provincias. El color te muestra dónde hay más.
               </motion.p>
               <motion.p
                 variants={elemento}

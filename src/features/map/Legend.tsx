@@ -80,7 +80,7 @@ export function LegendContenido({ onElegir }: { onElegir?: () => void }) {
 
       <section className="flex flex-col gap-2">
         <h3 className="text-xs uppercase tracking-wide text-neutral-500">
-          Las 24 provincias
+          Las provincias
         </h3>
         <div className="flex flex-col">
           {/* Cada fila entra escalonada (fundido + deslizamiento desde la

@@ -122,7 +122,7 @@ export function MapIntro() {
               className="text-justify text-xl leading-relaxed text-neutral-400"
             >
               Museos, teatros, bibliotecas, cines, galerías y más, repartidos
-              por las 24 provincias.
+              por las provincias.
             </motion.p>
 
             <motion.p
