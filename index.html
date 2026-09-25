@@ -2,10 +2,6 @@
 <html lang="es-AR">
   <head>
     <meta charset="UTF-8" />
-    <!-- Aplica el tema guardado (o el del sistema) antes del primer pintado:
-         sin esto, la página siempre arranca en oscuro y recién cambia a
-         claro después de que React monta — un flash visible del tema
-         equivocado. Bloqueante a propósito, por eso va tan arriba. -->
     <script>
       ;(function () {
         var guardado = localStorage.getItem('cca-tema')
@@ -54,10 +50,6 @@
       name="twitter:image"
       content="https://culturaarg.vercel.app/og-image.png"
     />
-    <!-- Arranca antes la conexión (DNS+TLS) al mapa de Google embebido que
-         se usa al abrir el panel de una provincia — así, cuando el código
-         realmente lo pide, la conexión ya está lista en vez de arrancar de
-         cero. -->
     <link rel="preconnect" href="https://maps.google.com" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

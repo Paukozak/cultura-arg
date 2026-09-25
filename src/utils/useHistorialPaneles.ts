@@ -1,5 +1,44 @@
 import { useEffect, useRef } from 'react'
+import { provinciasGeo } from '../data/provincias'
 import { useMapStore } from '../store/mapStore'
+import { normalizar } from './texto'
+
+// Slug legible a partir del nombre de la provincia (sin acentos, en
+// minúscula, espacios/puntuación como guiones) para usar en la URL en vez
+// del id numérico del store ("14"). Los 24 nombres reales no colisionan
+// entre sí una vez normalizados (verificado a mano), así que no hace falta
+// desambiguar.
+function slugParaProvincia(nombre: string): string {
+  return normalizar(nombre)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+const SLUG_POR_ID = new Map(
+  provinciasGeo.features.map((f) => [
+    f.properties.id,
+    slugParaProvincia(f.properties.nombre),
+  ]),
+)
+const ID_POR_SLUG = new Map(
+  provinciasGeo.features.map((f) => [
+    slugParaProvincia(f.properties.nombre),
+    f.properties.id,
+  ]),
+)
+
+// Esquema de URLs reales por provincia: `/` sin nada elegido,
+// `/provincia/:slug` con panel abierto, `/provincia/:slug/espacios` con la
+// vista completa. `:slug` es el nombre de la provincia legible (p. ej.
+// "cordoba"), no el id del store — internamente todo sigue usando el id.
+function urlParaEstado(
+  provinciaId: string | null,
+  vistaCompleta: boolean,
+): string {
+  if (!provinciaId) return '/'
+  const slug = SLUG_POR_ID.get(provinciaId) ?? provinciaId
+  return vistaCompleta ? `/provincia/${slug}/espacios` : `/provincia/${slug}`
+}
 
 /**
  * Sincroniza los paneles superpuestos (provincia elegida, vista completa)
@@ -25,10 +64,19 @@ export function useHistorialPaneles() {
   const vistaCompleta = useMapStore((s) => s.vistaCompleta)
   const seleccionarProvincia = useMapStore((s) => s.seleccionarProvincia)
   const setVistaCompleta = useMapStore((s) => s.setVistaCompleta)
+  const abrirVistaCompleta = useMapStore((s) => s.abrirVistaCompleta)
 
   const profundidad = (provinciaSeleccionada ? 1 : 0) + (vistaCompleta ? 1 : 0)
   // Cuántas entradas de historial cree este hook que ya empujó.
   const entradasEmpujadas = useRef(0)
+  // La restauración de abajo dispara `seleccionarProvincia`/`abrirVistaCompleta`,
+  // pero ese cambio de store recién se ve reflejado en un re-render
+  // posterior: la primera corrida del efecto que empuja historial (más
+  // abajo) todavía ve la `profundidad` vieja (0) mientras `entradasEmpujadas`
+  // ya fue adelantada a la profundidad restaurada, así que sin esta bandera
+  // ese primer pase la interpretaría como un descenso y llamaría a
+  // `history.go` de más, pisando la restauración recién hecha.
+  const primeraCorridaEmpuje = useRef(true)
   // Marca que el próximo descenso de profundidad vino de un popstate (gesto
   // o botón atrás): el navegador ya movió el historial solo, no hay que
   // compensarlo llamando a `history.go` de nuevo.
@@ -44,10 +92,46 @@ export function useHistorialPaneles() {
   // abierto detrás).
   const corrigiendoHistorial = useRef(false)
 
+  // Restaura el estado (provincia elegida, vista completa) a partir de la
+  // URL con la que se cargó la página, antes de que el efecto de abajo
+  // empiece a empujar historial. Usa `replaceState` (no `pushState`): no
+  // agrega una entrada nueva, solo le pega al estado inicial el `ccaPanel`
+  // que le corresponde según la URL.
   useEffect(() => {
+    const coincidencia = window.location.pathname.match(
+      /^\/provincia\/([^/]+)(\/espacios)?\/?$/,
+    )
+    if (!coincidencia) return
+    const [, slug, sufijoEspacios] = coincidencia
+    const id = ID_POR_SLUG.get(slug)
+    if (!id) return
+
+    const vistaCompletaInicial = Boolean(sufijoEspacios)
+    const profundidadInicial = vistaCompletaInicial ? 2 : 1
+    entradasEmpujadas.current = profundidadInicial
+    history.replaceState(
+      { ccaPanel: profundidadInicial },
+      '',
+      urlParaEstado(id, vistaCompletaInicial),
+    )
+    seleccionarProvincia(id)
+    if (vistaCompletaInicial) {
+      abrirVistaCompleta()
+    }
+  }, [seleccionarProvincia, abrirVistaCompleta])
+
+  useEffect(() => {
+    if (primeraCorridaEmpuje.current) {
+      primeraCorridaEmpuje.current = false
+      return
+    }
     if (profundidad > entradasEmpujadas.current) {
       for (let i = entradasEmpujadas.current; i < profundidad; i++) {
-        history.pushState({ ccaPanel: i + 1 }, '')
+        history.pushState(
+          { ccaPanel: i + 1 },
+          '',
+          urlParaEstado(provinciaSeleccionada, vistaCompleta),
+        )
       }
       entradasEmpujadas.current = profundidad
     } else if (profundidad < entradasEmpujadas.current) {
@@ -59,8 +143,19 @@ export function useHistorialPaneles() {
         corrigiendoHistorial.current = true
         history.go(-diferencia)
       }
+    } else {
+      // La profundidad no cambió pero el contenido sí (p. ej. se eligió otra
+      // provincia con el panel ya abierto, sin cerrarlo primero): la URL
+      // quedaría mostrando la provincia vieja si no se sincroniza acá.
+      // `replaceState`, no `pushState`: sigue siendo el mismo nivel de
+      // historial, no uno nuevo.
+      history.replaceState(
+        { ccaPanel: profundidad },
+        '',
+        urlParaEstado(provinciaSeleccionada, vistaCompleta),
+      )
     }
-  }, [profundidad])
+  }, [profundidad, provinciaSeleccionada, vistaCompleta])
 
   useEffect(() => {
     function onPopState() {

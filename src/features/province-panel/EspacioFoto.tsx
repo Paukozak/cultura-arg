@@ -16,7 +16,12 @@ export function EspacioFoto({ espacio, className, onClick }: Props) {
 
   const contenido = (
     <img
-      src={curada}
+      // Con barra inicial: `curada` es una ruta relativa a `public/`
+      // ("fotos-destacados/x.jpg"). Antes daba igual porque la app siempre
+      // vivía en `/`, pero ahora que las URLs reales cambian el pathname
+      // (`/provincia/:id`), un <img src> relativo se resolvería contra esa
+      // URL en vez de la raíz del sitio y la foto daba 404.
+      src={`/${curada}`}
       alt={nombreMostradoPara(espacio.id) ?? espacio.nombre ?? ''}
       loading="lazy"
       className="h-full w-full rounded-lg border border-neutral-800 object-cover"
