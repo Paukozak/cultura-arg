@@ -26,6 +26,7 @@ import {
   type Orden,
 } from './filtrarEspacios'
 import { GoogleMapsEmbed } from './GoogleMapsEmbed'
+import { IconoFlechaAtras } from './IconoFlechaAtras'
 
 /** Nombre de comuna/departamento por id (p. ej. "02007" -> "Comuna 1") — para
  * CABA, donde el filtro de localidad se reemplaza por comuna (ver
@@ -459,19 +460,7 @@ function ProvinceFullViewContent({
           aria-label="Volver"
           className="shrink-0 rounded-full border border-neutral-800 p-1.5 text-neutral-400 transition-colors hover:text-neutral-100"
         >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path
-              d="M19 12H5M12 19l-7-7 7-7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <IconoFlechaAtras />
         </button>
         <div>
           <h2 className="text-lg font-semibold text-neutral-100">
@@ -821,19 +810,7 @@ function ProvinceFullViewContent({
               onClick={() => setVistaMobil('lista')}
               className="mb-4 flex items-center gap-1.5 self-start text-sm text-neutral-400 transition-colors hover:text-neutral-100 md:hidden"
             >
-              <svg
-                viewBox="0 0 24 24"
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path
-                  d="M19 12H5M12 19l-7-7 7-7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <IconoFlechaAtras />
               Volver a la lista
             </button>
             {seleccionado ? (

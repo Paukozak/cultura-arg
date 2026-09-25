@@ -1,8 +1,6 @@
 import { HelpCircle } from 'lucide-react'
-import { AnimatePresence } from 'motion/react'
-import { useState } from 'react'
 import { useMediaQuery } from '../../utils/useMediaQuery'
-import { ModalInfoContent, Seccion } from './ModalInfo'
+import { BotonAbrirModal, ModalInfoContent, Seccion } from './ModalInfo'
 
 function TutorialContent({ onCerrar }: { onCerrar: () => void }) {
   const esMobil = useMediaQuery('(max-width: 767px)')
@@ -159,22 +157,9 @@ function TutorialContent({ onCerrar }: { onCerrar: () => void }) {
 }
 
 export function Tutorial() {
-  const [abierto, setAbierto] = useState(false)
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setAbierto(true)}
-        aria-label="¿Cómo se usa?"
-        className="flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-800 px-3 py-2 text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-100 sm:py-1.5 sm:text-sm"
-      >
-        <HelpCircle className="h-4 w-4 sm:hidden" aria-hidden="true" />
-        <span className="hidden sm:inline">¿Cómo se usa?</span>
-      </button>
-      <AnimatePresence>
-        {abierto && <TutorialContent onCerrar={() => setAbierto(false)} />}
-      </AnimatePresence>
-    </>
+    <BotonAbrirModal icono={HelpCircle} label="¿Cómo se usa?">
+      {({ onCerrar }) => <TutorialContent onCerrar={onCerrar} />}
+    </BotonAbrirModal>
   )
 }

@@ -1,7 +1,5 @@
 import { Info } from 'lucide-react'
-import { AnimatePresence } from 'motion/react'
-import { useState } from 'react'
-import { ModalInfoContent, Seccion } from './ModalInfo'
+import { BotonAbrirModal, ModalInfoContent, Seccion } from './ModalInfo'
 
 // Cifras de docs/data-quality-report.md y de los comentarios de
 // scripts/process-data.mjs (generado 2026-09-24, ver ahí el desglose por
@@ -237,22 +235,9 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
 }
 
 export function ComoSeHizo() {
-  const [abierto, setAbierto] = useState(false)
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setAbierto(true)}
-        aria-label="¿Cómo se hizo?"
-        className="flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-800 px-3 py-2 text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-100 sm:py-1.5 sm:text-sm"
-      >
-        <Info className="h-4 w-4 sm:hidden" aria-hidden="true" />
-        <span className="hidden sm:inline">¿Cómo se hizo?</span>
-      </button>
-      <AnimatePresence>
-        {abierto && <ComoSeHizoContent onCerrar={() => setAbierto(false)} />}
-      </AnimatePresence>
-    </>
+    <BotonAbrirModal icono={Info} label="¿Cómo se hizo?">
+      {({ onCerrar }) => <ComoSeHizoContent onCerrar={onCerrar} />}
+    </BotonAbrirModal>
   )
 }

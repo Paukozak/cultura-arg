@@ -2,30 +2,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import archivosFotos from 'virtual:fotos-destacados'
 import destacadosCurados from '../../data/destacados-curados.json'
-import type { Espacio } from '../../data/espacios'
 import { EspacioFoto } from './EspacioFoto'
+import { espacio } from './espacioDePrueba'
 import type { EntradaCurada } from './getDestacados'
-
-function espacio(id: string): Espacio {
-  return {
-    id,
-    nombre: id,
-    categoria: 'Museos',
-    subcategoria: null,
-    provinciaId: '99',
-    departamentoId: null,
-    departamento: null,
-    localidad: null,
-    lat: null,
-    lon: null,
-    anioInauguracion: null,
-    gestion: null,
-    direccion: null,
-    telefono: null,
-    mail: null,
-    web: null,
-  }
-}
 
 const entradasConFoto = Object.values(
   destacadosCurados.porProvincia as Record<string, EntradaCurada[]>,
@@ -37,7 +16,9 @@ describe('EspacioFoto', () => {
   it.each(entradasConFoto.map((e) => [e.id, e.foto] as const))(
     '%s: renderiza una ruta absoluta a un archivo que existe (%s)',
     (id) => {
-      const html = renderToStaticMarkup(<EspacioFoto espacio={espacio(id)} />)
+      const html = renderToStaticMarkup(
+        <EspacioFoto espacio={espacio({ id, categoria: 'Museos' })} />,
+      )
       const src = html.match(/src="([^"]+)"/)?.[1]
 
       // Absoluta (arranca con "/"): si no, un cambio de pathname de la SPA
@@ -56,7 +37,9 @@ describe('EspacioFoto', () => {
 
   it('no renderiza nada si el espacio no tiene foto curada', () => {
     const html = renderToStaticMarkup(
-      <EspacioFoto espacio={espacio('id-sin-curar-inventado')} />,
+      <EspacioFoto
+        espacio={espacio({ id: 'id-sin-curar-inventado', categoria: 'Museos' })}
+      />,
     )
     expect(html).toBe('')
   })

@@ -1,28 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Espacio } from '../../data/espacios'
+import { espacio } from './espacioDePrueba'
 import { getDestacados } from './getDestacados'
-
-function espacio(
-  overrides: Partial<Espacio> & Pick<Espacio, 'id' | 'categoria'>,
-): Espacio {
-  return {
-    nombre: overrides.id,
-    subcategoria: null,
-    provinciaId: '99',
-    departamentoId: null,
-    departamento: null,
-    localidad: null,
-    lat: null,
-    lon: null,
-    anioInauguracion: null,
-    gestion: null,
-    direccion: null,
-    telefono: null,
-    mail: null,
-    web: null,
-    ...overrides,
-  }
-}
 
 describe('getDestacados', () => {
   it('devuelve los espacios curados en el orden de la curaduría, no el de la lista original', () => {

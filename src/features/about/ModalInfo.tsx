@@ -1,5 +1,11 @@
-import { motion } from 'motion/react'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from 'react'
 
 export function Seccion({
   titulo,
@@ -91,5 +97,33 @@ export function ModalInfoContent({
         </div>
       </motion.div>
     </motion.div>
+  )
+}
+
+export function BotonAbrirModal({
+  icono: Icono,
+  label,
+  children,
+}: {
+  icono: ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
+  label: string
+  children: (props: { onCerrar: () => void }) => ReactNode
+}) {
+  const [abierto, setAbierto] = useState(false)
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        aria-label={label}
+        className="flex shrink-0 items-center gap-1.5 rounded-full border border-neutral-800 px-3 py-2 text-xs font-medium text-neutral-400 transition-colors hover:text-neutral-100 sm:py-1.5 sm:text-sm"
+      >
+        <Icono className="h-4 w-4 sm:hidden" aria-hidden={true} />
+        <span className="hidden sm:inline">{label}</span>
+      </button>
+      <AnimatePresence>
+        {abierto && children({ onCerrar: () => setAbierto(false) })}
+      </AnimatePresence>
+    </>
   )
 }
