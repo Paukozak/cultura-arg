@@ -25,5 +25,7 @@ const svg = `
 </svg>
 `
 
-await sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toFile('public/og-image.png')
+await sharp(Buffer.from(svg))
+  .png({ compressionLevel: 9 })
+  .toFile('public/og-image.png')
 console.log('Listo: public/og-image.png')

@@ -230,10 +230,10 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
 
       <Seccion titulo="Asistencia de inteligencia artificial">
         <p>
-          El desarrollo se
-          hizo con asistencia de Claude Code, bajo dirección y revisión humana
-          en cada etapa. La curaduría de destacados y las decisiones de qué
-          mostrar y cómo son editoriales, no generadas automáticamente.
+          El desarrollo se hizo con asistencia de Claude Code, bajo dirección y
+          revisión humana en cada etapa. La curaduría de destacados y las
+          decisiones de qué mostrar y cómo son editoriales, no generadas
+          automáticamente.
         </p>
       </Seccion>
     </ModalInfoContent>
