@@ -62,6 +62,12 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
           provincia: la idea es que se pueda ver y comparar de un vistazo la
           oferta cultural de cada rincón del país.
         </p>
+        <p>
+          Este proyecto fue desarrollado para participar del Concurso Nacional
+          de Visualización de Datos 2026 "Contar con Datos", organizado por la
+          Secretaría de Innovación, Ciencia y Tecnología de la Nación y la
+          Universidad de San Andrés.
+        </p>
       </Seccion>
 
       <Seccion titulo="Fuentes de datos">
@@ -224,7 +230,7 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
 
       <Seccion titulo="Asistencia de inteligencia artificial">
         <p>
-          El desarrollo (el pipeline de procesamiento de datos y la interfaz) se
+          El desarrollo se
           hizo con asistencia de Claude Code, bajo dirección y revisión humana
           en cada etapa. La curaduría de destacados y las decisiones de qué
           mostrar y cómo son editoriales, no generadas automáticamente.
