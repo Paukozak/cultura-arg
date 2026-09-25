@@ -1,3 +1,4 @@
+import { Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 interface Props {
@@ -50,7 +51,7 @@ export function GoogleMapsEmbed(props: Props) {
       ([entry]) => {
         if (entry.isIntersecting) setVisible(true)
       },
-      { rootMargin: '150px' },
+      { rootMargin: '400px' },
     )
     observer.observe(el)
     return () => observer.disconnect()
@@ -76,8 +77,13 @@ export function GoogleMapsEmbed(props: Props) {
         />
       ) : (
         <div
-          className={`${alto} w-full rounded-lg border border-neutral-800 bg-neutral-900`}
-        />
+          className={`${alto} flex w-full items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900`}
+        >
+          <Loader2
+            className="h-5 w-5 animate-spin text-neutral-600"
+            aria-hidden="true"
+          />
+        </div>
       )}
       <a
         href={linkHref}
