@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { ComoSeHizo } from '../features/about/ComoSeHizo'
+import { Tutorial } from '../features/about/Tutorial'
 import { GlobalSearch } from '../features/search/GlobalSearch'
 import { useMapStore } from '../store/mapStore'
 import { useMediaQuery } from '../utils/useMediaQuery'
@@ -8,6 +9,7 @@ import { ThemeToggle } from './ThemeToggle'
 function Acciones() {
   return (
     <>
+      <Tutorial />
       <ComoSeHizo />
       <ThemeToggle />
     </>
@@ -42,6 +44,7 @@ export function Header() {
     return (
       <header
         ref={headerRef}
+        data-mapa-ui
         className="flex flex-col gap-3 border-b border-neutral-800 bg-neutral-950 px-4 py-3"
       >
         <div className="flex items-center justify-between gap-3">
@@ -66,6 +69,7 @@ export function Header() {
   return (
     <header
       ref={headerRef}
+      data-mapa-ui
       className="flex h-16 shrink-0 items-center gap-4 border-b border-neutral-800 bg-neutral-950 px-6"
     >
       <h1 className="flex shrink-0 items-center gap-2 text-lg font-semibold tracking-tight text-neutral-100">

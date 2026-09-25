@@ -101,10 +101,11 @@ function ProvincePanelContent({
   // contenedor del mapa — el SVG tiene mucho espacio "vacío" alrededor de
   // la silueta del país que visualmente es fondo negro y debe cerrar el
   // panel igual que cualquier otro click afuera. Tampoco cuenta un control
-  // propio del mapa (`[data-mapa-ui]`, hoy el botón "← alejar" del zoom por
-  // cluster): sin esta exclusión, clickearlo retrocedía un nivel de zoom Y
-  // deseleccionaba la provincia a la vez, así que "alejar un nivel" se
-  // sentía como "volver de golpe al mapa nacional".
+  // de UI propio de la app (`[data-mapa-ui]`, hoy el `<header>` entero —
+  // buscador, "¿Cómo se usa?", "¿Cómo se hizo?", tema): sin esta exclusión,
+  // clickear cualquier botón del header con un panel de provincia abierto
+  // lo cerraba de paso, como efecto secundario no relacionado con lo que se
+  // quería hacer.
   // Se desactiva mientras la vista completa está abierta: esa vista cubre
   // toda la pantalla y cualquier clic dentro de ella también caería
   // "afuera" de este panel.

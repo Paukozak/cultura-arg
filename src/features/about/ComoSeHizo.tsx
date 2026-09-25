@@ -3,13 +3,13 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 
 // Cifras de docs/data-quality-report.md y de los comentarios de
-// scripts/process-data.mjs (generado 2026-09-14, ver ahí el desglose por
+// scripts/process-data.mjs (generado 2026-09-24, ver ahí el desglose por
 // categoría) — se hardcodean acá porque son un hecho puntual sobre el corte
 // de datos usado, no algo que la app recalcule en runtime.
 const TOTAL_ESPACIOS = 11234
 const PCT_SIN_ANIO = 58.4
 const PCT_SIN_LOCALIDAD = 0.8
-const FECHA_CORTE = '14 de septiembre de 2026'
+const FECHA_CORTE = '12 de septiembre de 2026'
 
 function Fuente({
   nombre,
@@ -176,20 +176,43 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
               confiable disponible, y no completar nada que no se pueda sostener
               con otro dato ya presente en el registro.
             </p>
+            <ul className="flex flex-col gap-2 list-disc pl-4 marker:text-neutral-600">
+              <li>
+                La provincia de cada espacio se calcula a partir de un código de
+                localidad numérico, no de la columna de texto libre (mucho más
+                propensa a errores de tipeo).
+              </li>
+              <li>
+                Los marcadores de "sin dato" que trae la fuente (como "s/d") se
+                tratan como campo vacío, no como si fueran un valor real.
+              </li>
+              <li>
+                Las variantes de un mismo nombre de localidad, por acentos o
+                mayúsculas inconsistentes, se unifican eligiendo la forma mejor
+                escrita, no la más repetida.
+              </li>
+              <li>
+                Los campos vacíos se completan solo cuando otro dato confiable
+                del mismo registro o de un vecino geográfico muy cercano lo
+                resuelve sin ambigüedad; si no hay esa certeza, queda como
+                faltante.
+              </li>
+              <li>
+                Un puñado de correcciones puntuales se aplicó a mano para
+                errores de origen que no siguen ningún patrón general,
+                verificadas cruzando otras columnas del mismo registro.
+              </li>
+            </ul>
             <p>
-              En la práctica, esto significó calcular la provincia de cada
-              espacio a partir de un código de localidad numérico en vez de la
-              columna de texto libre (mucho más propensa a errores de tipeo);
-              tratar los marcadores de "sin dato" que trae la fuente (como
-              "s/d") como campo vacío en vez de mostrarlos como si fueran un
-              valor real; unificar variantes de un mismo nombre de localidad,
-              por acentos o mayúsculas inconsistentes, eligiendo la forma mejor
-              escrita, no la más repetida; completar campos vacíos solo cuando
-              otro dato confiable del mismo registro o de un vecino geográfico
-              muy cercano lo resuelve sin ambigüedad, dejándolo como faltante si
-              no hay esa certeza; y aplicar a mano un puñado de correcciones
-              puntuales para errores de origen que no siguen ningún patrón
-              general, verificadas cruzando otras columnas del mismo registro.
+              El departamento de cada espacio surge de los mismos primeros 5
+              dígitos del código de localidad (2 de provincia + 3 de
+              departamento). CABA es un caso aparte: la fuente no llega a nivel
+              comuna y siempre trae el mismo código placeholder para toda la
+              ciudad, así que su comuna se resuelve por geocodificación,
+              ubicando cada coordenada dentro del polígono de una de las 15
+              comunas reales. Así se resolvieron 2625 de los 2653 espacios
+              porteños; los 28 restantes, sin coordenadas confiables dentro de
+              esos límites, quedan sin comuna asignada.
             </p>
           </section>
 
@@ -211,6 +234,31 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
               población. Ninguna reemplaza a la otra, por eso conviven como dos
               vistas del mismo mapa en vez de mezclarse en una sola métrica.
             </p>
+            <p>
+              La rampa de color (celeste clarito a azul profundo, 5 escalones)
+              es la paleta secuencial "Blues" de ColorBrewer, elegida por ser
+              legible con cualquier tipo de daltonismo (protanopia,
+              deuteranopia, tritanopia). Los espacios sin dato de densidad se
+              muestran en gris, no en el escalón más claro de la rampa, para no
+              confundir "sin datos" con "poco".
+            </p>
+            <ul className="flex flex-col gap-2 list-disc pl-4 marker:text-neutral-600">
+              <li>
+                Los escalones se arman por cuantiles de la propia distribución
+                (la misma cantidad de provincias o departamentos en cada
+                escalón), no dividiendo el rango de valores en partes iguales.
+                El total de espacios está muy sesgado por CABA y Buenos Aires
+                (miles) contra el resto (decenas a cientos): con una escala
+                lineal casi todo caía en el primer escalón y el mapa se veía
+                prácticamente de un solo color.
+              </li>
+              <li>
+                Al hacer zoom a una provincia, el choropleth de sus
+                departamentos usa la misma rampa pero calculada sobre los
+                departamentos de todo el país, no solo los de esa provincia, así el mismo color significa lo mismo en cualquier provincia que
+                se visite, sin depender de qué otra se miró antes.
+              </li>
+            </ul>
           </section>
 
           <section className="flex flex-col gap-2">
