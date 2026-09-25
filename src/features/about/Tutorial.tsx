@@ -25,13 +25,13 @@ function TutorialContent({ onCerrar }: { onCerrar: () => void }) {
           {esMobil ? (
             <>
               Un botón flotante con esa misma escala de colores abre una lista
-              con las provincias ordenadas de mayor a menor: tocar una desde
-              ahí te lleva directo a ella.
+              con las provincias ordenadas de mayor a menor: tocar una desde ahí
+              te lleva directo a ella.
             </>
           ) : (
             <>
-              Al costado del mapa hay una lista con las provincias ordenadas
-              de mayor a menor: pasar el mouse por una la resalta en el mapa.
+              Al costado del mapa hay una lista con las provincias ordenadas de
+              mayor a menor: pasar el mouse por una la resalta en el mapa.
             </>
           )}
         </p>
