@@ -1,5 +1,6 @@
 import { Info } from 'lucide-react'
 import { BotonAbrirModal, ModalInfoContent, Seccion } from './ModalInfo'
+import { SugerenciasInline } from './SugerenciasInline'
 
 // Cifras de docs/data-quality-report.md y de los comentarios de
 // scripts/process-data.mjs (generado 2026-09-24, ver ahí el desglose por
@@ -50,6 +51,8 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
       titulo="¿Cómo se hizo?"
       onCerrar={onCerrar}
     >
+      <SugerenciasInline />
+
       <Seccion titulo="Para qué es este mapa">
         <p>
           Argentina tiene {TOTAL_ESPACIOS.toLocaleString('es-AR')} espacios
