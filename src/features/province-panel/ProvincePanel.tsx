@@ -338,13 +338,15 @@ function ProvincePanelContent({
               en vez de abrir un modal por encima que tape el resto del
               panel. El icono `List` es el mismo que el botón "Todos" de más
               arriba, para que se lea como el mismo gesto (ver-como-lista).
-              Sin acción si ya se está viendo esa sección. */}
+              Sin acción si ya se está viendo esa sección. Borde + fondo
+              (mismo patrón que el botón "Volver al mapa" de arriba, en vez
+              de solo texto con hover) para que se note que es clickeable. */}
           <button
             type="button"
             onClick={() => setSeccion('departamentos')}
             disabled={seccion === 'departamentos'}
             aria-label={`Ver la lista completa de departamentos de ${nombre}, con su color y cantidad`}
-            className="flex items-center gap-1.5 whitespace-nowrap font-mono text-[10px] uppercase tracking-wide text-neutral-500 transition-colors hover:text-neutral-300 disabled:pointer-events-none disabled:opacity-50 md:text-xs"
+            className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-800 bg-neutral-900 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wide text-neutral-300 transition-colors hover:border-neutral-700 hover:text-neutral-100 disabled:pointer-events-none disabled:opacity-50 md:text-xs"
           >
             <List className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             Departamentos · {UNIDAD_CAPA[capaActiva]}

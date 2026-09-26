@@ -7,8 +7,8 @@ export function NotFoundPage() {
       <p className="font-mono text-sm text-neutral-500">404</p>
       <h1 className="text-2xl font-medium">Esta página no existe</h1>
       <p className="max-w-sm text-sm text-neutral-400">
-        La dirección a la que intentaste entrar no corresponde a ningún mapa
-        ni provincia.
+        La dirección a la que intentaste entrar no corresponde a ningún mapa ni
+        provincia.
       </p>
       <button
         type="button"
