@@ -3,33 +3,42 @@ import { normalizar } from '../../utils/texto'
 
 /** Extraída de ProvinceFullView.tsx para poder testearla sin montar el
  * componente (mismo criterio que filtrarEspacios.ts) — es la lógica del
- * filtro de "Localidad"/"Comuna" del panel de una provincia: en CABA se
- * agrupa por comuna en vez de por localidad, porque SInCA no distingue
+ * filtro de "Localidad"/"Departamento"/"Comuna" del panel de una provincia:
+ * se puede agrupar por localidad o por departamento (`departamentoId`,
+ * elegible con un toggle). En CABA el modo queda forzado en 'departamento'
+ * (mostrado como "Comuna", sin selector), porque SInCA no distingue
  * localidades ahí (todos sus espacios comparten una sola, "Ciudad Autónoma
  * de Buenos Aires" — ver `forzarLocalidadCaba` en process-data.mjs). */
+
+/** Qué campo del espacio arma la clave de agrupación: `departamento`
+ * (`departamentoId`, comuna incluida) o `localidad`. En CABA siempre es
+ * `'departamento'` (forzado, sin selector — ver `ProvinceFullView`); en el
+ * resto de las provincias es elegible con un toggle Localidad/Departamento. */
+export type ModoAgrupador = 'localidad' | 'departamento'
 
 export interface OpcionAgrupador {
   /** Lo que se guarda en `agrupadorActivo` y lo que compara el filtro real
    * (`departamentosActivos`/`localidadesActivas` en filtrarEspacios.ts). */
   clave: string
-  /** Lo que se muestra en el picker. Igual a `clave` salvo en CABA, donde
-   * `clave` es un `departamentoId` (p. ej. "02007") y `etiqueta` es el
-   * nombre legible de la comuna (p. ej. "Comuna 1"). */
+  /** Lo que se muestra en el picker. Igual a `clave` salvo en modo
+   * `'departamento'`, donde `clave` es un `departamentoId` (p. ej. "02007")
+   * y `etiqueta` es el nombre legible del departamento/comuna (p. ej.
+   * "Comuna 1"). */
   etiqueta: string
   count: number
 }
 
-/** Clave de agrupación de un espacio: `departamentoId` (comuna) en CABA,
- * `localidad` en el resto. A propósito NO se "limpia" acá (p. ej. mapear el
- * placeholder `02000` de CABA a otra cosa): tiene que ser la MISMA clave
- * cruda que compara `filtrarEspacios` — si difirieran, tildar una opción
- * del picker no filtraría nada (bug real que motivó este archivo: la clave
- * sintética `'sin-comuna'` no coincidía con el `departamentoId` real
- * `'02000'` que compara el filtro, así que esa opción siempre daba 0
- * resultados). El rótulo lindo se resuelve aparte, en `opcionesAgrupador`,
- * solo para mostrar. */
-export function claveAgrupador(espacio: Espacio, esCaba: boolean): string {
-  return esCaba
+/** Clave de agrupación de un espacio: `departamentoId` en modo
+ * `'departamento'`, `localidad` en modo `'localidad'`. A propósito NO se
+ * "limpia" acá (p. ej. mapear el placeholder `02000` de CABA a otra cosa):
+ * tiene que ser la MISMA clave cruda que compara `filtrarEspacios` — si
+ * difirieran, tildar una opción del picker no filtraría nada (bug real que
+ * motivó este archivo: la clave sintética `'sin-comuna'` no coincidía con
+ * el `departamentoId` real `'02000'` que compara el filtro, así que esa
+ * opción siempre daba 0 resultados). El rótulo lindo se resuelve aparte, en
+ * `opcionesAgrupador`, solo para mostrar. */
+export function claveAgrupador(espacio: Espacio, modo: ModoAgrupador): string {
+  return modo === 'departamento'
     ? (espacio.departamentoId ?? 'sin dato')
     : (espacio.localidad ?? 'sin dato')
 }
@@ -44,28 +53,46 @@ export function numeroComuna(etiqueta: string): number | null {
 }
 
 /** Arma las opciones del picker: una fila por clave distinta de
- * `claveAgrupador`, con su conteo. En CABA, la etiqueta es el nombre real
- * de la comuna (`nombrePorDepartamentoId`) o "Sin comuna" si la clave no
- * resuelve a ninguna (el placeholder `02000` de los espacios sin
- * coordenadas confiables que `asignarComunasCaba`, en process-data.mjs, no
- * pudo geocodificar). Ordenadas de menor a mayor por número de comuna en
- * CABA ("Sin comuna", sin número, siempre al final); alfabéticamente en el
- * resto. */
+ * `claveAgrupador` (según `modo`), con su conteo. En modo `'departamento'`,
+ * la etiqueta es el nombre real del departamento/comuna
+ * (`nombrePorDepartamentoId`) o "Sin comuna" si la clave no resuelve a
+ * ninguna (el placeholder `02000` de los espacios de CABA sin coordenadas
+ * confiables que `asignarComunasCaba`, en process-data.mjs, no pudo
+ * geocodificar). El orden numérico ("Comuna 1".."Comuna 15" en vez de
+ * alfabético) es específico de CABA, no de "modo departamento" en general:
+ * hay departamentos reales que arrancan con un número (p. ej. "9 de Julio"
+ * en Buenos Aires) y se romperían con esa regla — por eso `esCaba` se pasa
+ * aparte de `modo`, solo para decidir el orden.
+ *
+ * `departamentosDeProvincia` (solo relevante en modo `'departamento'`): los
+ * ids de TODOS los departamentos de la provincia según
+ * `departamentos-resumen.json`, no solo los que tienen espacios cargados —
+ * sin esto, un departamento con 0 espacios (p. ej. Ramón Lista en Formosa)
+ * no tendría ninguna clave que contar y quedaría afuera del picker aunque
+ * el choropleth sí lo pinte. En modo `'localidad'` no hay equivalente (no
+ * existe un padrón de localidades del país en el proyecto, solo las que ya
+ * aparecen en algún espacio), así que ahí este parámetro no se usa. */
 export function opcionesAgrupador(
   espacios: Espacio[],
+  modo: ModoAgrupador,
   esCaba: boolean,
   nombrePorDepartamentoId: Map<string, string>,
+  departamentosDeProvincia: string[] = [],
 ): OpcionAgrupador[] {
   const conteo = new Map<string, number>()
+  if (modo === 'departamento') {
+    for (const id of departamentosDeProvincia) conteo.set(id, 0)
+  }
   for (const e of espacios) {
-    const clave = claveAgrupador(e, esCaba)
+    const clave = claveAgrupador(e, modo)
     conteo.set(clave, (conteo.get(clave) ?? 0) + 1)
   }
   const opciones = [...conteo.entries()].map(([clave, count]) => ({
     clave,
-    etiqueta: esCaba
-      ? (nombrePorDepartamentoId.get(clave) ?? 'Sin comuna')
-      : clave,
+    etiqueta:
+      modo === 'departamento'
+        ? (nombrePorDepartamentoId.get(clave) ?? 'Sin comuna')
+        : clave,
     count,
   }))
   return opciones.sort((a, b) =>
@@ -111,8 +138,8 @@ export function opcionesMostradas(
 export function espaciosDeAgrupador(
   espacios: Espacio[],
   agrupadorActivo: Set<string> | null,
-  esCaba: boolean,
+  modo: ModoAgrupador,
 ): Espacio[] {
   if (!agrupadorActivo) return espacios
-  return espacios.filter((e) => agrupadorActivo.has(claveAgrupador(e, esCaba)))
+  return espacios.filter((e) => agrupadorActivo.has(claveAgrupador(e, modo)))
 }

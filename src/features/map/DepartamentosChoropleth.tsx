@@ -42,8 +42,9 @@ interface Props {
  * un departamento no dependa de qué otra provincia se visitó antes.
  *
  * Hover muestra el nombre (tooltip manejado por NationalMap, igual que el
- * de provincia); clic abre la vista completa filtrada a las localidades de
- * ese departamento (ver `abrirVistaCompletaPorDepartamento`). */
+ * de provincia); clic abre la vista completa con el agrupador en modo
+ * 'departamento' y ese departamento tildado (ver
+ * `abrirVistaCompletaPorDepartamento`). */
 export function DepartamentosChoropleth({
   provinciaId,
   path,

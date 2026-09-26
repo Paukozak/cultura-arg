@@ -7,11 +7,11 @@ import { cargarEspacios, type Espacio } from '../../data/espacios'
 import { provinciasGeo } from '../../data/provincias'
 import { useMapStore } from '../../store/mapStore'
 import {
-  claveAgrupador,
   espaciosDeAgrupador as espaciosDeAgrupadorPuro,
   opcionesAgrupador as opcionesAgrupadorPuro,
   opcionesMostradas as opcionesMostradasPuro,
   resumenAgrupador as resumenAgrupadorPuro,
+  type ModoAgrupador,
 } from './agruparEspacios'
 import { ICONOS_POR_CATEGORIA, ICONO_POR_DEFECTO } from './categoriaIcons'
 import { nombreMostradoPara } from './curaduriaDestacados'
@@ -215,6 +215,12 @@ function ProvinceFullViewContent({
   const [espacios, setEspacios] = useState<Espacio[] | null>(null)
   const [busqueda, setBusqueda] = useState('')
   const [orden, setOrden] = useState<Orden>('alfabetico')
+  // CABA arranca (y queda forzada) en 'departamento', sin selector — ver
+  // `esCaba` arriba. El resto de las provincias arranca en 'localidad' y
+  // puede cambiar a 'departamento' con el toggle de abajo.
+  const [modoAgrupador, setModoAgrupador] = useState<ModoAgrupador>(
+    esCaba ? 'departamento' : 'localidad',
+  )
   const [categoriasActivas, setCategoriasActivas] =
     useState<Set<string> | null>(null)
   const [gestionesActivas, setGestionesActivas] = useState<Set<string> | null>(
@@ -271,27 +277,22 @@ function ProvinceFullViewContent({
   }, [provinciaId])
 
   // Clic en una ficha del choropleth por departamento (ver
-  // DepartamentosChoropleth): en CABA el departamento clickeado ES la propia
-  // clave del filtro (comuna), se tilda directo. En el resto de las
-  // provincias el filtro sigue siendo por localidad, así que hay que
-  // esperar a que carguen los espacios para resolver qué localidades caen
-  // dentro de ese departamento. Se aplica UNA sola vez (con `aplicado`, no
-  // en `[agrupadorActivo]` entre las dependencias): si no, cada vez que el
-  // usuario destildara una opción a mano el efecto la volvería a tildar.
+  // DepartamentosChoropleth) o en la lista de departamentos (ver
+  // DepartamentosLista): el departamento clickeado ES la propia clave del
+  // filtro, así que alcanza con pasar el agrupador a modo 'departamento' y
+  // tildarlo directo — sin esperar a que carguen los espacios ni traducirlo
+  // a localidades. Se aplica UNA sola vez (con `aplicado`, no en
+  // `[agrupadorActivo]`/`[modoAgrupador]` entre las dependencias): si no,
+  // cada vez que el usuario cambiara de modo o destildara una opción a mano
+  // el efecto la volvería a pisar.
   const departamentoInicialAplicado = useRef(false)
   useEffect(() => {
-    if (!espacios || !departamentoIdInicial) return
+    if (!departamentoIdInicial) return
     if (departamentoInicialAplicado.current) return
     departamentoInicialAplicado.current = true
-    const clavesIniciales = esCaba
-      ? new Set([departamentoIdInicial])
-      : new Set(
-          espacios
-            .filter((e) => e.departamentoId === departamentoIdInicial)
-            .map((e) => claveAgrupador(e, false)),
-        )
-    setAgrupadorActivo(clavesIniciales)
-  }, [espacios, departamentoIdInicial, esCaba])
+    setModoAgrupador('departamento')
+    setAgrupadorActivo(new Set([departamentoIdInicial]))
+  }, [departamentoIdInicial])
 
   // Con la vista completa abierta, el body de atrás no debería poder
   // scrollear: es un overlay de pantalla completa y esa barra de scroll
@@ -337,8 +338,9 @@ function ProvinceFullViewContent({
   // viceversa). Lógica en agruparEspacios.ts (testeada ahí sin montar el
   // componente).
   const espaciosDeAgrupador = useMemo(
-    () => espaciosDeAgrupadorPuro(espacios ?? [], agrupadorActivo, esCaba),
-    [espacios, agrupadorActivo, esCaba],
+    () =>
+      espaciosDeAgrupadorPuro(espacios ?? [], agrupadorActivo, modoAgrupador),
+    [espacios, agrupadorActivo, modoAgrupador],
   )
 
   const categorias = useMemo(() => {
@@ -363,10 +365,29 @@ function ProvinceFullViewContent({
   // es lo que se guarda en `agrupadorActivo` (id de comuna o nombre de
   // localidad); `etiqueta` es lo que se muestra — en CABA son distintos (id
   // -> "Comuna 1"), en el resto son el mismo string.
+  // Todos los departamentos de la provincia según departamentos-resumen.json
+  // (no solo los que tienen espacios cargados): sin esto, un departamento
+  // con 0 espacios (p. ej. Ramón Lista en Formosa) no aparecería en el
+  // picker aunque el choropleth sí lo pinte — ver `opcionesAgrupador` en
+  // agruparEspacios.ts.
+  const departamentosDeProvincia = useMemo(
+    () =>
+      departamentosResumen
+        .filter((d) => d.provinciaId === provinciaId)
+        .map((d) => d.id),
+    [provinciaId],
+  )
+
   const opcionesAgrupador = useMemo(
     () =>
-      opcionesAgrupadorPuro(espacios ?? [], esCaba, NOMBRE_DEPARTAMENTO_POR_ID),
-    [espacios, esCaba],
+      opcionesAgrupadorPuro(
+        espacios ?? [],
+        modoAgrupador,
+        esCaba,
+        NOMBRE_DEPARTAMENTO_POR_ID,
+        departamentosDeProvincia,
+      ),
+    [espacios, modoAgrupador, esCaba, departamentosDeProvincia],
   )
 
   // Texto del gatillo del picker (plegado): qué está eligiendo sin tener
@@ -382,19 +403,20 @@ function ProvinceFullViewContent({
     [opcionesAgrupador, busquedaAgrupador],
   )
 
-  const filtrosActuales = esCaba
-    ? {
-        busqueda,
-        categoriasActivas,
-        gestionesActivas,
-        departamentosActivos: agrupadorActivo,
-      }
-    : {
-        busqueda,
-        categoriasActivas,
-        gestionesActivas,
-        localidadesActivas: agrupadorActivo,
-      }
+  const filtrosActuales =
+    modoAgrupador === 'departamento'
+      ? {
+          busqueda,
+          categoriasActivas,
+          gestionesActivas,
+          departamentosActivos: agrupadorActivo,
+        }
+      : {
+          busqueda,
+          categoriasActivas,
+          gestionesActivas,
+          localidadesActivas: agrupadorActivo,
+        }
 
   const filtrados = useMemo(() => {
     if (!espacios) return []
@@ -406,7 +428,7 @@ function ProvinceFullViewContent({
     categoriasActivas,
     gestionesActivas,
     agrupadorActivo,
-    esCaba,
+    modoAgrupador,
     orden,
   ])
 
@@ -566,8 +588,51 @@ function ProvinceFullViewContent({
                 </div>
 
                 <div ref={agrupadorRef} className="relative">
+                  {/* Solo fuera de CABA: ahí el agrupador queda forzado en
+                      comuna (ver `esCaba` arriba), sin selector. Cambiar de
+                      modo resetea `agrupadorActivo` para no dejar colgada
+                      una selección del modo anterior (una localidad tildada
+                      no significa nada al pasar a departamento, y viceversa). */}
+                  {!esCaba && (
+                    <div className="mb-1.5 flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setModoAgrupador('localidad')
+                          setAgrupadorActivo(null)
+                        }}
+                        aria-pressed={modoAgrupador === 'localidad'}
+                        className={`flex-1 rounded-md border px-2 py-1 text-xs transition-colors ${
+                          modoAgrupador === 'localidad'
+                            ? 'border-accent bg-accent/15 text-accent'
+                            : 'border-neutral-800 text-neutral-500'
+                        }`}
+                      >
+                        Localidad
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setModoAgrupador('departamento')
+                          setAgrupadorActivo(null)
+                        }}
+                        aria-pressed={modoAgrupador === 'departamento'}
+                        className={`flex-1 rounded-md border px-2 py-1 text-xs transition-colors ${
+                          modoAgrupador === 'departamento'
+                            ? 'border-accent bg-accent/15 text-accent'
+                            : 'border-neutral-800 text-neutral-500'
+                        }`}
+                      >
+                        Departamento
+                      </button>
+                    </div>
+                  )}
                   <span className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-neutral-500">
-                    {esCaba ? 'Comuna' : 'Localidad'}
+                    {esCaba
+                      ? 'Comuna'
+                      : modoAgrupador === 'departamento'
+                        ? 'Departamento'
+                        : 'Localidad'}
                   </span>
                   {/* Gatillo: la lista (buscador + checkboxes) solo se arma
                       y se muestra al abrirlo, no ocupa lugar de entrada. */}
@@ -600,7 +665,11 @@ function ProvinceFullViewContent({
                         value={busquedaAgrupador}
                         onChange={(e) => setBusquedaAgrupador(e.target.value)}
                         placeholder={
-                          esCaba ? 'Buscar comuna…' : 'Buscar localidad…'
+                          esCaba
+                            ? 'Buscar comuna…'
+                            : modoAgrupador === 'departamento'
+                              ? 'Buscar departamento…'
+                              : 'Buscar localidad…'
                         }
                         className="mb-1.5 w-full rounded-md border border-neutral-800 bg-neutral-900 px-2 py-1.5 text-xs text-neutral-200 placeholder:text-neutral-600"
                       />

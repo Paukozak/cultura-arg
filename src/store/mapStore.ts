@@ -34,11 +34,11 @@ interface MapState {
   localidadFocoId: string | null
   abrirVistaCompletaPorLocalidad: (localidad: string) => void
   /** Departamento/partido por el que arranca filtrada la vista completa (clic
-   * en una ficha del choropleth por departamento, Etapa 9 — ver
-   * `DepartamentosChoropleth`). A diferencia de `localidadFocoId` (una sola
-   * localidad puntual), un departamento suele contener varias localidades:
-   * `ProvinceFullView` arranca con todas ELLAS tildadas en el filtro de
-   * localidad, no con un filtro de departamento aparte. */
+   * en una ficha del choropleth por departamento, o en la lista de
+   * departamentos — ver `DepartamentosChoropleth`/`DepartamentosLista`).
+   * `ProvinceFullView` arranca con el agrupador en modo 'departamento' y
+   * este id tildado directo (mismo id que compara `filtrarEspacios` vía
+   * `departamentosActivos`). */
   departamentoFocoId: string | null
   abrirVistaCompletaPorDepartamento: (departamentoId: string) => void
   /** Cambia cada vez que hay que volver a hacer la animación de entrada del
