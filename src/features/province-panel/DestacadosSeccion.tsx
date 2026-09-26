@@ -69,14 +69,7 @@ function DestacadoCard({
       {espacio.direccion && (
         <div className="text-xs text-neutral-400">📍 {espacio.direccion}</div>
       )}
-      <GoogleMapsEmbed
-        nombre={espacio.nombre ?? espacio.categoria}
-        nombreMapa={espacio.nombreMapa ?? espacio.categoria}
-        direccionMapa={espacio.direccionMapa}
-        localidad={espacio.localidad}
-        lat={espacio.lat}
-        lon={espacio.lon}
-      />
+      <GoogleMapsEmbed espacio={espacio} />
     </div>
   )
 }

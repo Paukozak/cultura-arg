@@ -178,12 +178,7 @@ function Ficha({ espacio }: { espacio: Espacio }) {
       )}
 
       <GoogleMapsEmbed
-        nombre={espacio.nombre ?? espacio.categoria}
-        nombreMapa={espacio.nombreMapa ?? espacio.categoria}
-        direccionMapa={espacio.direccionMapa}
-        localidad={espacio.localidad}
-        lat={espacio.lat}
-        lon={espacio.lon}
+        espacio={espacio}
         className="mt-1"
         alto="h-72 lg:h-[28rem]"
       />

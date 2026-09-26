@@ -1,21 +1,9 @@
 import { Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import type { Espacio } from '../../data/espacios'
 
 interface Props {
-  /** Nombre mostrado en el resto de la ficha (título del iframe, etc.). */
-  nombre: string
-  /** Nombre a usar para la búsqueda en Google Maps (ver `nombreMapa` en
-   * `src/data/espacios.ts`) — a veces el nombre oficial/administrativo de
-   * SInCA no es el que tiene registrado Google Maps. */
-  nombreMapa: string
-  /** Dirección ya filtrada para geocodificar (ver `direccionMapa` en
-   * `src/data/espacios.ts`) — `null` si la fuente no trae una dirección
-   * puntual o si es una lista de calles que rodean la manzana, no
-   * geocodificable como un punto. */
-  direccionMapa: string | null
-  localidad: string | null
-  lat: number | null
-  lon: number | null
+  espacio: Espacio
   className?: string
   /** Clase de alto del mapa (default `h-36`, el de las tarjetas de destacados). */
   alto?: string
@@ -28,13 +16,9 @@ interface Props {
 // Colón" real en A Coruña, España, y otro en Bogotá — sin el país, Google
 // puede dudar entre esos y el de Buenos Aires). La coordenada queda como
 // último recurso, solo cuando no queda nada de texto útil para buscar.
-function buildQuery({
-  nombreMapa,
-  direccionMapa,
-  localidad,
-  lat,
-  lon,
-}: Props): string {
+function buildQuery({ espacio }: Props): string {
+  const nombreMapa = espacio.nombreMapa ?? espacio.categoria
+  const { direccionMapa, localidad, lat, lon } = espacio
   const partes = [nombreMapa, direccionMapa, localidad].filter(Boolean)
   if (partes.length === 0) {
     return lat !== null && lon !== null ? `${lat},${lon}` : ''
@@ -85,7 +69,7 @@ export function GoogleMapsEmbed(props: Props) {
     >
       {visible ? (
         <iframe
-          title={`Mapa de ${props.nombre}`}
+          title={`Mapa de ${props.espacio.nombre ?? props.espacio.categoria}`}
           src={embedSrc}
           className={`${alto} w-full rounded-lg border border-neutral-800`}
           referrerPolicy="no-referrer-when-downgrade"
