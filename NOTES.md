@@ -56,14 +56,17 @@ Reproducir: point-in-polygon de cada espacio contra
 `src/data/provincias-detalle.json` (la geometría sin simplificar, no la del
 mapa nacional).
 
-## CABA no tiene datos a nivel comuna (2026-09-23)
+## CABA no tiene datos a nivel comuna (2026-09-23) — resuelto (2026-09-24)
 
 El choropleth por departamento de la Etapa 9 (zoom a una provincia → colorea
-sus departamentos/partidos por total/densidad) deja las 15 comunas de CABA
-siempre sin datos. No es un bug de agregación: los ~2653 registros de CABA
-en SInCA traen el código de localidad `02000` (la ciudad entera) en vez de
-un código de comuna real (`02007`...`02105`, los que usa Georef) — la fuente
-simplemente no llega a ese nivel de detalle para CABA. Documentado también
-en `docs/data-quality-report.md` (sección "Asignación de departamento por
-registro"). No hay forma de arreglarlo sin otra fuente que sí geocodifique
-por comuna.
+sus departamentos/partidos por total/densidad) dejaba las 15 comunas de CABA
+siempre sin datos: los ~2653 registros de CABA en SInCA traen el código de
+localidad `02000` (la ciudad entera) en vez de un código de comuna real
+(`02007`...`02105`, los que usa Georef).
+
+Se resolvió por geocodificación point-in-polygon contra las 15 comunas
+reales de Georef (`asignarComunasCaba` en `scripts/process-data.mjs`).
+Quedan 28 de ~2653 espacios de CABA sin comuna resuelta (sin coordenadas
+confiables o fuera de los límites de las 15 comunas); esos se muestran
+correctamente en la UI bajo la opción "Sin comuna" del filtro de
+departamento en `ProvinceFullView.tsx`.

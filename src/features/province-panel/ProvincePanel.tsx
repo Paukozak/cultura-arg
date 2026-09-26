@@ -54,7 +54,11 @@ function ProvincePanelContent({
   provinciaId: string
   onCerrar: () => void
 }) {
-  const espacios = useEspacios(provinciaId)
+  const {
+    espacios,
+    error: errorEspacios,
+    reintentar: reintentarEspacios,
+  } = useEspacios(provinciaId)
   const abrirVistaCompleta = useMapStore((s) => s.abrirVistaCompleta)
   const vistaCompleta = useMapStore((s) => s.vistaCompleta)
   const headerHeight = useMapStore((s) => s.headerHeight)
@@ -384,6 +388,8 @@ function ProvincePanelContent({
             espacios={espacios}
             destacados={destacados}
             onAbrirFicha={(e) => abrirVistaCompleta(e.id)}
+            error={errorEspacios}
+            onReintentar={reintentarEspacios}
           />
         ) : (
           <>

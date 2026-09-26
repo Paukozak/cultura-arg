@@ -82,17 +82,34 @@ export function DestacadosSeccion({
   espacios,
   destacados,
   onAbrirFicha,
+  error,
+  onReintentar,
 }: {
   espacios: Espacio[] | null
   destacados: Espacio[]
   onAbrirFicha: (espacio: Espacio) => void
+  error: boolean
+  onReintentar: () => void
 }) {
   return (
     <>
       <h3 className="mb-3 font-mono text-xs uppercase tracking-wide text-neutral-500">
         Destacados
       </h3>
-      {!espacios ? (
+      {error ? (
+        <div className="flex flex-col items-start gap-2">
+          <p className="text-sm text-neutral-500">
+            No se pudieron cargar los espacios.
+          </p>
+          <button
+            type="button"
+            onClick={onReintentar}
+            className="rounded-full border border-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-neutral-700 hover:text-neutral-100"
+          >
+            Reintentar
+          </button>
+        </div>
+      ) : !espacios ? (
         <p className="text-sm text-neutral-500">Cargando espacios…</p>
       ) : destacados.length === 0 ? (
         <p className="text-sm text-neutral-500">

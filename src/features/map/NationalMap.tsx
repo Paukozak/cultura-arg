@@ -214,7 +214,11 @@ export function NationalMap() {
   // buscar qué departamento hay bajo el dedo por su id, y esos datos solo
   // existen acá si se cargan en este nivel — de paso, un único punto de
   // carga en vez de dos hooks separados pidiendo lo mismo.
-  const departamentosData = useDepartamentos(provinciaSeleccionada)
+  const {
+    datos: departamentosData,
+    error: errorDepartamentos,
+    reintentar: reintentarDepartamentos,
+  } = useDepartamentos(provinciaSeleccionada)
 
   // Argentina, proyectada, mide (en las unidades del viewBox) mucho más de
   // alto que de ancho — su bounding box real dentro de un viewBox de
@@ -1061,6 +1065,26 @@ export function NationalMap() {
           <div className="font-mono text-xs text-neutral-400">
             {metricaTooltip(departamentoHover, capaActiva)}
           </div>
+        </div>
+      )}
+
+      {/* El choropleth por departamento (`DepartamentosChoropleth`, arriba)
+          se queda sin datos en silencio si falla el import dinámico — este
+          aviso, superpuesto al mapa ya zoomeado, es la única señal al
+          usuario de que puede reintentar en vez de ver la ficha siempre
+          plana. */}
+      {provinciaSeleccionada && errorDepartamentos && (
+        <div className="pointer-events-auto absolute left-1/2 top-4 z-10 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-950/95 px-3 py-2 text-sm shadow-lg">
+          <span className="text-neutral-400">
+            No se pudieron cargar los departamentos.
+          </span>
+          <button
+            type="button"
+            onClick={reintentarDepartamentos}
+            className="shrink-0 rounded-full border border-neutral-800 px-3 py-1 text-xs font-medium text-neutral-300 transition-colors hover:border-neutral-700 hover:text-neutral-100"
+          >
+            Reintentar
+          </button>
         </div>
       )}
     </div>

@@ -207,7 +207,12 @@ function ProvinceFullViewContent({
   // distingue. El resto de las provincias sigue filtrando por localidad.
   const esCaba = provinciaId === '02'
 
-  const [espacios, setEspacios] = useState<Espacio[] | null>(null)
+  const [estadoEspacios, setEstadoEspacios] = useState<
+    | { provinciaId: string; tipo: 'listo'; espacios: Espacio[] }
+    | { provinciaId: string; tipo: 'error' }
+    | null
+  >(null)
+  const [intentoEspacios, setIntentoEspacios] = useState(0)
   const [busqueda, setBusqueda] = useState('')
   const [orden, setOrden] = useState<Orden>('alfabetico')
   // CABA arranca (y queda forzada) en 'departamento', sin selector — ver
@@ -263,13 +268,28 @@ function ProvinceFullViewContent({
 
   useEffect(() => {
     let cancelado = false
-    cargarEspacios(provinciaId).then((data) => {
-      if (!cancelado) setEspacios(data)
-    })
+    cargarEspacios(provinciaId)
+      .then((data) => {
+        if (!cancelado)
+          setEstadoEspacios({ provinciaId, tipo: 'listo', espacios: data })
+      })
+      .catch(() => {
+        if (!cancelado) setEstadoEspacios({ provinciaId, tipo: 'error' })
+      })
     return () => {
       cancelado = true
     }
-  }, [provinciaId])
+  }, [provinciaId, intentoEspacios])
+
+  // Derivado, no reseteado a mano: si el estado guardado es de una
+  // provincia distinta a la pedida (todavía cargando la nueva, o cambió
+  // antes de que termine), se ignora en vez de mostrar por un instante los
+  // datos/error viejos.
+  const vigenteEspacios =
+    estadoEspacios?.provinciaId === provinciaId ? estadoEspacios : null
+  const espacios =
+    vigenteEspacios?.tipo === 'listo' ? vigenteEspacios.espacios : null
+  const errorEspacios = vigenteEspacios?.tipo === 'error'
 
   // Clic en una ficha del choropleth por departamento (ver
   // DepartamentosChoropleth) o en la lista de departamentos (ver
@@ -490,7 +510,18 @@ function ProvinceFullViewContent({
         </div>
       </header>
 
-      {!espacios ? (
+      {errorEspacios ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-neutral-500">
+          <p>No se pudieron cargar los espacios.</p>
+          <button
+            type="button"
+            onClick={() => setIntentoEspacios((n) => n + 1)}
+            className="rounded-full border border-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:border-neutral-700 hover:text-neutral-100"
+          >
+            Reintentar
+          </button>
+        </div>
+      ) : !espacios ? (
         <div className="flex flex-1 items-center justify-center text-sm text-neutral-500">
           Cargando espacios…
         </div>
