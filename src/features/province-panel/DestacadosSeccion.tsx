@@ -30,7 +30,18 @@ function DestacadoCard({
 }) {
   const Icono = ICONOS_POR_CATEGORIA[espacio.categoria] ?? ICONO_POR_DEFECTO
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-neutral-800 bg-neutral-900/60 p-4 transition-all duration-200 hover:-translate-y-1 hover:border-accent/60 hover:shadow-lg hover:shadow-accent/10">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onAbrirFicha(espacio)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onAbrirFicha(espacio)
+        }
+      }}
+      className="flex cursor-pointer flex-col gap-3 rounded-xl border border-neutral-800 bg-neutral-900/60 p-4 transition-all duration-200 hover:-translate-y-1 hover:border-accent/60 hover:shadow-lg hover:shadow-accent/10"
+    >
       <EspacioFoto
         espacio={espacio}
         className="h-36 w-full"
