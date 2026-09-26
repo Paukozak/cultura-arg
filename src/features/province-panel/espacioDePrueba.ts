@@ -19,7 +19,7 @@ export function espacio(
     mail: null,
     web: null,
     direccionMapa: null,
-    nombreMapa: null,
+    nombreMapa: '',
     ...overrides,
   }
 }

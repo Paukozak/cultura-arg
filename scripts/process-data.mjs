@@ -309,14 +309,17 @@ function aplicarCorreccionesPuntuales(espacios) {
 // Aplica el registro de CORRECCIONES_MAPA (ver
 // scripts/lib/correcciones-mapa.mjs) por id de espacio: dirección, nombre
 // para Google Maps, o ambos, según lo que traiga cada entrada. `nombreMapa`
-// se calcula para todos los espacios (con o sin corrección) porque
-// GoogleMapsEmbed lo necesita siempre.
+// queda en `null` salvo que haya una corrección real (solo ~12 de los
+// ~11.000 espacios la tienen) — `null` en vez de duplicar `e.nombre` para
+// casi todos, así el JSON no repite el mismo string dos veces por fila;
+// `cargarEspacios()` en src/data/espacios.ts resuelve el fallback a
+// `e.nombre` recién en el front.
 function aplicarCorreccionesMapa(espacios) {
   const porId = new Map(CORRECCIONES_MAPA.map((c) => [c.id, c]))
   let aplicadas = 0
   for (const e of espacios) {
     const correccion = porId.get(e.id)
-    e.nombreMapa = correccion?.nombreMapa ?? e.nombre
+    e.nombreMapa = correccion?.nombreMapa ?? null
     if (correccion?.direccionNueva) {
       e.direccion = correccion.direccionNueva
     }
@@ -342,11 +345,13 @@ function esDireccionGeocodificable(direccion) {
   return !(comas >= 2 && / y /.test(direccion))
 }
 
+// Guarda solo el booleano, no `e.direccion` de nuevo (sería el mismo string
+// duplicado para ~11.000 de los ~11.063 espacios, salvo las ~63 excepciones
+// de "calles de manzana") — `cargarEspacios()` en src/data/espacios.ts
+// resuelve `direccionMapa` a partir de este booleano y de `direccion`.
 function calcularDireccionMapa(espacios) {
   for (const e of espacios) {
-    e.direccionMapa = esDireccionGeocodificable(e.direccion)
-      ? e.direccion
-      : null
+    e.direccionEsGeocodificable = esDireccionGeocodificable(e.direccion)
   }
   return espacios
 }
@@ -1274,7 +1279,7 @@ async function main() {
       e.telefono,
       e.mail,
       e.web,
-      e.direccionMapa,
+      e.direccionEsGeocodificable,
       e.nombreMapa,
     ])
     await writeFile(

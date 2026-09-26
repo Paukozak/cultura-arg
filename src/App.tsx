@@ -7,6 +7,7 @@ import { MapInfoPanel } from './features/map/MapInfoPanel'
 import { MapIntro } from './features/map/MapIntro'
 import { MapIntroMobil } from './features/map/MapIntroMobil'
 import { NationalMap } from './features/map/NationalMap'
+import { NotFoundPage } from './features/not-found/NotFoundPage'
 import { ProvincePanel } from './features/province-panel/ProvincePanel'
 import { altoPeekPx } from './features/province-panel/hojaLayout'
 import { useMapStore } from './store/mapStore'
@@ -51,9 +52,12 @@ function ProvinceFullViewFallback() {
 function App() {
   const provinciaSeleccionada = useMapStore((s) => s.provinciaSeleccionada)
   const headerHeight = useMapStore((s) => s.headerHeight)
+  const paginaNoEncontrada = useMapStore((s) => s.paginaNoEncontrada)
   // El gesto de "atrás" (deslizar desde el borde en mobile, botón atrás del
   // navegador) cierra el panel de provincia o la vista completa en vez de
-  // sacar a la persona de la página — ver useHistorialPaneles.ts.
+  // sacar a la persona de la página — ver useHistorialPaneles.ts. También es
+  // quien marca `paginaNoEncontrada`, así que corre siempre, incluso cuando
+  // este render va a terminar reemplazado por NotFoundPage.
   useHistorialPaneles()
   const esMobil = useMediaQuery('(max-width: 767px)')
   // El intro a la izquierda le resta otro ancho de columna al mapa: solo entra en
@@ -90,6 +94,14 @@ function App() {
     // en mobile) — hay que reenganchar el observer cada vez que puede
     // haber cambiado de nodo.
   }, [esMobil, provinciaSeleccionada])
+
+  // Reemplazo completo de pantalla, no un overlay: ninguno de los hooks de
+  // arriba deja de correr (siguen siendo los mismos en cada render), pero el
+  // layout normal (mapa, header, paneles) no tiene sentido para una URL que
+  // no corresponde a nada.
+  if (paginaNoEncontrada) {
+    return <NotFoundPage />
+  }
 
   return (
     // `h-dvh overflow-hidden` (no `min-h-screen` ni `h-screen`): altura

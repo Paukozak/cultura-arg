@@ -16,7 +16,7 @@ export interface Espacio {
   mail: string | null
   web: string | null
   direccionMapa: string | null
-  nombreMapa: string | null
+  nombreMapa: string
 }
 
 // Fila tal como la emite `process-data.mjs`: tupla posicional en vez de
@@ -26,6 +26,11 @@ export interface Espacio {
 // distintos del archivo (muy pocos frente a la cantidad de filas) en vez del
 // string repetido entero. `provinciaId` ni viaja: es el mismo para todo el
 // archivo, lo repone esta función a partir del parámetro que ya recibe.
+// `direccionEsGeocodificable` y `nombreMapa` tampoco duplican `direccion`/
+// `nombre`: son casi siempre el mismo string (`nombreMapa` solo difiere en
+// ~12 de los ~11.000 espacios, la dirección geocodificable en ~63), así que
+// la tupla guarda el booleano o `null` y esta función resuelve el fallback
+// abajo en vez de repetir el string entero en el JSON.
 type FilaEspacio = [
   id: string,
   nombre: string | null,
@@ -42,7 +47,7 @@ type FilaEspacio = [
   telefono: string | null,
   mail: string | null,
   web: string | null,
-  direccionMapa: string | null,
+  direccionEsGeocodificable: boolean,
   nombreMapa: string | null,
 ]
 interface EspaciosProvinciaJSON {
@@ -78,8 +83,8 @@ export async function cargarEspacios(provinciaId: string): Promise<Espacio[]> {
       telefono,
       mail,
       web,
-      direccionMapa,
-      nombreMapa,
+      direccionEsGeocodificable,
+      nombreMapaCruda,
     ]) => ({
       id,
       nombre,
@@ -97,8 +102,8 @@ export async function cargarEspacios(provinciaId: string): Promise<Espacio[]> {
       telefono,
       mail,
       web,
-      direccionMapa,
-      nombreMapa,
+      direccionMapa: direccionEsGeocodificable ? direccion : null,
+      nombreMapa: nombreMapaCruda ?? nombre ?? '',
     }),
   )
 }

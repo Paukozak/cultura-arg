@@ -66,6 +66,7 @@ export function useHistorialPaneles() {
   const seleccionarProvincia = useMapStore((s) => s.seleccionarProvincia)
   const setVistaCompleta = useMapStore((s) => s.setVistaCompleta)
   const abrirVistaCompleta = useMapStore((s) => s.abrirVistaCompleta)
+  const setPaginaNoEncontrada = useMapStore((s) => s.setPaginaNoEncontrada)
 
   const profundidad = (provinciaSeleccionada ? 1 : 0) + (vistaCompleta ? 1 : 0)
   // Cuántas entradas de historial cree este hook que ya empujó.
@@ -99,13 +100,19 @@ export function useHistorialPaneles() {
   // agrega una entrada nueva, solo le pega al estado inicial el `ccaPanel`
   // que le corresponde según la URL.
   useEffect(() => {
-    const coincidencia = window.location.pathname.match(
+    const { pathname } = window.location
+    if (pathname === '/') return
+
+    const coincidencia = pathname.match(
       /^\/provincia\/([^/]+)(\/espacios)?\/?$/,
     )
-    if (!coincidencia) return
-    const [, slug, sufijoEspacios] = coincidencia
-    const id = ID_POR_SLUG.get(slug)
-    if (!id) return
+    const slug = coincidencia?.[1]
+    const id = slug ? ID_POR_SLUG.get(slug) : undefined
+    if (!coincidencia || !id) {
+      setPaginaNoEncontrada(true)
+      return
+    }
+    const sufijoEspacios = coincidencia[2]
 
     const vistaCompletaInicial = Boolean(sufijoEspacios)
     const profundidadInicial = vistaCompletaInicial ? 2 : 1
@@ -119,7 +126,7 @@ export function useHistorialPaneles() {
     if (vistaCompletaInicial) {
       abrirVistaCompleta()
     }
-  }, [seleccionarProvincia, abrirVistaCompleta])
+  }, [seleccionarProvincia, abrirVistaCompleta, setPaginaNoEncontrada])
 
   useEffect(() => {
     if (primeraCorridaEmpuje.current) {

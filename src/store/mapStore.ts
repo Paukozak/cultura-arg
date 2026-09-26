@@ -62,6 +62,13 @@ interface MapState {
    * directamente. `ThemeToggle` es quien lo cambia. */
   tema: 'dark' | 'light'
   toggleTema: () => void
+  /** La URL con la que se cargó la página no corresponde a nada navegable
+   * (ni "/" ni `/provincia/:slug` con un slug real) — la restauración de
+   * estado en useHistorialPaneles.ts la marca así en vez de dejar el mapa
+   * nacional de fondo con una URL que no le corresponde. App.tsx la lee
+   * para reemplazar toda la pantalla por NotFoundPage. */
+  paginaNoEncontrada: boolean
+  setPaginaNoEncontrada: (valor: boolean) => void
 }
 
 const TEMA_KEY = 'cca-tema'
@@ -130,4 +137,6 @@ export const useMapStore = create<MapState>((set) => ({
       localStorage.setItem(TEMA_KEY, siguiente)
       return { tema: siguiente }
     }),
+  paginaNoEncontrada: false,
+  setPaginaNoEncontrada: (valor) => set({ paginaNoEncontrada: valor }),
 }))
