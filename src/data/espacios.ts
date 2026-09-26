@@ -15,6 +15,8 @@ export interface Espacio {
   telefono: string | null
   mail: string | null
   web: string | null
+  direccionMapa: string | null
+  nombreMapa: string | null
 }
 
 // Fila tal como la emite `process-data.mjs`: tupla posicional en vez de
@@ -40,6 +42,8 @@ type FilaEspacio = [
   telefono: string | null,
   mail: string | null,
   web: string | null,
+  direccionMapa: string | null,
+  nombreMapa: string | null,
 ]
 interface EspaciosProvinciaJSON {
   categorias: string[]
@@ -74,6 +78,8 @@ export async function cargarEspacios(provinciaId: string): Promise<Espacio[]> {
       telefono,
       mail,
       web,
+      direccionMapa,
+      nombreMapa,
     ]) => ({
       id,
       nombre,
@@ -91,6 +97,8 @@ export async function cargarEspacios(provinciaId: string): Promise<Espacio[]> {
       telefono,
       mail,
       web,
+      direccionMapa,
+      nombreMapa,
     }),
   )
 }

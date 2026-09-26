@@ -2,8 +2,17 @@ import { Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 interface Props {
+  /** Nombre mostrado en el resto de la ficha (título del iframe, etc.). */
   nombre: string
-  direccion: string | null
+  /** Nombre a usar para la búsqueda en Google Maps (ver `nombreMapa` en
+   * `src/data/espacios.ts`) — a veces el nombre oficial/administrativo de
+   * SInCA no es el que tiene registrado Google Maps. */
+  nombreMapa: string
+  /** Dirección ya filtrada para geocodificar (ver `direccionMapa` en
+   * `src/data/espacios.ts`) — `null` si la fuente no trae una dirección
+   * puntual o si es una lista de calles que rodean la manzana, no
+   * geocodificable como un punto. */
+  direccionMapa: string | null
   localidad: string | null
   lat: number | null
   lon: number | null
@@ -12,19 +21,25 @@ interface Props {
   alto?: string
 }
 
-// Prioriza nombre + dirección/localidad por sobre la coordenada cruda:
-// buscando así, Google suele resolver directamente a la ficha real del
-// lugar (con sus fotos y reseñas, si el lugar está cargado en Google Maps)
-// en vez de tirar un pin genérico sin identificar nada. La coordenada queda
-// como respaldo solo cuando no hay ni dirección ni localidad para buscar —
-// ahí un nombre solo puede ser ambiguo y el pin exacto es más confiable.
-function buildQuery({ nombre, direccion, localidad, lat, lon }: Props): string {
-  const textoDescriptivo = [nombre, direccion, localidad]
-    .filter(Boolean)
-    .join(', ')
-  if (direccion || localidad) return textoDescriptivo
-  if (lat !== null && lon !== null) return `${lat},${lon}`
-  return textoDescriptivo
+// Prioriza el texto (nombre + dirección/localidad) porque así Google suele
+// resolver directo a la ficha real del lugar, con sus fotos y reseñas, en
+// vez de tirar un pin genérico. Se le agrega "Argentina" al final para
+// desambiguar nombres que se repiten en otros países (hay un "Teatro
+// Colón" real en A Coruña, España, y otro en Bogotá — sin el país, Google
+// puede dudar entre esos y el de Buenos Aires). La coordenada queda como
+// último recurso, solo cuando no queda nada de texto útil para buscar.
+function buildQuery({
+  nombreMapa,
+  direccionMapa,
+  localidad,
+  lat,
+  lon,
+}: Props): string {
+  const partes = [nombreMapa, direccionMapa, localidad].filter(Boolean)
+  if (partes.length === 0) {
+    return lat !== null && lon !== null ? `${lat},${lon}` : ''
+  }
+  return [...partes, 'Argentina'].join(', ')
 }
 
 /** Mapa embebido de Google Maps (sin API key, vía el endpoint clásico

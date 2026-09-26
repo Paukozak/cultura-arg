@@ -13,6 +13,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import simplify from '@turf/simplify'
 import { parseCsv } from './lib/csv-parser.mjs'
+import { CORRECCIONES_MAPA } from './lib/correcciones-mapa.mjs'
 import { SINCA_RESOURCES } from './lib/sinca-sources.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -305,6 +306,51 @@ function aplicarCorreccionesPuntuales(espacios) {
   }
 }
 
+// Aplica el registro de CORRECCIONES_MAPA (ver
+// scripts/lib/correcciones-mapa.mjs) por id de espacio: dirección, nombre
+// para Google Maps, o ambos, según lo que traiga cada entrada. `nombreMapa`
+// se calcula para todos los espacios (con o sin corrección) porque
+// GoogleMapsEmbed lo necesita siempre.
+function aplicarCorreccionesMapa(espacios) {
+  const porId = new Map(CORRECCIONES_MAPA.map((c) => [c.id, c]))
+  let aplicadas = 0
+  for (const e of espacios) {
+    const correccion = porId.get(e.id)
+    e.nombreMapa = correccion?.nombreMapa ?? e.nombre
+    if (correccion?.direccionNueva) {
+      e.direccion = correccion.direccionNueva
+    }
+    if (correccion) aplicadas++
+  }
+  const sinAplicar = CORRECCIONES_MAPA.length - aplicadas
+  if (sinAplicar > 0) {
+    console.warn(
+      `Aviso: ${sinAplicar} corrección(es) de CORRECCIONES_MAPA no encontraron su id — ¿se movió o borró el registro en SInCA?`,
+    )
+  }
+  return espacios
+}
+
+// Algunos registros (sobre todo en "Monumentos y Lugares Históricos") no
+// traen una dirección puntual sino una lista de las calles que rodean la
+// manzana ("Libertad, Tucumán, Arturo Toscanini y Cerrito") — eso no es
+// geocodificable como un punto. Se detecta acá una sola vez (no en cada
+// render del mapa) y se guarda ya limpio.
+function esDireccionGeocodificable(direccion) {
+  if (!direccion) return false
+  const comas = (direccion.match(/,/g) ?? []).length
+  return !(comas >= 2 && / y /.test(direccion))
+}
+
+function calcularDireccionMapa(espacios) {
+  for (const e of espacios) {
+    e.direccionMapa = esDireccionGeocodificable(e.direccion)
+      ? e.direccion
+      : null
+  }
+  return espacios
+}
+
 // --- Comuna real de CABA por point-in-polygon ---------------------------------
 // SInCA no llega a nivel comuna para CABA: sus ~2650 registros siempre traen
 // el código placeholder `02000` (la ciudad entera, no una de las 15 comunas
@@ -536,7 +582,7 @@ function field(row, key) {
   if (!key) return null
   const v = row[key]
   if (!v || !v.trim()) return null
-  const limpio = v.trim()
+  const limpio = v.trim().replace(/\s+/g, ' ')
   return esMarcadorSinDato(limpio) ? null : limpio
 }
 
@@ -910,6 +956,8 @@ async function main() {
 
   console.log('Aplicando correcciones puntuales...')
   aplicarCorreccionesPuntuales(espacios)
+  aplicarCorreccionesMapa(espacios)
+  calcularDireccionMapa(espacios)
 
   console.log(
     'CABA: asignando comuna real por point-in-polygon (SInCA no la provee)...',
@@ -1226,6 +1274,8 @@ async function main() {
       e.telefono,
       e.mail,
       e.web,
+      e.direccionMapa,
+      e.nombreMapa,
     ])
     await writeFile(
       path.join(DATA_DIR, 'espacios', `${provinciaId}.json`),

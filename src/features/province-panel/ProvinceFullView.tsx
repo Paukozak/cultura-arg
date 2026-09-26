@@ -179,7 +179,8 @@ function Ficha({ espacio }: { espacio: Espacio }) {
 
       <GoogleMapsEmbed
         nombre={espacio.nombre ?? espacio.categoria}
-        direccion={espacio.direccion}
+        nombreMapa={espacio.nombreMapa ?? espacio.categoria}
+        direccionMapa={espacio.direccionMapa}
         localidad={espacio.localidad}
         lat={espacio.lat}
         lon={espacio.lon}
