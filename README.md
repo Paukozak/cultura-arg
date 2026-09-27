@@ -1,8 +1,8 @@
-# CulturArg — Cartografía Cultural Argentina
+# CulturArg - Cartografía Cultural Argentina
 
 **[culturaarg.vercel.app](https://culturaarg.vercel.app/)**
 
-Mapa interactivo de los espacios culturales de Argentina: casi **11.000 espacios** —museos, teatros, bibliotecas, cines, centros culturales, galerías de arte, librerías, monumentos y sitios patrimoniales— cruzados con población por provincia y por departamento para mostrar densidad real, no solo un conteo.
+Mapa interactivo de los espacios culturales de Argentina: más de **11.000 espacios** (museos, teatros, bibliotecas, cines, centros culturales, galerías de arte, librerías, monumentos y sitios patrimoniales) cruzados con población por provincia y por departamento para mostrar su densidad real y su totalidad.
 
 Proyecto presentado a la categoría **Exploración interactiva** del concurso ["Contar con Datos" 2026](https://datos.cultura.gob.ar), Ministerio de Cultura de la Nación.
 
@@ -20,9 +20,9 @@ Proyecto presentado a la categoría **Exploración interactiva** del concurso ["
 
 ## Qué se puede hacer
 
-- **Explorar el mapa nacional** con dos capas intercambiables (Densidad, Total) y una leyenda que se recalcula sola.
-- **Entrar a una provincia** con zoom animado, ver su ficha resumen y sus destacados curados.
-- **Abrir la vista completa de una provincia**: filtrar espacios por categoría y departamento, ver el choropleth de departamentos coloreado por densidad, y listar todos sus espacios (virtualizado, sin que se cuelgue con miles de filas).
+- **Explorar el mapa nacional** con dos capas intercambiables (Densidad, Total).
+- **Entrar a una provincia**, ver su ficha resumen y sus destacados curados.
+- **Abrir la vista completa de una provincia**: filtrar espacios por categoría y departamento, ver el choropleth de departamentos coloreado por densidad, y listar todos sus espacios.
 - **Buscar** cualquier espacio o provincia desde el buscador global del header.
 - **Leer "Cómo se hizo"**: la metodología, las fuentes y las limitaciones reales de los datos, contadas sin vueltas.
 - Funciona en **mobile y desktop** con layouts distintos (hoja inferior deslizable en mobile, paneles laterales en desktop), tema claro/oscuro y respeta `prefers-reduced-motion`.
@@ -31,7 +31,7 @@ Proyecto presentado a la categoría **Exploración interactiva** del concurso ["
 
 | Dato                                    | Fuente                                                                                                                      |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Espacios culturales                     | [SInCA](https://datos.cultura.gob.ar) — Sistema de Información Cultural de la Argentina, Ministerio de Cultura de la Nación |
+| Espacios culturales                     | [SInCA](https://datos.cultura.gob.ar) - Sistema de Información Cultural de la Argentina, Ministerio de Cultura de la Nación |
 | Geometría de provincias y departamentos | [API Georef Argentina](https://apis.datos.gob.ar/georef/api/), Ministerio de Economía                                       |
 | Población por provincia y departamento  | Censo Nacional de Población, Hogares y Viviendas 2022 (INDEC)                                                               |
 
@@ -41,12 +41,12 @@ Todo el detalle de cómo se cruzan y qué limitaciones tienen está en [`docs/da
 
 - **Vite + React 19 + TypeScript**
 - **Tailwind CSS 4**
-- **Mapa**: SVG puro con `d3-geo` (proyección Mercator fiteada al viewport) y `d3-scale` para las escalas de color — sin librerías de tiles, no hacen falta para un choropleth de 24 jurisdicciones
+- **Mapa**: SVG puro con `d3-geo` (proyección Mercator fiteada al viewport) y `d3-scale` para las escalas de color.
 - **Estado global**: Zustand
 - **Listas largas**: `react-window` (virtualización del listado de espacios)
 - **Animaciones**: Motion (Framer Motion) para paneles y transiciones; el mapa usa transiciones CSS nativas en sus `<path>` por ser más liviano
 - **Testing**: Vitest + Testing Library (397 tests sobre lógica de datos, hooks y componentes)
-- **Pipeline de datos**: scripts Node (`@turf/simplify`, `xlsx`, `sharp`) — ver más abajo
+- **Pipeline de datos**: scripts Node (`@turf/simplify`, `xlsx`, `sharp`).
 
 ## Cómo correr el proyecto
 
@@ -80,7 +80,7 @@ src/
     about/          modal de info, "Cómo se hizo", buzón de sugerencias
   store/            estado global (Zustand)
   utils/            hooks utilitarios (historial de paneles, media queries, ...)
-scripts/            pipeline de datos (Node, no va al bundle)
+scripts/            pipeline de datos
 data/               población por provincia/departamento y CSVs crudos (data/raw)
 docs/               reporte de calidad de datos
 ```
@@ -113,5 +113,5 @@ Otros scripts (`comprimir-fotos-destacados.mjs`, `optimize-fotos-destacados.mjs`
 Documentadas con más detalle en [`NOTES.md`](NOTES.md) y en "Cómo se hizo" dentro de la app:
 
 - ~200 de ~11.000 espacios tienen coordenadas que no caen dentro de la provincia que el propio registro declara (error de geocodificación de la fuente, no del mapa).
-- El 58% de los registros no tiene año de inauguración documentado —varía mucho por categoría—, por eso no se construyó una línea de tiempo continua.
+- El 58% de los registros no tiene año de inauguración documentado (varía mucho por categoría).
 - 28 espacios de CABA quedan sin comuna resuelta (sin coordenadas confiables o fuera de los límites de las 15 comunas reales).

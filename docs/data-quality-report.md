@@ -20,7 +20,6 @@ En total, **4669 de 11234** registros (41.6%) tienen un año documentado y váli
 | Sitios Patrimonio UNESCO        |    24 |             24 | 100.0% |             sí              |
 | Casas del Bicentenario          |   133 |            114 |  85.7% |             sí              |
 
-
 - Las categorías **Bibliotecas Especializadas, Cines, Galerías de Arte, Librerías** no traen ningún campo de año en el CSV de origen: para esos registros `anioInauguracion` es siempre `null`, no es un dato faltante por casualidad.
 - **Monumentos y Lugares Históricos**: el campo fuente se llama `fecha_de_inauguracion`, pero en la práctica corresponde a la fecha de declaración/protección legal del bien (100% de completitud, sospechosamente alta comparada con el resto), no necesariamente a la fecha física de construcción. Aclarar esto en la UI si se usa.
 - **Sitios Patrimonio UNESCO**: el campo fuente es `declaracion_año` (año en que UNESCO declaró el sitio), no un año de inauguración — son accidentes geográficos o conjuntos históricos preexistentes a su declaración.
@@ -31,4 +30,3 @@ En total, **4669 de 11234** registros (41.6%) tienen un año documentado y váli
 ## Asignación de provincia por registro
 
 `provinciaId` se deriva del código de localidad INDEC (`cod_loc`/`cod_localidad`/`localidad_id` según el CSV) y no de la columna explícita de provincia: al comparar ambas fuentes fila por fila, la columna de provincia trae errores de tipeo puntuales (confirmado en `galerias-de-arte.csv`, 3 filas, y `salas-de-teatro.csv`, 1 fila) mientras que el código de localidad es consistente en la enorme mayoría de los casos. Se detectó una única excepción en sentido inverso en `librerias.csv` (1 fila de 1623) donde el código de localidad parece ser el erróneo. Impacto total: menos de 5 registros de 11234 (<0.05%) podrían estar en la provincia equivocada.
-

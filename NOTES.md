@@ -9,7 +9,6 @@ investigó con un test punto-en-polígono contra la geometría real (sin
 simplificar) de cada provincia. Existen coordenadas del dataset de SInCA que no caen dentro de la provincia que el
 propio registro dice tener.
 
-
 **Lo que queda pendiente de una limpieza real:**
 
 1. **Buenos Aires (id 06): ~127 de 2500 espacios** — la mayoría categoría
