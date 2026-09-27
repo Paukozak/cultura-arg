@@ -405,12 +405,22 @@ function ProvinceFullViewContent({
     [espacios, modoAgrupador, esCaba, departamentosDeProvincia],
   )
 
+  // "Departamento" es masculino ("Todos"); "Localidad" y "Comuna" (CABA,
+  // forzada en modo 'departamento' pero mostrada como comuna) son
+  // femeninos ("Todas") — ver el rótulo de la sección más abajo.
+  const masculinoAgrupador = modoAgrupador === 'departamento' && !esCaba
+
   // Texto del gatillo del picker (plegado): qué está eligiendo sin tener
   // que abrirlo. Mismo criterio de "todas" que categoría/gestión — un Set
   // que terminó incluyendo a todas cuenta como "todas", no como "3 de 3".
   const resumenAgrupador = useMemo(
-    () => resumenAgrupadorPuro(agrupadorActivo, opcionesAgrupador),
-    [agrupadorActivo, opcionesAgrupador],
+    () =>
+      resumenAgrupadorPuro(
+        agrupadorActivo,
+        opcionesAgrupador,
+        masculinoAgrupador,
+      ),
+    [agrupadorActivo, opcionesAgrupador, masculinoAgrupador],
   )
 
   const opcionesMostradas = useMemo(
@@ -710,7 +720,9 @@ function ProvinceFullViewContent({
                             onChange={toggleTodosAgrupador}
                             className="accent-accent"
                           />
-                          <span className="min-w-0 flex-1 truncate">Todas</span>
+                          <span className="min-w-0 flex-1 truncate">
+                            {masculinoAgrupador ? 'Todos' : 'Todas'}
+                          </span>
                           <span className="shrink-0 text-neutral-500">
                             {espacios.length}
                           </span>

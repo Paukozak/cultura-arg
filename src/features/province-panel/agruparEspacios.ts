@@ -110,11 +110,16 @@ export function opcionesAgrupador(
 export function resumenAgrupador(
   agrupadorActivo: Set<string> | null,
   opciones: OpcionAgrupador[],
+  // "Departamento" es masculino ("Todos"); "Localidad"/"Comuna" son
+  // femeninos ("Todas", el default) — ver el selector Localidad/Departamento
+  // y el caso forzado de CABA en ProvinceFullView.tsx.
+  masculino = false,
 ): string {
-  if (!agrupadorActivo) return `Todas (${opciones.length})`
+  const todas = masculino ? 'Todos' : 'Todas'
+  if (!agrupadorActivo) return `${todas} (${opciones.length})`
   if (agrupadorActivo.size === 0) return 'Ninguna'
   if (agrupadorActivo.size === opciones.length)
-    return `Todas (${opciones.length})`
+    return `${todas} (${opciones.length})`
   const primera = opciones.find((o) => agrupadorActivo.has(o.clave))?.etiqueta
   return agrupadorActivo.size === 1
     ? (primera ?? '')

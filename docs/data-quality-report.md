@@ -20,19 +20,15 @@ En total, **4669 de 11234** registros (41.6%) tienen un año documentado y váli
 | Sitios Patrimonio UNESCO        |    24 |             24 | 100.0% |             sí              |
 | Casas del Bicentenario          |   133 |            114 |  85.7% |             sí              |
 
-## Notas importantes para el diseño de la línea de tiempo (Etapa 8)
 
 - Las categorías **Bibliotecas Especializadas, Cines, Galerías de Arte, Librerías** no traen ningún campo de año en el CSV de origen: para esos registros `anioInauguracion` es siempre `null`, no es un dato faltante por casualidad.
 - **Monumentos y Lugares Históricos**: el campo fuente se llama `fecha_de_inauguracion`, pero en la práctica corresponde a la fecha de declaración/protección legal del bien (100% de completitud, sospechosamente alta comparada con el resto), no necesariamente a la fecha física de construcción. Aclarar esto en la UI si se usa.
 - **Sitios Patrimonio UNESCO**: el campo fuente es `declaracion_año` (año en que UNESCO declaró el sitio), no un año de inauguración — son accidentes geográficos o conjuntos históricos preexistentes a su declaración.
 - **Salas de Teatro**: el campo `inicio_act` trae el valor `0` en varios registros como placeholder de dato faltante; se descartó como inválido (no se cuenta como año real).
 
-- **58.4% de los registros no tiene año documentado, por arriba del umbral de ~30-40% del plan. La Etapa 8 NO debería armar un scrubber continuo año por año: conviene un set fijo de hitos (décadas/períodos) con conteo acumulado real hasta cada hito, y declarar visiblemente ese porcentaje sin año documentado.**
+- **58.4% de los registros no tiene año documentado.
 
 ## Asignación de provincia por registro
 
 `provinciaId` se deriva del código de localidad INDEC (`cod_loc`/`cod_localidad`/`localidad_id` según el CSV) y no de la columna explícita de provincia: al comparar ambas fuentes fila por fila, la columna de provincia trae errores de tipeo puntuales (confirmado en `galerias-de-arte.csv`, 3 filas, y `salas-de-teatro.csv`, 1 fila) mientras que el código de localidad es consistente en la enorme mayoría de los casos. Se detectó una única excepción en sentido inverso en `librerias.csv` (1 fila de 1623) donde el código de localidad parece ser el erróneo. Impacto total: menos de 5 registros de 11234 (<0.05%) podrían estar en la provincia equivocada.
 
-## Asignación de departamento por registro (Etapa 9)
-
-`departamentoId` toma los primeros 5 dígitos del mismo código de localidad (2 de provincia + 3 de departamento), el mismo id que usa Georef para `departamentos.geojson`. Dos bolsones de códigos vencidos (nomenclatura vieja, previa a una redivisión administrativa) se remapean a mano — ver `DEPARTAMENTO_ID_LEGACY` en este script: Tierra del Fuego (102 registros bajo los códigos previos a la creación de Tolhuin en 2017) y Chascomús, Buenos Aires (12 registros). **CABA es aparte**: sus registros siempre traen el código placeholder `02000` (la ciudad entera, no una comuna) porque SInCA no llega a nivel comuna — se resuelve por geocodificación (point-in-polygon de lat/lon contra las 15 comunas reales de Georef, ver `asignarComunasCaba`): 2625 registros asignados a su comuna real, 28 sin coordenadas o fuera de los límites de las 15 comunas (quedan bajo `02000`, sin comuna en el choropleth).

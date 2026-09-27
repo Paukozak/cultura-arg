@@ -242,6 +242,13 @@ describe('resumenAgrupador — texto del gatillo del picker', () => {
   it('varias opciones muestran la primera + cuántas más', () => {
     expect(resumenAgrupador(new Set(['a', 'c']), opciones)).toBe('Alfa +1')
   })
+
+  it('en masculino (modo departamento) dice "Todos" en vez de "Todas"', () => {
+    expect(resumenAgrupador(null, opciones, true)).toBe('Todos (3)')
+    expect(resumenAgrupador(new Set(['a', 'b', 'c']), opciones, true)).toBe(
+      'Todos (3)',
+    )
+  })
 })
 
 describe('opcionesMostradas — buscador del propio picker', () => {

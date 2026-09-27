@@ -83,16 +83,17 @@ const TOQUE_TOLERANCIA_PX = 10
 // Zoom animado hacia la provincia clickeada (Etapa 6): al seleccionar una
 // provincia, todo el mapa se escala/traslada como una sola unidad hacia el
 // área real de esa provincia.
-const ZOOM_MS = 450
+const ZOOM_MS = 600
 // Entrada del mapa (ver `.provincia-cara`/`.provincia-lado` en index.css): las
 // provincias aparecen en una ola de norte a sur — la de más arriba arranca de
 // entrada y la de más abajo ENTRADA_ONDA_MS después.
 const ENTRADA_ONDA_MS = 650
-// Curva "ease-out" pronunciada: arranca rápido y llega a destino con una
-// desaceleración larga y suave, en vez de la deceleración más brusca de un
-// "ease" genérico — se nota sobre todo en el zoom-out, que es el tramo más
-// largo (vuelve de golpe a escala 1).
-const ZOOM_EASING = 'cubic-bezier(0.16, 1, 0.3, 1)'
+// Curva "ease-in-out" (acelera y decelera suave en ambas puntas) en vez del
+// "ease-out" pronunciado anterior, que arrancaba de golpe a máxima
+// velocidad — se notaba como un salto en el instante del click, sobre todo
+// zoomeando a provincias grandes. Simétrica a propósito: se usa igual para
+// entrar (click) y volver (deseleccionar).
+const ZOOM_EASING = 'cubic-bezier(0.65, 0, 0.35, 1)'
 const ZOOM_FILL_RATIO = 0.7
 
 // `main` (App.tsx) ocupa el alto del viewport menos el header y centra el

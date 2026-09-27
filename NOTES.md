@@ -1,23 +1,14 @@
 # Notas fuera de alcance
 
-Hallazgos que aparecieron trabajando en otra etapa y que no se arreglan ahí
-mismo (regla del plan) — quedan anotados acá para una pasada dedicada.
+Hallazgos que aparecieron trabajando.
 
 ## Coordenadas de espacios que no coinciden con su provincia (2026-09-14)
 
-Al implementar los pines de la Etapa 6 (zoom + pines por espacio), varios
-espacios mostraban su pin lejos de cualquier provincia o en la vecina. Se
+Se
 investigó con un test punto-en-polígono contra la geometría real (sin
-simplificar) de cada provincia — no es un bug del zoom ni de los pines: son
-coordenadas del dataset de SInCA que no caen dentro de la provincia que el
+simplificar) de cada provincia. Existen coordenadas del dataset de SInCA que no caen dentro de la provincia que el
 propio registro dice tener.
 
-**Los pines se sacaron del mapa (2026-09-23)** (`ProvincePins.tsx` y su
-mitigación punto-en-polígono ya no existen — el zoom a una provincia sigue
-funcionando, pero ya no dibuja un punto por espacio). El problema de datos de
-abajo sigue siendo real igual, solo que hoy no tiene ningún efecto visible;
-queda documentado por si se reintroduce algo que dibuje espacios
-individuales sobre el mapa.
 
 **Lo que queda pendiente de una limpieza real:**
 
