@@ -4,7 +4,7 @@
 
 Mapa interactivo de los espacios culturales de Argentina: más de **11.000 espacios** (museos, teatros, bibliotecas, cines, centros culturales, galerías de arte, librerías, monumentos y sitios patrimoniales) cruzados con población por provincia y por departamento para mostrar su densidad real y su totalidad.
 
-Proyecto presentado a la categoría **Exploración interactiva** del concurso ["Contar con Datos" 2026](https://datos.cultura.gob.ar), Ministerio de Cultura de la Nación.
+Proyecto presentado a la categoría **Exploración interactiva** del concurso ["Contar con Datos" 2026](https://www.udesa.edu.ar/contar-con-datos), Ministerio de Cultura de la Nación.
 
 ![CI](https://github.com/Paukozak/cultura-arg/actions/workflows/ci.yml/badge.svg)
 

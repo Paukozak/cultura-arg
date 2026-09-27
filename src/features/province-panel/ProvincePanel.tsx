@@ -13,7 +13,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { ArrowLeft, List } from 'lucide-react'
+import { List } from 'lucide-react'
 import { ContadorAnimado } from '../../components/ContadorAnimado'
 import { departamentosResumen } from '../../data/departamentos'
 import { provinciasGeo } from '../../data/provincias'
@@ -201,6 +201,96 @@ function ProvincePanelContent({
     setExpandida((valor) => !valor)
   }
 
+  // Par de chips Destacados/Departamentos (mismo lenguaje que los de
+  // Categoría/Gestión en ProvinceFullView.tsx). Se llama dos veces —desktop
+  // y mobile— con distinta ubicación en la cabecera (ver más abajo), por eso
+  // vive acá como función en vez de repetir el JSX.
+  function toggleSeccion(className: string) {
+    return (
+      <div
+        role="group"
+        aria-label="Sección del panel"
+        className={`flex gap-1.5 ${className}`}
+      >
+        <button
+          type="button"
+          onClick={() => setSeccion('destacados')}
+          aria-pressed={seccion === 'destacados'}
+          className={`rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wide transition-colors md:text-xs ${
+            seccion === 'destacados'
+              ? 'border-accent bg-accent/15 text-accent'
+              : 'border-neutral-800 text-neutral-500 hover:border-neutral-700 hover:text-neutral-300'
+          }`}
+        >
+          Destacados
+        </button>
+        <button
+          type="button"
+          onClick={() => setSeccion('departamentos')}
+          aria-pressed={seccion === 'departamentos'}
+          aria-label={`Ver la lista completa de departamentos de ${nombre}, con su color y cantidad`}
+          className={`rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wide transition-colors md:text-xs ${
+            seccion === 'departamentos'
+              ? 'border-accent bg-accent/15 text-accent'
+              : 'border-neutral-800 text-neutral-500 hover:border-neutral-700 hover:text-neutral-300'
+          }`}
+        >
+          Departamentos
+        </button>
+      </div>
+    )
+  }
+
+  // Versión mobile: tabs de ancho parejo (`flex-1`, ocupan todo el largo
+  // disponible) con línea divisoria vertical entre ambas y una línea de
+  // acento animada debajo de la activa (`layoutId`, mismo patrón que
+  // LayerToggle.tsx pero como subrayado en vez de pastilla) — el segmented
+  // control con fondo pastilla no se leía bien con dos textos de largo tan
+  // distinto ("Destacados" vs "Departamentos").
+  function toggleSeccionMobil(className: string) {
+    return (
+      <div
+        role="group"
+        aria-label="Sección del panel"
+        className={`flex border-b border-neutral-800 ${className}`}
+      >
+        {(
+          [
+            { valor: 'destacados', etiqueta: 'Destacados' },
+            { valor: 'departamentos', etiqueta: 'Departamentos' },
+          ] as const
+        ).map(({ valor, etiqueta }, i) => {
+          const activo = seccion === valor
+          return (
+            <button
+              key={valor}
+              type="button"
+              onClick={() => setSeccion(valor)}
+              aria-pressed={activo}
+              aria-label={
+                valor === 'departamentos'
+                  ? `Ver la lista completa de departamentos de ${nombre}, con su color y cantidad`
+                  : undefined
+              }
+              className={`relative flex-1 px-4 py-3 text-center font-mono text-xs uppercase tracking-wide transition-colors ${
+                i === 0 ? 'border-r border-neutral-800' : ''
+              } ${activo ? 'text-accent' : 'text-neutral-400 hover:text-neutral-200'}`}
+            >
+              {etiqueta}
+              {activo && (
+                <motion.span
+                  layoutId="seccion-panel-linea-mobil"
+                  className="absolute inset-x-6 bottom-0 h-0.5 rounded-full bg-accent"
+                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                />
+              )}
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+
   const gestoBarra = esMobil
     ? {
         onPointerDown: (e: ReactPointerEvent) => {
@@ -262,7 +352,7 @@ function ProvincePanelContent({
       className={
         esMobil
           ? 'pointer-events-auto fixed inset-x-0 bottom-0 z-30 flex flex-col rounded-t-2xl border-t border-neutral-800 bg-neutral-950/98 shadow-2xl backdrop-blur'
-          : 'pointer-events-auto fixed bottom-0 right-0 z-30 flex w-full max-w-md flex-col border-l border-neutral-800 bg-neutral-950/98 shadow-2xl backdrop-blur'
+          : 'pointer-events-auto fixed bottom-0 right-0 z-30 flex w-full max-w-lg flex-col border-l border-neutral-800 bg-neutral-950/98 shadow-2xl backdrop-blur'
       }
     >
       {esMobil && (
@@ -316,6 +406,10 @@ function ProvincePanelContent({
             </div>
           </dl>
         </div>
+        {/* Desktop: el toggle va en la fila, junto al nombre y los números
+            de la provincia, centrado verticalmente contra ese bloque
+            (`self-center` en la fila `items-start`, no `mt-1` a mano). */}
+        {!esMobil && toggleSeccion('shrink-0 self-center')}
         {/* Atajo al mismo destino que el botón de abajo del todo — que en
             mobile, en reposo (peek), vive fuera de la porción visible de la
             hoja (ver PEEK_FRACCION en hojaLayout.ts) y solo se alcanza
@@ -335,26 +429,27 @@ function ProvincePanelContent({
         )}
       </div>
 
+      {/* En mobile las tabs van en su propia fila, fuera de la cabecera: ahí
+          adentro convivían con el botón "Todos" que solo aparece en reposo
+          (peek) y desaparece al expandir — al ser hermano de la columna
+          `flex-1` que contenía las tabs, ese botón entrando y saliendo le
+          cambiaba el ancho disponible y las tabs (con `w-full`) se corrían
+          de lugar cada vez que se expandía o achicaba el panel. Como fila
+          propia el ancho es siempre el del panel completo, sin importar el
+          estado, y el `border-b` de la cabecera de arriba le da la
+          separación visual que faltaba. */}
+      {esMobil && toggleSeccionMobil('')}
+
       <div className="border-b border-neutral-800 px-5 py-3">
         <div className="flex items-center justify-between gap-2">
-          {/* Cambia el contenido de abajo a la lista de departamentos —
-              mismo color, nombre y cantidad que se ven pintados en el mapa —
-              en vez de abrir un modal por encima que tape el resto del
-              panel. El icono `List` es el mismo que el botón "Todos" de más
-              arriba, para que se lea como el mismo gesto (ver-como-lista).
-              Sin acción si ya se está viendo esa sección. Borde + fondo
-              (mismo patrón que el botón "Volver al mapa" de arriba, en vez
-              de solo texto con hover) para que se note que es clickeable. */}
-          <button
-            type="button"
-            onClick={() => setSeccion('departamentos')}
-            disabled={seccion === 'departamentos'}
-            aria-label={`Ver la lista completa de departamentos de ${nombre}, con su color y cantidad`}
-            className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-800 bg-neutral-900 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wide text-neutral-300 transition-colors hover:border-neutral-700 hover:text-neutral-100 disabled:pointer-events-none disabled:opacity-50 md:text-xs"
-          >
-            <List className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            Departamentos · {UNIDAD_CAPA[capaActiva]}
-          </button>
+          {/* Qué representa la barra de color de abajo (total o densidad,
+              según la capa activa) — antes vivía pegado al botón de
+              "Departamentos", pero ese texto es sobre la escala, no sobre la
+              navegación, así que acompaña acá a la barra y al toggle que
+              deciden esa misma unidad. */}
+          <span className="font-mono text-[10px] uppercase tracking-wide text-neutral-500 md:text-xs">
+            {UNIDAD_CAPA[capaActiva]}
+          </span>
           {/* Layer toggle propio: con la provincia abierta, `LayerToggle` de
               MapInfoPanel/mobile queda tapado o desmontado — antes no había
               forma de cambiar de capa sin cerrar el panel. `layoutId`
@@ -393,17 +488,6 @@ function ProvincePanelContent({
           />
         ) : (
           <>
-            {/* Vuelve a destacados en el mismo lugar, sin cerrar ni
-                navegar afuera del panel — la contraparte del botón de arriba
-                que trajo hasta acá. */}
-            <button
-              type="button"
-              onClick={() => setSeccion('destacados')}
-              className="mb-3 flex items-center gap-1.5 font-mono text-xs uppercase tracking-wide text-neutral-500 transition-colors hover:text-neutral-300"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-              Volver a destacados
-            </button>
             <h3 className="mb-3 font-mono text-xs uppercase tracking-wide text-neutral-500">
               Los {departamentosProvincia.length} departamentos
             </h3>
