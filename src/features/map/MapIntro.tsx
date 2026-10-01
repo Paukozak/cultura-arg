@@ -60,10 +60,10 @@ export function MapIntro() {
           style={{ top: headerHeight }}
           // Posición y tamaño del texto — para moverlo, tocar acá:
           //  - `pl-22`: margen izquierdo (22 × 4px = 88px).
-          //  - `pb-[13vh]`: lo sube por encima del centro vertical (sacarlo
+          //  - `pb-[6vh]`: lo sube un poco por encima del centro vertical (sacarlo
           //    para centrarlo del todo).
           //  - `w-[32rem]`: ancho de todo el bloque (margen + texto).
-          className="pointer-events-none fixed bottom-0 left-0 z-20 flex w-[32rem] items-center pb-[13vh] pl-22"
+          className="pointer-events-none fixed bottom-0 left-0 z-20 flex w-[32rem] items-center pb-[6vh] pl-22"
         >
           <motion.div
             variants={contenedor}
