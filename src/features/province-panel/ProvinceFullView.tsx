@@ -1,10 +1,11 @@
 import { ChevronDown, SlidersHorizontal } from 'lucide-react'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, type Variants } from 'motion/react'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { List, type RowComponentProps } from 'react-window'
 import { departamentosResumen } from '../../data/departamentos'
 import { cargarEspacios, type Espacio } from '../../data/espacios'
 import { provinciasGeo } from '../../data/provincias'
+import { EASE_SALIDA, staggerItem } from '../../lib/motion'
 import { useMapStore } from '../../store/mapStore'
 import {
   espaciosDeAgrupador as espaciosDeAgrupadorPuro,
@@ -27,6 +28,27 @@ import {
 } from './filtrarEspacios'
 import { GoogleMapsEmbed } from './GoogleMapsEmbed'
 import { IconoFlechaAtras } from './IconoFlechaAtras'
+
+// Entrada de la vista completa: fundido + leve subida, y sus dos grandes
+// secciones (header, cuerpo) en cascada detrás de ese mismo fundido — ver
+// `staggerItem` en cada una. No se desglosa más adentro (filtros/lista/
+// ficha): la columna izquierda pasa a `display: contents` en `lg:` (ver el
+// comentario junto a esa columna) y `opacity` no tiene efecto ahí, así que
+// animarla por separado se perdería silenciosamente en desktop.
+const vistaCompletaVariants: Variants = {
+  oculto: { opacity: 0, y: 40, scale: 0.97 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.55,
+      ease: EASE_SALIDA,
+      staggerChildren: 0.15,
+      delayChildren: 0.1,
+    },
+  },
+}
 
 /** Nombre de comuna/departamento por id (p. ej. "02007" -> "Comuna 1") — para
  * CABA, donde el filtro de localidad se reemplaza por comuna (ver
@@ -499,13 +521,16 @@ function ProvinceFullViewContent({
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
+      variants={vistaCompletaVariants}
+      initial="oculto"
+      animate="visible"
+      exit="oculto"
       className="fixed inset-0 z-40 flex flex-col bg-neutral-950"
     >
-      <header className="flex items-center gap-3 border-b border-neutral-800 px-6 py-4">
+      <motion.header
+        variants={staggerItem}
+        className="flex items-center gap-3 border-b border-neutral-800 px-6 py-4"
+      >
         <button
           type="button"
           onClick={onCerrar}
@@ -522,7 +547,7 @@ function ProvinceFullViewContent({
             {filtrados.length} de {espacios?.length ?? '…'} espacios
           </p>
         </div>
-      </header>
+      </motion.header>
 
       {errorEspacios ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-neutral-500">
@@ -540,7 +565,10 @@ function ProvinceFullViewContent({
           Cargando espacios…
         </div>
       ) : (
-        <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
+        <motion.div
+          variants={staggerItem}
+          className="flex flex-1 flex-col overflow-hidden md:flex-row"
+        >
           {/* Desktop (`lg:`): tres columnas — filtros, espacios y ficha. Este
               contenedor pasa a `contents` (deja de generar caja) para que
               filtros y lista sean hijos directos de la fila y cada uno sea
@@ -933,7 +961,7 @@ function ProvinceFullViewContent({
               </p>
             )}
           </div>
-        </div>
+        </motion.div>
       )}
     </motion.div>
   )

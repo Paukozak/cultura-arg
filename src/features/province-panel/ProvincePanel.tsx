@@ -5,6 +5,7 @@ import {
   useDragControls,
   useMotionValue,
   type PanInfo,
+  type Variants,
 } from 'motion/react'
 import {
   useEffect,
@@ -18,6 +19,12 @@ import { ContadorAnimado } from '../../components/ContadorAnimado'
 import { departamentosResumen } from '../../data/departamentos'
 import { provinciasGeo } from '../../data/provincias'
 import { useEspacios } from '../../data/useEspacios'
+import { cn } from '../../lib/cn'
+import {
+  EASE_SALIDA,
+  PANEL_LATERAL_TRANSITION,
+  staggerItem,
+} from '../../lib/motion'
 import { useMapStore } from '../../store/mapStore'
 import { useMediaQuery } from '../../utils/useMediaQuery'
 import { useWindowHeight } from '../../utils/useWindowHeight'
@@ -54,7 +61,10 @@ function etiquetaTramo(cortes: number[], i: number) {
 
 // Resorte de la hoja de mobile (entrar, expandir, colapsar y volver a su lugar
 // tras un arrastre): `damping` cerca del crítico para esta `stiffness`
-// (crítico ≈ 2·√stiffness), llega rápido pero sin rebotar de más.
+// (crítico ≈ 2·√stiffness), llega rápido pero sin rebotar de más. Física de
+// gesto propia, no las variantes genéricas de lib/motion.ts: acá el
+// desplazamiento lo maneja un `MotionValue` a mano (`y`), no `initial`/
+// `animate` planos.
 const TRANSICION_HOJA = {
   type: 'spring',
   stiffness: 380,
@@ -62,11 +72,45 @@ const TRANSICION_HOJA = {
   mass: 0.9,
 } as const
 
-function ProvincePanelContent({
+// Cuerpo del panel (todo lo que depende de la provincia elegida): fundido +
+// leve subida al entrar, y sus hijos directos (bloque de nombre/stats, barra
+// de escala, contenido de la sección activa, botón "ver todos") en cascada
+// detrás de ese mismo fundido — ver `staggerItem` en cada uno. Vive en
+// ProvincePanelBody, no en el marco que desliza (ProvincePanelShell): así,
+// al pasar de una provincia a otra con el panel ya abierto, lo que se
+// reemplaza es este contenido (crossfade, `AnimatePresence mode="wait"` con
+// `key={provinciaId}` más abajo), sin que el marco vuelva a jugar su
+// animación de entrada desde el costado/abajo.
+const cuerpoPanelVariants: Variants = {
+  oculto: { opacity: 0, y: 24 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.4,
+      ease: EASE_SALIDA,
+      staggerChildren: 0.12,
+      delayChildren: 0.2,
+    },
+  },
+}
+
+interface GestoBarra {
+  onPointerDown?: (e: ReactPointerEvent) => void
+  onClick?: (e: ReactMouseEvent) => void
+}
+
+function ProvincePanelBody({
   provinciaId,
+  esMobil,
+  expandida,
+  gestoBarra,
   onCerrar,
 }: {
   provinciaId: string
+  esMobil: boolean
+  expandida: boolean
+  gestoBarra: GestoBarra
   onCerrar: () => void
 }) {
   const {
@@ -75,22 +119,322 @@ function ProvincePanelContent({
     reintentar: reintentarEspacios,
   } = useEspacios(provinciaId)
   const abrirVistaCompleta = useMapStore((s) => s.abrirVistaCompleta)
-  const vistaCompleta = useMapStore((s) => s.vistaCompleta)
-  const headerHeight = useMapStore((s) => s.headerHeight)
   const capaActiva = useMapStore((s) => s.capaActiva)
-  const esMobil = useMediaQuery('(max-width: 767px)')
   // Misma condición que App.tsx para mostrar SabiasQueLateral: en pantallas
   // anchas el "¿Sabías que…?" va a la izquierda del mapa; si no, dentro del
   // panel.
   const hayLateral = useMediaQuery('(min-width: 1366px)') && !esMobil
-  const panelRef = useRef<HTMLDivElement>(null)
-  const [expandida, setExpandida] = useState(false)
   // Qué se ve en el contenido del panel: los destacados (default) o la
   // lista de departamentos — no un modal aparte, para no tapar el resto del
   // panel (header, escala, botón de "ver todos") con una capa por encima.
+  // Local a este cuerpo: al cambiar de provincia (remount por `key`) arranca
+  // de nuevo en "destacados", que es lo que se espera al entrar a cualquier
+  // provincia.
   const [seccion, setSeccion] = useState<'destacados' | 'departamentos'>(
     'destacados',
   )
+
+  const provincia = provinciasGeo.features.find(
+    (f) => f.properties.id === provinciaId,
+  )
+  if (!provincia) return null
+  const { nombre, totalEspacios, densidadPor100k } = provincia.properties
+  const destacados = espacios ? getDestacados(provinciaId, espacios) : []
+  const departamentosProvincia = departamentosResumen.filter(
+    (d) => d.provinciaId === provinciaId,
+  )
+  // La escala de color del choropleth es global a propósito (mismo tono en
+  // todo el país para el mismo valor, ver DepartamentosChoropleth.tsx), así
+  // que la barra de abajo muestra los 4 cortes REALES entre colores, cada
+  // uno bajo la unión de dos tramos. Antes se mostraba el mín/máx de la
+  // provincia en los extremos, lo que sugería que los 5 colores repartían
+  // ese rango en partes iguales — y no: el color depende de los cortes
+  // nacionales.
+  // `quantiles()` devuelve los 4 cortes; se usan como borde entre tramos.
+  const cortesEscala = [
+    ...(capaActiva === 'densidad'
+      ? escalasDepartamentos.densidadScale
+      : escalasDepartamentos.totalScale
+    ).quantiles(),
+    Infinity,
+  ]
+
+  // Par de chips Destacados/Departamentos (mismo lenguaje que los de
+  // Categoría/Gestión en ProvinceFullView.tsx). Se llama dos veces —desktop
+  // y mobile— con distinta ubicación en la cabecera (ver más abajo), por eso
+  // vive acá como función en vez de repetir el JSX.
+  function toggleSeccion(className: string) {
+    return (
+      <div
+        role="group"
+        aria-label="Sección del panel"
+        className={cn('flex gap-1.5', className)}
+      >
+        <button
+          type="button"
+          onClick={() => setSeccion('destacados')}
+          aria-pressed={seccion === 'destacados'}
+          className={cn(
+            'rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wide transition-colors md:text-xs',
+            seccion === 'destacados'
+              ? 'border-accent bg-accent/15 text-accent'
+              : 'border-neutral-800 text-neutral-500 hover:border-neutral-700 hover:text-neutral-300',
+          )}
+        >
+          Destacados
+        </button>
+        <button
+          type="button"
+          onClick={() => setSeccion('departamentos')}
+          aria-pressed={seccion === 'departamentos'}
+          aria-label={`Ver la lista completa de departamentos de ${nombre}, con su color y cantidad`}
+          className={cn(
+            'rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wide transition-colors md:text-xs',
+            seccion === 'departamentos'
+              ? 'border-accent bg-accent/15 text-accent'
+              : 'border-neutral-800 text-neutral-500 hover:border-neutral-700 hover:text-neutral-300',
+          )}
+        >
+          Departamentos
+        </button>
+      </div>
+    )
+  }
+
+  // Versión mobile: tabs de ancho parejo (`flex-1`, ocupan todo el largo
+  // disponible) con línea divisoria vertical entre ambas y una línea de
+  // acento animada debajo de la activa (`layoutId`, mismo patrón que
+  // LayerToggle.tsx pero como subrayado en vez de pastilla) — el segmented
+  // control con fondo pastilla no se leía bien con dos textos de largo tan
+  // distinto ("Destacados" vs "Departamentos").
+  function toggleSeccionMobil(className: string) {
+    return (
+      <div
+        role="group"
+        aria-label="Sección del panel"
+        className={cn('flex border-b border-neutral-800', className)}
+      >
+        {(
+          [
+            { valor: 'destacados', etiqueta: 'Destacados' },
+            { valor: 'departamentos', etiqueta: 'Departamentos' },
+          ] as const
+        ).map(({ valor, etiqueta }, i) => {
+          const activo = seccion === valor
+          return (
+            <button
+              key={valor}
+              type="button"
+              onClick={() => setSeccion(valor)}
+              aria-pressed={activo}
+              aria-label={
+                valor === 'departamentos'
+                  ? `Ver la lista completa de departamentos de ${nombre}, con su color y cantidad`
+                  : undefined
+              }
+              className={cn(
+                'relative flex-1 px-4 py-3 text-center font-mono text-xs uppercase tracking-wide transition-colors',
+                i === 0 && 'border-r border-neutral-800',
+                activo
+                  ? 'text-accent'
+                  : 'text-neutral-400 hover:text-neutral-200',
+              )}
+            >
+              {etiqueta}
+              {activo && (
+                <motion.span
+                  layoutId="seccion-panel-linea-mobil"
+                  className="absolute inset-x-6 bottom-0 h-0.5 rounded-full bg-accent"
+                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                />
+              )}
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+
+  return (
+    <motion.div
+      variants={cuerpoPanelVariants}
+      initial="oculto"
+      animate="visible"
+      exit="oculto"
+      className="flex min-h-0 flex-1 flex-col"
+    >
+      <motion.div
+        {...gestoBarra}
+        variants={staggerItem}
+        className={cn(
+          'flex items-start gap-3 border-b border-neutral-800 p-5',
+          esMobil &&
+            'cursor-grab touch-none select-none active:cursor-grabbing',
+        )}
+      >
+        <button
+          type="button"
+          onClick={onCerrar}
+          aria-label="Volver al mapa"
+          className="mt-1 shrink-0 rounded-full border border-neutral-800 p-1.5 text-neutral-400 transition-colors hover:text-neutral-100"
+        >
+          <IconoFlechaAtras />
+        </button>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-semibold text-neutral-100">{nombre}</h2>
+          <dl className="mt-1 flex gap-4 font-mono text-xs text-neutral-400">
+            <div>
+              <dt className="uppercase tracking-wide">Espacios</dt>
+              <dd className="text-neutral-200">
+                <ContadorAnimado valor={totalEspacios} />
+              </dd>
+            </div>
+            <div>
+              <dt className="uppercase tracking-wide">Densidad/100k</dt>
+              <dd className="text-neutral-200">
+                {densidadPor100k === null
+                  ? 's/d'
+                  : formatNumero(densidadPor100k)}
+              </dd>
+            </div>
+          </dl>
+        </div>
+        {/* Desktop: el toggle va en la fila, junto al nombre y los números
+            de la provincia, centrado verticalmente contra ese bloque
+            (`self-center` en la fila `items-start`, no `mt-1` a mano). */}
+        {!esMobil && toggleSeccion('shrink-0 self-center')}
+        {/* Atajo al mismo destino que el botón de abajo del todo — que en
+            mobile, en reposo (peek), vive fuera de la porción visible de la
+            hoja (ver PEEK_FRACCION en hojaLayout.ts) y solo se alcanza
+            expandiendo o scrolleando. Se oculta al expandir: ahí ya entra el
+            de abajo, y no tiene sentido duplicarlo. */}
+        {esMobil && !expandida && (
+          <button
+            type="button"
+            onClick={() => abrirVistaCompleta()}
+            disabled={!espacios}
+            aria-label={`Ver todos los espacios${espacios ? ` (${formatNumero(totalEspacios)})` : ''}`}
+            className="mt-1 flex shrink-0 items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            <List className="h-3.5 w-3.5" aria-hidden="true" />
+            Todos
+          </button>
+        )}
+      </motion.div>
+
+      {/* En mobile las tabs van en su propia fila, fuera de la cabecera: ahí
+          adentro convivían con el botón "Todos" que solo aparece en reposo
+          (peek) y desaparece al expandir — al ser hermano de la columna
+          `flex-1` que contenía las tabs, ese botón entrando y saliendo le
+          cambiaba el ancho disponible y las tabs (con `w-full`) se corrían
+          de lugar cada vez que se expandía o achicaba el panel. Como fila
+          propia el ancho es siempre el del panel completo, sin importar el
+          estado, y el `border-b` de la cabecera de arriba le da la
+          separación visual que faltaba. */}
+      {esMobil && (
+        <motion.div variants={staggerItem}>{toggleSeccionMobil('')}</motion.div>
+      )}
+
+      <motion.div
+        variants={staggerItem}
+        className="border-b border-neutral-800 px-5 py-3"
+      >
+        <div className="flex items-center justify-between gap-2">
+          {/* Qué representa la barra de color de abajo (total o densidad,
+              según la capa activa) — antes vivía pegado al botón de
+              "Departamentos", pero ese texto es sobre la escala, no sobre la
+              navegación, así que acompaña acá a la barra y al toggle que
+              deciden esa misma unidad. */}
+          <span className="font-mono text-[10px] uppercase tracking-wide text-neutral-500 md:text-xs">
+            {UNIDAD_CAPA[capaActiva]}
+          </span>
+          {/* Layer toggle propio: con la provincia abierta, `LayerToggle` de
+              MapInfoPanel/mobile queda tapado o desmontado — antes no había
+              forma de cambiar de capa sin cerrar el panel. `layoutId`
+              distinto (ver LayerToggle.tsx) para no cruzar la animación de
+              la pastilla con esa otra instancia, que sigue montada detrás.
+              `compacto` + `sutil`: más chico y en gris (no el azul de marca)
+              que el toggle grande de MapInfoPanel — acá es una opción
+              secundaria del bloque de departamentos, no el control principal
+              de capa, y con los mismos colores competía con la barra de
+              gradiente de abajo en vez de acompañarla. */}
+          <LayerToggle layoutId="capa-activa-fondo-provincia" compacto sutil />
+        </div>
+        <div className="mt-3 flex overflow-hidden rounded">
+          {pasosActivos().map((color) => (
+            <span
+              key={color}
+              className="h-2 flex-1"
+              style={{ backgroundColor: color }}
+            />
+          ))}
+        </div>
+        <div className="mt-1 flex font-mono text-[10px] text-neutral-500">
+          {cortesEscala.map((_, i) => (
+            <span key={i} className="flex-1 text-center">
+              {etiquetaTramo(cortesEscala, i)}
+            </span>
+          ))}
+        </div>
+      </motion.div>
+
+      <motion.div variants={staggerItem} className="flex-1 overflow-y-auto p-5">
+        {seccion === 'destacados' ? (
+          <>
+            {!hayLateral && <SabiasQueTarjeta provinciaId={provinciaId} />}
+            <DestacadosSeccion
+              espacios={espacios}
+              destacados={destacados}
+              onAbrirFicha={(e) => abrirVistaCompleta(e.id)}
+              error={errorEspacios}
+              onReintentar={reintentarEspacios}
+            />
+          </>
+        ) : (
+          <>
+            <h3 className="mb-3 font-mono text-xs uppercase tracking-wide text-neutral-500">
+              Los {departamentosProvincia.length} departamentos
+            </h3>
+            <DepartamentosLista provinciaId={provinciaId} />
+          </>
+        )}
+      </motion.div>
+
+      <motion.div
+        variants={staggerItem}
+        className="border-t border-neutral-800 p-4"
+      >
+        <button
+          type="button"
+          onClick={() => abrirVistaCompleta()}
+          disabled={!espacios}
+          className="w-full rounded-full bg-accent px-4 py-2.5 text-sm font-medium text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-50"
+        >
+          Ver todos los espacios ({espacios ? formatNumero(totalEspacios) : '…'}
+          )
+        </button>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+/** Marco que desliza (panel lateral en desktop, hoja arrastrable en mobile):
+ * monta y desmonta una sola vez por apertura/cierre del panel, sin volver a
+ * jugar su animación de entrada cuando se pasa de una provincia a otra con
+ * el panel ya abierto — eso lo resuelve el crossfade de `ProvincePanelBody`,
+ * que es lo único que cambia con `provinciaId` acá adentro. */
+function ProvincePanelShell({
+  provinciaId,
+  onCerrar,
+}: {
+  provinciaId: string
+  onCerrar: () => void
+}) {
+  const vistaCompleta = useMapStore((s) => s.vistaCompleta)
+  const headerHeight = useMapStore((s) => s.headerHeight)
+  const esMobil = useMediaQuery('(max-width: 767px)')
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [expandida, setExpandida] = useState(false)
   const dragControls = useDragControls()
   // Con mouse (no con el dedo), al soltar un arrastre el navegador dispara
   // además un `click` sobre lo que quedó bajo el cursor — la agarradera o la
@@ -147,31 +491,6 @@ function ProvincePanelContent({
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [vistaCompleta, onCerrar])
 
-  const provincia = provinciasGeo.features.find(
-    (f) => f.properties.id === provinciaId,
-  )
-  if (!provincia) return null
-  const { nombre, totalEspacios, densidadPor100k } = provincia.properties
-  const destacados = espacios ? getDestacados(provinciaId, espacios) : []
-  const departamentosProvincia = departamentosResumen.filter(
-    (d) => d.provinciaId === provinciaId,
-  )
-  // La escala de color del choropleth es global a propósito (mismo tono en
-  // todo el país para el mismo valor, ver DepartamentosChoropleth.tsx), así
-  // que la barra de abajo muestra los 4 cortes REALES entre colores, cada
-  // uno bajo la unión de dos tramos. Antes se mostraba el mín/máx de la
-  // provincia en los extremos, lo que sugería que los 5 colores repartían
-  // ese rango en partes iguales — y no: el color depende de los cortes
-  // nacionales.
-  // `quantiles()` devuelve los 4 cortes; se usan como borde entre tramos.
-  const cortesEscala = [
-    ...(capaActiva === 'densidad'
-      ? escalasDepartamentos.densidadScale
-      : escalasDepartamentos.totalScale
-    ).quantiles(),
-    Infinity,
-  ]
-
   // Qué hace cada gesto (expandir, colapsar o cerrar) lo decide
   // `destinoTrasArrastre` (hojaLayout.ts), donde tiene sus tests.
   // Si no se cierra, siempre se anima `y` hasta el destino a mano, incluso si
@@ -218,103 +537,13 @@ function ProvincePanelContent({
     setExpandida((valor) => !valor)
   }
 
-  // Par de chips Destacados/Departamentos (mismo lenguaje que los de
-  // Categoría/Gestión en ProvinceFullView.tsx). Se llama dos veces —desktop
-  // y mobile— con distinta ubicación en la cabecera (ver más abajo), por eso
-  // vive acá como función en vez de repetir el JSX.
-  function toggleSeccion(className: string) {
-    return (
-      <div
-        role="group"
-        aria-label="Sección del panel"
-        className={`flex gap-1.5 ${className}`}
-      >
-        <button
-          type="button"
-          onClick={() => setSeccion('destacados')}
-          aria-pressed={seccion === 'destacados'}
-          className={`rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wide transition-colors md:text-xs ${
-            seccion === 'destacados'
-              ? 'border-accent bg-accent/15 text-accent'
-              : 'border-neutral-800 text-neutral-500 hover:border-neutral-700 hover:text-neutral-300'
-          }`}
-        >
-          Destacados
-        </button>
-        <button
-          type="button"
-          onClick={() => setSeccion('departamentos')}
-          aria-pressed={seccion === 'departamentos'}
-          aria-label={`Ver la lista completa de departamentos de ${nombre}, con su color y cantidad`}
-          className={`rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wide transition-colors md:text-xs ${
-            seccion === 'departamentos'
-              ? 'border-accent bg-accent/15 text-accent'
-              : 'border-neutral-800 text-neutral-500 hover:border-neutral-700 hover:text-neutral-300'
-          }`}
-        >
-          Departamentos
-        </button>
-      </div>
-    )
-  }
-
-  // Versión mobile: tabs de ancho parejo (`flex-1`, ocupan todo el largo
-  // disponible) con línea divisoria vertical entre ambas y una línea de
-  // acento animada debajo de la activa (`layoutId`, mismo patrón que
-  // LayerToggle.tsx pero como subrayado en vez de pastilla) — el segmented
-  // control con fondo pastilla no se leía bien con dos textos de largo tan
-  // distinto ("Destacados" vs "Departamentos").
-  function toggleSeccionMobil(className: string) {
-    return (
-      <div
-        role="group"
-        aria-label="Sección del panel"
-        className={`flex border-b border-neutral-800 ${className}`}
-      >
-        {(
-          [
-            { valor: 'destacados', etiqueta: 'Destacados' },
-            { valor: 'departamentos', etiqueta: 'Departamentos' },
-          ] as const
-        ).map(({ valor, etiqueta }, i) => {
-          const activo = seccion === valor
-          return (
-            <button
-              key={valor}
-              type="button"
-              onClick={() => setSeccion(valor)}
-              aria-pressed={activo}
-              aria-label={
-                valor === 'departamentos'
-                  ? `Ver la lista completa de departamentos de ${nombre}, con su color y cantidad`
-                  : undefined
-              }
-              className={`relative flex-1 px-4 py-3 text-center font-mono text-xs uppercase tracking-wide transition-colors ${
-                i === 0 ? 'border-r border-neutral-800' : ''
-              } ${activo ? 'text-accent' : 'text-neutral-400 hover:text-neutral-200'}`}
-            >
-              {etiqueta}
-              {activo && (
-                <motion.span
-                  layoutId="seccion-panel-linea-mobil"
-                  className="absolute inset-x-6 bottom-0 h-0.5 rounded-full bg-accent"
-                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                />
-              )}
-            </button>
-          )
-        })}
-      </div>
-    )
-  }
-
-  const gestoBarra = esMobil
+  const gestoBarra: GestoBarra = esMobil
     ? {
-        onPointerDown: (e: ReactPointerEvent) => {
+        onPointerDown: (e) => {
           if ((e.target as Element).closest('button')) return
           dragControls.start(e)
         },
-        onClick: (e: ReactMouseEvent) => {
+        onClick: (e) => {
           if ((e.target as Element).closest('button')) return
           alternarExpandida()
         },
@@ -352,9 +581,7 @@ function ProvincePanelContent({
       // de una animación mecánica de tiempo fijo. `damping` cerca del
       // crítico para esta `stiffness` (crítico ≈ 2·√stiffness): llega
       // rápido pero sin rebotar de más.
-      transition={
-        esMobil ? TRANSICION_HOJA : { duration: 0.28, ease: 'easeOut' }
-      }
+      transition={esMobil ? TRANSICION_HOJA : PANEL_LATERAL_TRANSITION}
       // Desktop: panel angosto acoplado a la derecha, de la altura completa
       // por debajo del header (`top: headerHeight` en vez de `inset-y-0`:
       // no debe taparse por encima, ahí vive el buscador global — con
@@ -366,22 +593,24 @@ function ProvincePanelContent({
       // reposo solo asome `PEEK_VH` — deslizar hacia arriba la lleva a
       // `translateY(0)` sin que la altura real cambie (ver el comentario
       // junto a `PEEK_VH`).
-      className={
+      className={cn(
+        'pointer-events-auto fixed z-30 flex flex-col shadow-2xl',
         esMobil
-          ? 'pointer-events-auto fixed inset-x-0 bottom-0 z-30 flex flex-col rounded-t-2xl border-t border-neutral-800 bg-neutral-950/98 shadow-2xl'
-          : 'pointer-events-auto fixed bottom-0 right-0 z-30 flex w-full max-w-lg flex-col border-l border-neutral-800 bg-neutral-950/98 shadow-2xl'
-      }
+          ? 'inset-x-0 bottom-0 rounded-t-2xl border-t border-neutral-800 bg-neutral-950/98'
+          : 'bottom-0 right-0 w-full max-w-lg border-l border-neutral-800 bg-neutral-950/98',
+      )}
     >
       {esMobil && (
-        // Agarradera: junto con la barra del nombre (`gestoBarra`, abajo),
-        // el único punto desde donde arranca el arrastre (`dragListener=
-        // {false}` + `dragControls` arriba) — así scrollear la lista de
-        // destacados o tocar sus botones no se confunde con un gesto de
-        // arrastrar la hoja. También responde a un toque simple (`onClick`,
-        // sin arrastrar nada): no todos van a animarse a hacer el gesto de
-        // deslizar, un tap directo alcanza para expandir o volver a achicar.
-        // Es el punto accesible por teclado (un `button` real con etiqueta);
-        // la barra del nombre es solo una comodidad extra para el dedo.
+        // Agarradera: junto con la barra del nombre (`gestoBarra`, en
+        // ProvincePanelBody), el único punto desde donde arranca el arrastre
+        // (`dragListener={false}` + `dragControls` arriba) — así scrollear
+        // la lista de destacados o tocar sus botones no se confunde con un
+        // gesto de arrastrar la hoja. También responde a un toque simple
+        // (`onClick`, sin arrastrar nada): no todos van a animarse a hacer
+        // el gesto de deslizar, un tap directo alcanza para expandir o
+        // volver a achicar. Es el punto accesible por teclado (un `button`
+        // real con etiqueta); la barra del nombre es solo una comodidad
+        // extra para el dedo.
         <button
           type="button"
           onPointerDown={(e) => dragControls.start(e)}
@@ -392,144 +621,16 @@ function ProvincePanelContent({
           <div className="h-1.5 w-10 rounded-full bg-neutral-700" />
         </button>
       )}
-      <div
-        {...gestoBarra}
-        className={`flex items-start gap-3 border-b border-neutral-800 p-5 ${esMobil ? 'cursor-grab touch-none select-none active:cursor-grabbing' : ''}`}
-      >
-        <button
-          type="button"
-          onClick={onCerrar}
-          aria-label="Volver al mapa"
-          className="mt-1 shrink-0 rounded-full border border-neutral-800 p-1.5 text-neutral-400 transition-colors hover:text-neutral-100"
-        >
-          <IconoFlechaAtras />
-        </button>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-semibold text-neutral-100">{nombre}</h2>
-          <dl className="mt-1 flex gap-4 font-mono text-xs text-neutral-400">
-            <div>
-              <dt className="uppercase tracking-wide">Espacios</dt>
-              <dd className="text-neutral-200">
-                <ContadorAnimado valor={totalEspacios} />
-              </dd>
-            </div>
-            <div>
-              <dt className="uppercase tracking-wide">Densidad/100k</dt>
-              <dd className="text-neutral-200">
-                {densidadPor100k === null
-                  ? 's/d'
-                  : formatNumero(densidadPor100k)}
-              </dd>
-            </div>
-          </dl>
-        </div>
-        {/* Desktop: el toggle va en la fila, junto al nombre y los números
-            de la provincia, centrado verticalmente contra ese bloque
-            (`self-center` en la fila `items-start`, no `mt-1` a mano). */}
-        {!esMobil && toggleSeccion('shrink-0 self-center')}
-        {/* Atajo al mismo destino que el botón de abajo del todo — que en
-            mobile, en reposo (peek), vive fuera de la porción visible de la
-            hoja (ver PEEK_FRACCION en hojaLayout.ts) y solo se alcanza
-            expandiendo o scrolleando. Se oculta al expandir: ahí ya entra el
-            de abajo, y no tiene sentido duplicarlo. */}
-        {esMobil && !expandida && (
-          <button
-            type="button"
-            onClick={() => abrirVistaCompleta()}
-            disabled={!espacios}
-            aria-label={`Ver todos los espacios${espacios ? ` (${formatNumero(totalEspacios)})` : ''}`}
-            className="mt-1 flex shrink-0 items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-50"
-          >
-            <List className="h-3.5 w-3.5" aria-hidden="true" />
-            Todos
-          </button>
-        )}
-      </div>
-
-      {/* En mobile las tabs van en su propia fila, fuera de la cabecera: ahí
-          adentro convivían con el botón "Todos" que solo aparece en reposo
-          (peek) y desaparece al expandir — al ser hermano de la columna
-          `flex-1` que contenía las tabs, ese botón entrando y saliendo le
-          cambiaba el ancho disponible y las tabs (con `w-full`) se corrían
-          de lugar cada vez que se expandía o achicaba el panel. Como fila
-          propia el ancho es siempre el del panel completo, sin importar el
-          estado, y el `border-b` de la cabecera de arriba le da la
-          separación visual que faltaba. */}
-      {esMobil && toggleSeccionMobil('')}
-
-      <div className="border-b border-neutral-800 px-5 py-3">
-        <div className="flex items-center justify-between gap-2">
-          {/* Qué representa la barra de color de abajo (total o densidad,
-              según la capa activa) — antes vivía pegado al botón de
-              "Departamentos", pero ese texto es sobre la escala, no sobre la
-              navegación, así que acompaña acá a la barra y al toggle que
-              deciden esa misma unidad. */}
-          <span className="font-mono text-[10px] uppercase tracking-wide text-neutral-500 md:text-xs">
-            {UNIDAD_CAPA[capaActiva]}
-          </span>
-          {/* Layer toggle propio: con la provincia abierta, `LayerToggle` de
-              MapInfoPanel/mobile queda tapado o desmontado — antes no había
-              forma de cambiar de capa sin cerrar el panel. `layoutId`
-              distinto (ver LayerToggle.tsx) para no cruzar la animación de
-              la pastilla con esa otra instancia, que sigue montada detrás.
-              `compacto` + `sutil`: más chico y en gris (no el azul de marca)
-              que el toggle grande de MapInfoPanel — acá es una opción
-              secundaria del bloque de departamentos, no el control principal
-              de capa, y con los mismos colores competía con la barra de
-              gradiente de abajo en vez de acompañarla. */}
-          <LayerToggle layoutId="capa-activa-fondo-provincia" compacto sutil />
-        </div>
-        <div className="mt-3 flex overflow-hidden rounded">
-          {pasosActivos().map((color) => (
-            <span
-              key={color}
-              className="h-2 flex-1"
-              style={{ backgroundColor: color }}
-            />
-          ))}
-        </div>
-        <div className="mt-1 flex font-mono text-[10px] text-neutral-500">
-          {cortesEscala.map((_, i) => (
-            <span key={i} className="flex-1 text-center">
-              {etiquetaTramo(cortesEscala, i)}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-5">
-        {seccion === 'destacados' ? (
-          <>
-            {!hayLateral && <SabiasQueTarjeta provinciaId={provinciaId} />}
-            <DestacadosSeccion
-              espacios={espacios}
-              destacados={destacados}
-              onAbrirFicha={(e) => abrirVistaCompleta(e.id)}
-              error={errorEspacios}
-              onReintentar={reintentarEspacios}
-            />
-          </>
-        ) : (
-          <>
-            <h3 className="mb-3 font-mono text-xs uppercase tracking-wide text-neutral-500">
-              Los {departamentosProvincia.length} departamentos
-            </h3>
-            <DepartamentosLista provinciaId={provinciaId} />
-          </>
-        )}
-      </div>
-
-      <div className="border-t border-neutral-800 p-4">
-        <button
-          type="button"
-          onClick={() => abrirVistaCompleta()}
-          disabled={!espacios}
-          className="w-full rounded-full bg-accent px-4 py-2.5 text-sm font-medium text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-50"
-        >
-          Ver todos los espacios ({espacios ? formatNumero(totalEspacios) : '…'}
-          )
-        </button>
-      </div>
+      <AnimatePresence mode="wait">
+        <ProvincePanelBody
+          key={provinciaId}
+          provinciaId={provinciaId}
+          esMobil={esMobil}
+          expandida={expandida}
+          gestoBarra={gestoBarra}
+          onCerrar={onCerrar}
+        />
+      </AnimatePresence>
     </motion.div>
   )
 }
@@ -541,8 +642,7 @@ export function ProvincePanel() {
   return (
     <AnimatePresence>
       {provinciaId && (
-        <ProvincePanelContent
-          key={provinciaId}
+        <ProvincePanelShell
           provinciaId={provinciaId}
           onCerrar={() => seleccionarProvincia(null)}
         />

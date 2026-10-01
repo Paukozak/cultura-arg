@@ -1,5 +1,6 @@
-import { motion, type Variants } from 'motion/react'
+import { motion } from 'motion/react'
 import type { Espacio } from '../../data/espacios'
+import { staggerContainer, staggerItem } from '../../lib/motion'
 import { ICONOS_POR_CATEGORIA, ICONO_POR_DEFECTO } from './categoriaIcons'
 import { EspacioFoto } from './EspacioFoto'
 import { GoogleMapsEmbed } from './GoogleMapsEmbed'
@@ -7,19 +8,10 @@ import { GoogleMapsEmbed } from './GoogleMapsEmbed'
 // Las tarjetas de destacados entran una tras otra (fundido + subida) al
 // abrirse el panel. La animación va en un contenedor aparte de cada tarjeta,
 // no en la tarjeta misma: esa ya usa `transform` para su elevación en hover
-// (`hover:-translate-y-1`) y las dos se pisarían.
-const listaDestacados: Variants = {
-  oculto: {},
-  visible: { transition: { staggerChildren: 0.08, delayChildren: 0.2 } },
-}
-const itemDestacado: Variants = {
-  oculto: { opacity: 0, y: 18 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] },
-  },
-}
+// (`hover:-translate-y-1`) y las dos se pisarían. `delay`: un respiro para que
+// el título "Destacados" de arriba (su propio paso de la cascada del panel)
+// ya esté a la vista antes de que empiecen a entrar las tarjetas.
+const listaDestacados = staggerContainer({ stagger: 0.12, delay: 0.3 })
 
 function DestacadoCard({
   espacio,
@@ -123,7 +115,7 @@ export function DestacadosSeccion({
           className="flex flex-col gap-3"
         >
           {destacados.map((espacio) => (
-            <motion.div key={espacio.id} variants={itemDestacado}>
+            <motion.div key={espacio.id} variants={staggerItem}>
               <DestacadoCard espacio={espacio} onAbrirFicha={onAbrirFicha} />
             </motion.div>
           ))}
