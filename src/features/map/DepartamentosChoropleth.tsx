@@ -1,6 +1,6 @@
 import type { geoPath } from 'd3-geo'
 import type { FeatureCollection, Geometry } from 'geojson'
-import type { MouseEvent } from 'react'
+import { memo, useMemo, type MouseEvent } from 'react'
 import type { DepartamentoProperties } from '../../data/departamentos'
 import { useMapStore, type Capa } from '../../store/mapStore'
 import {
@@ -35,6 +35,69 @@ interface Props {
   onLeave: () => void
 }
 
+type DepartamentoFeature = FeatureCollection<
+  Geometry,
+  DepartamentoProperties
+>['features'][number]
+
+interface DepartamentoProps {
+  feature: DepartamentoFeature
+  d: string
+  capaActiva: Capa
+  scales: ReturnType<typeof buildColorScales>
+  isHovered: boolean
+  atenuado: boolean
+  onHover: Props['onHover']
+  onLeave: () => void
+  onClick: (id: string) => void
+}
+
+// Memoizado: un movimiento de mouse sobre el mapa re-renderiza al padre, pero
+// a cada path solo le cambian las props cuando entra o sale de hover/atenuado.
+const Departamento = memo(function Departamento({
+  feature: f,
+  d,
+  capaActiva,
+  scales,
+  isHovered,
+  atenuado,
+  onHover,
+  onLeave,
+  onClick,
+}: DepartamentoProps) {
+  const id = f.properties.id
+  const color = colorForFeature(f.properties, capaActiva, scales)
+  const bordeBase = darken(color, 0.35)
+  const alHover = (e: MouseEvent) =>
+    onHover(id, f.properties.nombre, f.properties, e.clientX, e.clientY)
+  return (
+    <path
+      data-departamento={id}
+      d={d}
+      fill={atenuado ? apagarConFondo(color, 0.45) : color}
+      stroke={
+        isHovered
+          ? highlightStroke(color)
+          : atenuado
+            ? apagarConFondo(bordeBase, 0.45)
+            : bordeBase
+      }
+      strokeWidth={isHovered ? 1.75 : 1}
+      strokeLinejoin="round"
+      vectorEffect="non-scaling-stroke"
+      style={{
+        cursor: 'pointer',
+        filter: isHovered ? 'brightness(1.15)' : 'none',
+        transition: 'filter 150ms ease, stroke 150ms ease, fill 150ms ease',
+      }}
+      onMouseEnter={alHover}
+      onMouseMove={alHover}
+      onMouseLeave={onLeave}
+      onClick={() => onClick(id)}
+    />
+  )
+})
+
 /** Choropleth por departamento/partido de la provincia zoomeada (Etapa 9):
  * mismo color plano por `capaActiva` (total/densidad) que las provincias del
  * mapa nacional, a una escala calculada sobre TODOS los departamentos del
@@ -60,6 +123,16 @@ export function DepartamentosChoropleth({
     (s) => s.abrirVistaCompletaPorDepartamento,
   )
   const departamentoResaltado = useMapStore((s) => s.departamentoResaltado)
+  // Generar el `d` recorre cada punto de la geometría: se hace una vez por
+  // provincia/proyección, no en cada movimiento del mouse.
+  const paths = useMemo(
+    () =>
+      (datos?.features ?? []).flatMap((f) => {
+        const d = path(f)
+        return d ? [{ f, d }] : []
+      }),
+    [datos, path],
+  )
   if (!datos) return null
 
   return (
@@ -78,57 +151,22 @@ export function DepartamentosChoropleth({
           lista, ver DepartamentosLista.tsx), el resto se atenúa para que se
           destaque — mismo criterio que las provincias del mapa nacional
           cuando se resalta una desde el ranking (ver NationalMap.tsx). */}
-      {datos.features.map((f) => {
-        const d = path(f)
-        if (!d) return null
+      {paths.map(({ f, d }) => {
         const id = f.properties.id
         const idResaltado = hoveredId ?? departamentoResaltado
         const isHovered = id === idResaltado
-        const atenuado = idResaltado !== null && !isHovered
-        const color = colorForFeature(f.properties, capaActiva, scales)
-        const bordeBase = darken(color, 0.35)
         return (
-          <path
+          <Departamento
             key={id}
-            data-departamento={id}
+            feature={f}
             d={d}
-            fill={atenuado ? apagarConFondo(color, 0.45) : color}
-            stroke={
-              isHovered
-                ? highlightStroke(color)
-                : atenuado
-                  ? apagarConFondo(bordeBase, 0.45)
-                  : bordeBase
-            }
-            strokeWidth={isHovered ? 1.75 : 1}
-            strokeLinejoin="round"
-            vectorEffect="non-scaling-stroke"
-            style={{
-              cursor: 'pointer',
-              filter: isHovered ? 'brightness(1.15)' : 'none',
-              transition:
-                'filter 150ms ease, stroke 150ms ease, fill 150ms ease',
-            }}
-            onMouseEnter={(e: MouseEvent) =>
-              onHover(
-                id,
-                f.properties.nombre,
-                f.properties,
-                e.clientX,
-                e.clientY,
-              )
-            }
-            onMouseMove={(e: MouseEvent) =>
-              onHover(
-                id,
-                f.properties.nombre,
-                f.properties,
-                e.clientX,
-                e.clientY,
-              )
-            }
-            onMouseLeave={() => onLeave()}
-            onClick={() => abrirVistaCompletaPorDepartamento(id)}
+            capaActiva={capaActiva}
+            scales={scales}
+            isHovered={isHovered}
+            atenuado={idResaltado !== null && !isHovered}
+            onHover={onHover}
+            onLeave={onLeave}
+            onClick={abrirVistaCompletaPorDepartamento}
           />
         )
       })}

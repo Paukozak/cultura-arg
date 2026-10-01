@@ -92,7 +92,11 @@ function Ficha({ espacio }: { espacio: Espacio }) {
   const Icono = ICONOS_POR_CATEGORIA[espacio.categoria] ?? ICONO_POR_DEFECTO
   return (
     <div className="flex flex-col gap-5">
-      <EspacioFoto espacio={espacio} className="h-96 w-full" />
+      <EspacioFoto
+        espacio={espacio}
+        className="h-96 w-full"
+        sizes="(min-width: 1024px) 960px, 100vw"
+      />
       <div className="flex items-start gap-3">
         <Icono className="h-8 w-8 shrink-0 text-accent" aria-hidden="true" />
         <div>

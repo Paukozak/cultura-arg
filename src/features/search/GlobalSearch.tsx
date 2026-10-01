@@ -143,7 +143,7 @@ export function GlobalSearch() {
             // provincia abierto, este dropdown puede caer geométricamente
             // debajo de su franja derecha y quedar tapado si no se le da
             // más jerarquía.
-            className="absolute left-0 right-0 top-full z-40 mt-2 max-h-96 overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-950/98 py-1.5 shadow-xl shadow-black/50 backdrop-blur"
+            className="absolute left-0 right-0 top-full z-40 mt-2 max-h-96 overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-950/98 py-1.5 shadow-xl shadow-black/50"
           >
             {resultados.length === 0 ? (
               <p className="px-4 py-3 text-sm text-neutral-500">

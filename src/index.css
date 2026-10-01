@@ -12,10 +12,10 @@
      escala `neutral` activa, nunca un valor fijo. */
   --color-accent-ink: #141414;
 
-  --font-sans: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Space Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
   /* Reservada para datos precisos (coordenadas, años, "ESPACIOS/100K") — no
      para texto corrido, ver nota de diseño en PLAN.md. */
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
 }
 
 :root {

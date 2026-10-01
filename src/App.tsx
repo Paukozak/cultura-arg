@@ -10,6 +10,7 @@ import { NationalMap } from './features/map/NationalMap'
 import { NotFoundPage } from './features/not-found/NotFoundPage'
 import { ProvincePanel } from './features/province-panel/ProvincePanel'
 import { altoPeekPx } from './features/province-panel/hojaLayout'
+import { SabiasQueLateral } from './features/province-panel/SabiasQueLateral'
 import { useMapStore } from './store/mapStore'
 import { useHistorialPaneles } from './utils/useHistorialPaneles'
 import { useMediaQuery } from './utils/useMediaQuery'
@@ -214,6 +215,7 @@ function App() {
       </main>
       {!esMobil && <MapInfoPanel />}
       {!esMobil && hayIntro && <MapIntro />}
+      {!esMobil && hayIntro && <SabiasQueLateral />}
       {/* Mobile: pantalla de bienvenida, una sola vez por dispositivo. */}
       {esMobil && <MapIntroMobil />}
       <ProvincePanel />

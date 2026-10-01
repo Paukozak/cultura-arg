@@ -26,7 +26,7 @@ export function MapInfoPanel() {
       inert={oculto}
       aria-label="Información de la capa del mapa"
       style={{ top: headerHeight }}
-      className="pointer-events-auto fixed bottom-0 right-0 z-20 flex w-full max-w-md flex-col border-l border-neutral-800 bg-neutral-950/98 backdrop-blur"
+      className="pointer-events-auto fixed bottom-0 right-0 z-20 flex w-full max-w-md flex-col border-l border-neutral-800 bg-neutral-950/98"
     >
       <div className="flex flex-col gap-3 border-b border-neutral-800 p-5">
         <h2 className="text-lg font-semibold text-neutral-100">

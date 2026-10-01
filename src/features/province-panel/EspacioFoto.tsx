@@ -1,16 +1,27 @@
 import type { Espacio } from '../../data/espacios'
-import { fotoCuradaPara, nombreMostradoPara } from './curaduriaDestacados'
+import {
+  fotoCuradaPara,
+  nombreMostradoPara,
+  srcSetFoto,
+} from './curaduriaDestacados'
 
 interface Props {
   espacio: Espacio
   className?: string
+  /** Ancho CSS con que se muestra la foto (atributo `sizes`). */
+  sizes?: string
   onClick?: () => void
 }
 
 /** Foto de un espacio: solo se muestra si es uno de los destacados curados a
  * mano (ver destacados-curados.json / public/fotos-destacados/). El resto no
  * tiene foto — se sacó la búsqueda automática en Wikipedia. */
-export function EspacioFoto({ espacio, className, onClick }: Props) {
+export function EspacioFoto({
+  espacio,
+  className,
+  sizes = '480px',
+  onClick,
+}: Props) {
   const curada = fotoCuradaPara(espacio.id)
   if (!curada) return null
 
@@ -22,6 +33,8 @@ export function EspacioFoto({ espacio, className, onClick }: Props) {
       // (`/provincia/:id`), un <img src> relativo se resolvería contra esa
       // URL en vez de la raíz del sitio y la foto daba 404.
       src={`/${curada}`}
+      srcSet={srcSetFoto(curada)}
+      sizes={sizes}
       alt={nombreMostradoPara(espacio.id) ?? espacio.nombre ?? ''}
       loading="lazy"
       className="h-full w-full rounded-lg border border-neutral-800 object-cover"

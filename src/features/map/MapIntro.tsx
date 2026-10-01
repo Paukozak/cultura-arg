@@ -73,7 +73,7 @@ export function MapIntro() {
           >
             <motion.p
               variants={elemento}
-              className="font-mono text-base uppercase tracking-wide text-neutral-500"
+              className="font-mono text-sm uppercase tracking-[0.25em] text-neutral-500"
             >
               Cartografía cultural
             </motion.p>
@@ -83,11 +83,17 @@ export function MapIntro() {
                 el mismo lugar). `pb-1.5` deja lugar a los rabitos de la "y"
                 y la "g" y a la barra, que quedarían cortados por la
                 máscara. */}
-            <h2 className="text-4xl font-semibold leading-tight text-neutral-100">
-              <span className="block overflow-hidden pb-1.5">
+            <h2 className="text-5xl font-bold leading-[1.05] tracking-tight text-neutral-100">
+              <span className="block overflow-hidden pb-2">
                 <motion.span variants={renglon} className="block">
-                  Mirá cuánta{' '}
-                  <span className="relative inline-block text-accent">
+                  La{' '}
+                  <span
+                    className="relative inline-block bg-clip-text text-transparent"
+                    style={{
+                      backgroundImage:
+                        'linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 55%, white))',
+                    }}
+                  >
                     cultura
                     <motion.span
                       variants={subrayado}
@@ -97,9 +103,9 @@ export function MapIntro() {
                   </span>
                 </motion.span>
               </span>
-              <span className="block overflow-hidden pb-1.5">
+              <span className="block overflow-hidden pb-2">
                 <motion.span variants={renglon} className="block">
-                  hay en Argentina
+                  que nos rodea
                 </motion.span>
               </span>
             </h2>
@@ -123,6 +129,13 @@ export function MapIntro() {
             >
               Museos, teatros, bibliotecas, cines, galerías y más, repartidos
               por las provincias.
+            </motion.p>
+
+            <motion.p
+              variants={elemento}
+              className="text-xl font-medium text-neutral-100"
+            >
+              ¿Cuántos te faltan descubrir?
             </motion.p>
 
             <motion.p

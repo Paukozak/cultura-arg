@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -462,6 +463,51 @@ export function NationalMap() {
   }
   const handleLeave = () => setHover(null)
 
+  // Mover el mouse DENTRO de la misma provincia/departamento solo cambia la
+  // posición del tooltip: se escribe directo al DOM (refs) en vez de por
+  // `setState`, que re-renderizaba todo el mapa en cada `mousemove`. Los
+  // refs espejan el estado para saber a qué elemento pertenece el tooltip.
+  const tooltipProvRef = useRef<HTMLDivElement>(null)
+  const tooltipDepRef = useRef<HTMLDivElement>(null)
+  const hoverRef = useRef(hover)
+  const departamentoHoverRef = useRef(departamentoHover)
+  useEffect(() => {
+    hoverRef.current = hover
+    departamentoHoverRef.current = departamentoHover
+  }, [hover, departamentoHover])
+
+  const onHoverDepartamento = useCallback(
+    (
+      id: string,
+      nombre: string,
+      estadisticas: ConEstadisticas,
+      clientX: number,
+      clientY: number,
+    ) => {
+      const svg = svgRef.current
+      const rect = svg?.getBoundingClientRect()
+      if (!svg || !rect) return
+      const x = clientX - rect.left
+      const y = clientY - rect.top
+      const bordeSuperior =
+        svg.closest('main')?.getBoundingClientRect().top ?? 0
+      const abajo = tooltipVaDebajo(
+        clientY - bordeSuperior,
+        ALTO_TOOLTIP_DEPARTAMENTO_PX,
+      )
+      const actual = departamentoHoverRef.current
+      const el = tooltipDepRef.current
+      if (el && actual?.id === id && actual.abajo === abajo) {
+        el.style.left = `${x}px`
+        el.style.top = `${y + (abajo ? 20 : -10)}px`
+        return
+      }
+      setDepartamentoHover({ id, nombre, ...estadisticas, x, y, abajo })
+    },
+    [],
+  )
+  const onLeaveDepartamento = useCallback(() => setDepartamentoHover(null), [])
+
   // Distancia (px de pantalla) entre el cursor y el borde superior visible del
   // mapa: `main` recorta contra el header (ver App.tsx). En coordenadas de
   // pantalla y no del SVG para que valga igual con o sin zoom (el contenedor
@@ -722,8 +768,11 @@ export function NationalMap() {
           // una sombra pensada para hacer flotar el mapa sobre un fondo
           // oscuro; sobre fondo claro se ve como un halo negro pegado al
           // mapa en vez de una sombra de profundidad.
+          // Solo en la vista país (`zoom === null`): con una provincia
+          // zoomeada la sombra del SVG entero (blur de 32px sobre cientos de
+          // departamentos) se recalculaba en cada hover de departamento.
           filter:
-            zoomAsentado && tema === 'dark'
+            zoom === null && zoomAsentado && tema === 'dark'
               ? 'drop-shadow(0 18px 32px rgba(0, 0, 0, 0.65))'
               : 'none',
           // Sin esto, mantener presionado dispara el callout/lupa nativo de
@@ -746,6 +795,12 @@ export function NationalMap() {
             espacioSobreCursor(e.clientY),
             ALTO_TOOLTIP_PROVINCIA_PX,
           )
+          const el = tooltipProvRef.current
+          if (el && hoverRef.current?.abajo === abajo) {
+            el.style.left = `${x}px`
+            el.style.top = `${y + (abajo ? 20 : -10)}px`
+            return
+          }
           setHover((prev) => (prev ? { ...prev, x, y, abajo } : prev))
         }}
         {...gestosToque}
@@ -862,7 +917,7 @@ export function NationalMap() {
                         // mientras el zoom está en transición — ver el comentario
                         // junto a `zoomAsentado`.
                         filter: isHovered
-                          ? 'brightness(1.15) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5))'
+                          ? 'brightness(1.15)'
                           : isSelected && zoomAsentado
                             ? 'drop-shadow(0 0 10px var(--color-accent)) drop-shadow(0 6px 14px rgba(0, 0, 0, 0.55))'
                             : 'none',
@@ -1013,22 +1068,8 @@ export function NationalMap() {
               visible={zoomAsentado}
               datos={departamentosData}
               hoveredId={departamentoHover?.id ?? null}
-              onHover={(id, nombre, estadisticas, clientX, clientY) => {
-                const rect = svgRef.current?.getBoundingClientRect()
-                if (!rect) return
-                setDepartamentoHover({
-                  id,
-                  nombre,
-                  ...estadisticas,
-                  x: clientX - rect.left,
-                  y: clientY - rect.top,
-                  abajo: tooltipVaDebajo(
-                    espacioSobreCursor(clientY),
-                    ALTO_TOOLTIP_DEPARTAMENTO_PX,
-                  ),
-                })
-              }}
-              onLeave={() => setDepartamentoHover(null)}
+              onHover={onHoverDepartamento}
+              onLeave={onLeaveDepartamento}
             />
           )}
         </g>
@@ -1036,6 +1077,7 @@ export function NationalMap() {
 
       {hover && (
         <div
+          ref={tooltipProvRef}
           className={`pointer-events-none absolute z-10 -translate-x-1/2 rounded-lg border border-neutral-800 bg-neutral-950/95 px-3 py-2 text-sm shadow-lg ${
             hover.abajo ? '' : '-translate-y-full'
           }`}
@@ -1052,6 +1094,7 @@ export function NationalMap() {
 
       {departamentoHover && (
         <div
+          ref={tooltipDepRef}
           className={`pointer-events-none absolute z-10 -translate-x-1/2 rounded-lg border border-neutral-800 bg-neutral-950/95 px-3 py-2 text-sm shadow-lg ${
             departamentoHover.abajo ? '' : '-translate-y-full'
           }`}

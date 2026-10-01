@@ -32,6 +32,7 @@ import {
   destinoTrasArrastre,
 } from './hojaLayout'
 import { IconoFlechaAtras } from './IconoFlechaAtras'
+import { SabiasQueTarjeta } from './SabiasQueTarjeta'
 
 function formatNumero(n: number) {
   return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 }).format(n)
@@ -78,6 +79,10 @@ function ProvincePanelContent({
   const headerHeight = useMapStore((s) => s.headerHeight)
   const capaActiva = useMapStore((s) => s.capaActiva)
   const esMobil = useMediaQuery('(max-width: 767px)')
+  // Misma condición que App.tsx para mostrar SabiasQueLateral: en pantallas
+  // anchas el "¿Sabías que…?" va a la izquierda del mapa; si no, dentro del
+  // panel.
+  const hayLateral = useMediaQuery('(min-width: 1366px)') && !esMobil
   const panelRef = useRef<HTMLDivElement>(null)
   const [expandida, setExpandida] = useState(false)
   // Qué se ve en el contenido del panel: los destacados (default) o la
@@ -363,8 +368,8 @@ function ProvincePanelContent({
       // junto a `PEEK_VH`).
       className={
         esMobil
-          ? 'pointer-events-auto fixed inset-x-0 bottom-0 z-30 flex flex-col rounded-t-2xl border-t border-neutral-800 bg-neutral-950/98 shadow-2xl backdrop-blur'
-          : 'pointer-events-auto fixed bottom-0 right-0 z-30 flex w-full max-w-lg flex-col border-l border-neutral-800 bg-neutral-950/98 shadow-2xl backdrop-blur'
+          ? 'pointer-events-auto fixed inset-x-0 bottom-0 z-30 flex flex-col rounded-t-2xl border-t border-neutral-800 bg-neutral-950/98 shadow-2xl'
+          : 'pointer-events-auto fixed bottom-0 right-0 z-30 flex w-full max-w-lg flex-col border-l border-neutral-800 bg-neutral-950/98 shadow-2xl'
       }
     >
       {esMobil && (
@@ -494,13 +499,16 @@ function ProvincePanelContent({
 
       <div className="flex-1 overflow-y-auto p-5">
         {seccion === 'destacados' ? (
-          <DestacadosSeccion
-            espacios={espacios}
-            destacados={destacados}
-            onAbrirFicha={(e) => abrirVistaCompleta(e.id)}
-            error={errorEspacios}
-            onReintentar={reintentarEspacios}
-          />
+          <>
+            {!hayLateral && <SabiasQueTarjeta provinciaId={provinciaId} />}
+            <DestacadosSeccion
+              espacios={espacios}
+              destacados={destacados}
+              onAbrirFicha={(e) => abrirVistaCompleta(e.id)}
+              error={errorEspacios}
+              onReintentar={reintentarEspacios}
+            />
+          </>
         ) : (
           <>
             <h3 className="mb-3 font-mono text-xs uppercase tracking-wide text-neutral-500">

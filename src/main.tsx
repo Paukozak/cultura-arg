@@ -2,6 +2,10 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MotionConfig } from 'motion/react'
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
+// Autohospedadas (variables, subset por unicode-range): sin pedidos a Google
+// Fonts ni CSS bloqueante en el <head>.
+import '@fontsource-variable/space-grotesk/wght.css'
+import '@fontsource-variable/jetbrains-mono/wght.css'
 import './index.css'
 import App from './App.tsx'
 

@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import archivosFotos from 'virtual:fotos-destacados'
 import destacadosCurados from '../../data/destacados-curados.json'
+import { srcSetFoto } from './curaduriaDestacados'
 import { EspacioFoto } from './EspacioFoto'
 import { espacio } from './espacioDePrueba'
 import type { EntradaCurada } from './getDestacados'
@@ -42,5 +43,25 @@ describe('EspacioFoto', () => {
       />,
     )
     expect(html).toBe('')
+  })
+})
+
+describe('EspacioFoto srcset', () => {
+  it('arma el srcset con las variantes webp de 480 y 960px', () => {
+    expect(srcSetFoto('fotos-destacados/chaco3.jpg')).toBe(
+      '/fotos-destacados/chaco3-480.webp 480w, /fotos-destacados/chaco3-960.webp 960w',
+    )
+  })
+
+  it('renderiza srcset y sizes en el <img>', () => {
+    const { id } = entradasConFoto[0]
+    const html = renderToStaticMarkup(
+      <EspacioFoto
+        espacio={espacio({ id, categoria: 'Museos' })}
+        sizes="960px"
+      />,
+    )
+    expect(html).toMatch(/srcSet="[^"]+-480.webp 480w, [^"]+-960.webp 960w"/)
+    expect(html).toContain('sizes="960px"')
   })
 })

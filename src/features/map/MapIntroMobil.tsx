@@ -54,7 +54,11 @@ export function MapIntroMobil() {
             aria-hidden="true"
             animate={{ scale: [1, 1.18, 1], opacity: [0.55, 0.9, 0.55] }}
             transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
-            className="pointer-events-none absolute -right-28 -top-28 h-80 w-80 rounded-full bg-accent/25 blur-3xl"
+            className="pointer-events-none absolute -right-40 -top-40 h-[28rem] w-[28rem]"
+            style={{
+              background:
+                'radial-gradient(circle, color-mix(in srgb, var(--color-accent) 25%, transparent) 0%, transparent 70%)',
+            }}
           />
 
           <motion.div
@@ -69,16 +73,26 @@ export function MapIntroMobil() {
             <div className="flex flex-col gap-5">
               <motion.p
                 variants={elemento}
-                className="font-mono text-sm uppercase tracking-wide text-neutral-500"
+                className="font-mono text-xs uppercase tracking-[0.25em] text-neutral-500"
               >
                 Cartografía cultural
               </motion.p>
               <motion.h2
                 variants={elemento}
-                className="text-4xl font-semibold leading-tight text-neutral-100"
+                className="text-[2.6rem] font-bold leading-[1.05] tracking-tight text-neutral-100"
               >
-                Mirá cuánta <span className="text-accent">cultura</span> hay en
-                Argentina
+                La{' '}
+                <span
+                  className="bg-clip-text text-transparent"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 55%, white))',
+                  }}
+                >
+                  cultura
+                </span>
+                <br />
+                que nos rodea
               </motion.h2>
               <motion.div
                 variants={elemento}
@@ -98,6 +112,12 @@ export function MapIntroMobil() {
               >
                 Museos, teatros, bibliotecas, cines, galerías y más, repartidos
                 por las provincias. El color te muestra dónde hay más.
+              </motion.p>
+              <motion.p
+                variants={elemento}
+                className="text-lg font-medium text-neutral-100"
+              >
+                ¿Cuántos te faltan descubrir?
               </motion.p>
               <motion.p
                 variants={elemento}

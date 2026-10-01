@@ -21,6 +21,13 @@ export function resolverFoto(
   return carpeta ? `${carpeta}/${real}` : real
 }
 
+/** `srcset` con las variantes WebP (480/960px) que genera
+ * scripts/generar-variantes-fotos.mjs junto a cada foto curada. */
+export function srcSetFoto(foto: string): string {
+  const base = foto.replace(/.[^./]+$/, '')
+  return `/${base}-480.webp 480w, /${base}-960.webp 960w`
+}
+
 const TODAS_LAS_ENTRADAS = Object.values(
   destacadosCurados.porProvincia as Record<string, EntradaCurada[]>,
 ).flat()

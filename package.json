@@ -11,9 +11,12 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "fotos:variantes": "node scripts/generar-variantes-fotos.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/space-grotesk": "^5.3.0",
     "d3-geo": "^3.1.1",
     "d3-scale": "^4.0.2",
     "lucide-react": "^1.45.0",
