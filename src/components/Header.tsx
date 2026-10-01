@@ -20,7 +20,13 @@ export function Header() {
   const headerRef = useRef<HTMLElement>(null)
   const setHeaderHeight = useMapStore((s) => s.setHeaderHeight)
   const provinciaSeleccionada = useMapStore((s) => s.provinciaSeleccionada)
+  const seleccionarProvincia = useMapStore((s) => s.seleccionarProvincia)
   const esMobil = useMediaQuery('(max-width: 767px)')
+
+  // Deseleccionar la provincia también cierra la vista completa
+  // (`seleccionarProvincia` la resetea), así que alcanza para volver al mapa
+  // nacional desde cualquier panel.
+  const irAlMapaNacional = () => seleccionarProvincia(null)
 
   useEffect(() => {
     const el = headerRef.current
@@ -48,9 +54,16 @@ export function Header() {
         className="flex flex-col gap-3 border-b border-neutral-800 bg-neutral-950 px-4 py-3"
       >
         <div className="flex items-center justify-between gap-3">
-          <h1 className="flex shrink-0 items-center gap-2 text-base font-semibold tracking-tight text-neutral-100">
-            <img src="/favicon.png" alt="" className="h-6 w-6" />
-            CulturArg
+          <h1 className="shrink-0 text-base font-semibold tracking-tight text-neutral-100">
+            <button
+              type="button"
+              onClick={irAlMapaNacional}
+              aria-label="CulturArg: volver al mapa de toda Argentina"
+              className="flex cursor-pointer items-center gap-2"
+            >
+              <img src="/favicon.png" alt="" className="h-6 w-6" />
+              CulturArg
+            </button>
           </h1>
           <div className="flex shrink-0 items-center gap-2">
             <Acciones />
@@ -72,9 +85,16 @@ export function Header() {
       data-mapa-ui
       className="flex h-16 shrink-0 items-center gap-4 border-b border-neutral-800 bg-neutral-950 px-6"
     >
-      <h1 className="flex shrink-0 items-center gap-2 text-lg font-semibold tracking-tight text-neutral-100">
-        <img src="/favicon.png" alt="" className="h-7 w-7" />
-        CulturArg
+      <h1 className="shrink-0 text-lg font-semibold tracking-tight text-neutral-100">
+        <button
+          type="button"
+          onClick={irAlMapaNacional}
+          aria-label="CulturArg: volver al mapa de toda Argentina"
+          className="flex cursor-pointer items-center gap-2"
+        >
+          <img src="/favicon.png" alt="" className="h-7 w-7" />
+          CulturArg
+        </button>
       </h1>
       <div className="flex flex-1 items-center justify-end gap-3">
         <GlobalSearch />
