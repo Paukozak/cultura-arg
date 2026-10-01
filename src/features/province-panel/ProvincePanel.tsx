@@ -21,7 +21,7 @@ import { useEspacios } from '../../data/useEspacios'
 import { useMapStore } from '../../store/mapStore'
 import { useMediaQuery } from '../../utils/useMediaQuery'
 import { useWindowHeight } from '../../utils/useWindowHeight'
-import { pasosActivos, UNIDAD_CAPA } from '../map/colorScales'
+import { buildColorScales, pasosActivos, UNIDAD_CAPA } from '../map/colorScales'
 import { LayerToggle } from '../map/LayerToggle'
 import { DepartamentosLista } from './DepartamentosLista'
 import { DestacadosSeccion } from './DestacadosSeccion'
@@ -35,6 +35,20 @@ import { IconoFlechaAtras } from './IconoFlechaAtras'
 
 function formatNumero(n: number) {
   return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 }).format(n)
+}
+
+// Misma escala que el choropleth y la lista de departamentos: cuantiles sobre
+// los departamentos de todo el país.
+const escalasDepartamentos = buildColorScales(
+  departamentosResumen.map((properties) => ({ properties })),
+)
+
+// Rango de un tramo de la escala: "<9", "9–17", ..., "≥40". `cortes` trae los
+// bordes superiores de cada tramo (el último es Infinity).
+function etiquetaTramo(cortes: number[], i: number) {
+  if (i === 0) return `<${formatNumero(cortes[0])}`
+  if (i === cortes.length - 1) return `≥${formatNumero(cortes[i - 1])}`
+  return `${formatNumero(cortes[i - 1])}–${formatNumero(cortes[i])}`
 }
 
 // Resorte de la hoja de mobile (entrar, expandir, colapsar y volver a su lugar
@@ -134,26 +148,24 @@ function ProvincePanelContent({
   if (!provincia) return null
   const { nombre, totalEspacios, densidadPor100k } = provincia.properties
   const destacados = espacios ? getDestacados(provinciaId, espacios) : []
-  // Rango de ESTA provincia (no el de los ~529 departamentos del país): la
-  // escala de color del choropleth sí es global a propósito (mismo tono en
-  // todo el país para el mismo valor, ver DepartamentosChoropleth.tsx), pero
-  // mostrar acá ese mínimo/máximo nacional confundía — decía "865" en TODAS
-  // las provincias por igual, sin relación con lo que esa provincia
-  // realmente tiene.
   const departamentosProvincia = departamentosResumen.filter(
     (d) => d.provinciaId === provinciaId,
   )
-  const valoresDepartamentos = departamentosProvincia
-    .map((d) =>
-      capaActiva === 'densidad' ? d.densidadPor100k : d.totalEspacios,
-    )
-    .filter((v): v is number => v !== null)
-  const minDepartamentos = valoresDepartamentos.length
-    ? Math.min(...valoresDepartamentos)
-    : 0
-  const maxDepartamentos = valoresDepartamentos.length
-    ? Math.max(...valoresDepartamentos)
-    : 0
+  // La escala de color del choropleth es global a propósito (mismo tono en
+  // todo el país para el mismo valor, ver DepartamentosChoropleth.tsx), así
+  // que la barra de abajo muestra los 4 cortes REALES entre colores, cada
+  // uno bajo la unión de dos tramos. Antes se mostraba el mín/máx de la
+  // provincia en los extremos, lo que sugería que los 5 colores repartían
+  // ese rango en partes iguales — y no: el color depende de los cortes
+  // nacionales.
+  // `quantiles()` devuelve los 4 cortes; se usan como borde entre tramos.
+  const cortesEscala = [
+    ...(capaActiva === 'densidad'
+      ? escalasDepartamentos.densidadScale
+      : escalasDepartamentos.totalScale
+    ).quantiles(),
+    Infinity,
+  ]
 
   // Qué hace cada gesto (expandir, colapsar o cerrar) lo decide
   // `destinoTrasArrastre` (hojaLayout.ts), donde tiene sus tests.
@@ -471,9 +483,12 @@ function ProvincePanelContent({
             />
           ))}
         </div>
-        <div className="mt-1 flex justify-between font-mono text-[10px] text-neutral-500">
-          <span>{formatNumero(minDepartamentos)}</span>
-          <span>{formatNumero(maxDepartamentos)}</span>
+        <div className="mt-1 flex font-mono text-[10px] text-neutral-500">
+          {cortesEscala.map((_, i) => (
+            <span key={i} className="flex-1 text-center">
+              {etiquetaTramo(cortesEscala, i)}
+            </span>
+          ))}
         </div>
       </div>
 
