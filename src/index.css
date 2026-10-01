@@ -7,9 +7,9 @@
 @theme {
   --color-accent: #3b82f6;
   /* Texto/ícono sobre una superficie de acento (botón activo, pill de
-     marca, badge de cluster de pines) — casi negro en oscuro, casi blanco
-     en claro (ver override más abajo): siempre el extremo opuesto al de la
-     escala `neutral` activa, nunca un valor fijo. */
+     marca) — casi negro en oscuro, casi blanco en claro (ver override más
+     abajo): siempre el extremo opuesto al de la escala `neutral` activa,
+     nunca un valor fijo. */
   --color-accent-ink: #141414;
 
   --font-sans: 'Space Grotesk Variable', ui-sans-serif, system-ui, sans-serif;

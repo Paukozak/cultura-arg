@@ -805,10 +805,10 @@ export function NationalMap() {
         }}
         {...gestosToque}
       >
-        {/* Grupo con zoom: envuelve fichas + etiquetas + pines para que todo
-            se escale/traslade como una sola unidad al entrar a una
-            provincia (Etapa 6). `vectorEffect="non-scaling-stroke"` en los
-            trazos evita que se vean gigantes una vez escalados. */}
+        {/* Grupo con zoom: envuelve fichas + etiquetas para que todo se
+            escale/traslade como una sola unidad al entrar a una provincia
+            (Etapa 6). `vectorEffect="non-scaling-stroke"` en los trazos
+            evita que se vean gigantes una vez escalados. */}
         <g style={zoomGroupStyle} onTransitionEnd={onZoomTransitionEnd}>
           {/* Paso 1: los "lados" de todas las provincias, para que ninguno
             tape la cara de arriba de una provincia vecina. */}
@@ -968,10 +968,10 @@ export function NationalMap() {
                   ETIQUETA_CORTA[feature.properties.id] ??
                   feature.properties.nombre
                 // Una vez zoomeada esta provincia, la etiqueta deja de tener
-                // sentido: a esta escala ya se ve su ficha real con pines. Se
-                // oculta del todo (la ficha del paso 2 sigue ahí, a su
-                // tamaño real, dibujada por el choropleth por departamento
-                // del paso 4 una vez asentado el zoom).
+                // sentido: a esta escala ya se ve su ficha real. Se oculta
+                // del todo (la ficha del paso 2 sigue ahí, a su tamaño real,
+                // dibujada por el choropleth por departamento del paso 4 una
+                // vez asentado el zoom).
                 const zoomeada = isSelected && zoom !== null
                 if (zoomeada) return null
                 const onClick = () =>

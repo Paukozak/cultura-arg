@@ -6,8 +6,7 @@ type Estado =
   | { provinciaId: string; tipo: 'error' }
 
 /** Carga (lazy, cacheada por el import dinámico) los espacios de una
- * provincia. Compartido entre el panel lateral y los pines del mapa
- * nacional para no duplicar la lógica de carga/cancelación. */
+ * provincia, con su lógica de carga/cancelación. */
 export function useEspacios(provinciaId: string | null): {
   espacios: Espacio[] | null
   error: boolean

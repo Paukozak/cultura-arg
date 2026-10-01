@@ -359,9 +359,9 @@ function ProvincePanelContent({
       // por debajo del header (`top: headerHeight` en vez de `inset-y-0`:
       // no debe taparse por encima, ahí vive el buscador global — con
       // `inset-y-0` interceptaba sus clics mientras un panel estaba
-      // abierto). Mobile: taparlo TODO dejaría el mapa recién zoomeado con
-      // sus pines completamente inalcanzable (la Etapa 6 entera), así que
-      // pasa a ser una hoja siempre de la misma altura (casi toda la
+      // abierto). Mobile: taparlo TODO dejaría el mapa recién zoomeado (la
+      // Etapa 6 entera) completamente inalcanzable, así que pasa a ser una
+      // hoja siempre de la misma altura (casi toda la
       // pantalla) pero corrida hacia abajo con `translateY` para que en
       // reposo solo asome `PEEK_VH` — deslizar hacia arriba la lleva a
       // `translateY(0)` sin que la altura real cambie (ver el comentario

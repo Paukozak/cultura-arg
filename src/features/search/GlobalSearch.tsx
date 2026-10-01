@@ -75,7 +75,7 @@ export function GlobalSearch() {
 
   function elegir(resultado: ResultadoBusqueda) {
     // En los tres casos, seleccionar la provincia primero (dispara el zoom
-    // + pines de la Etapa 6) y recién después abrir ficha/lista — al revés,
+    // de la Etapa 6) y recién después abrir ficha/lista — al revés,
     // seleccionarProvincia pisa `vistaCompleta` de vuelta a false.
     if (resultado.tipo === 'provincia') {
       seleccionarProvincia(resultado.id)
