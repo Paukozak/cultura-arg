@@ -69,6 +69,21 @@ interface MapState {
    * para reemplazar toda la pantalla por NotFoundPage. */
   paginaNoEncontrada: boolean
   setPaginaNoEncontrada: (valor: boolean) => void
+  /** Rectángulo en pantalla (coordenadas de viewport) del <path> de la
+   * provincia seleccionada en el mapa nacional, una vez asentado el zoom —
+   * lo mide NationalMap (ver el efecto junto a `zoomAsentado` ahí) y lo usa
+   * SiluetaViajera como punto de partida real de la transición "shared
+   * element" hacia la vista completa. `id` identifica a qué provincia
+   * corresponde, para no usar un rect viejo de otra provincia mientras el
+   * nuevo todavía no se midió. */
+  origenSiluetaRect: {
+    id: string
+    left: number
+    top: number
+    width: number
+    height: number
+  } | null
+  setOrigenSiluetaRect: (rect: MapState['origenSiluetaRect']) => void
 }
 
 const TEMA_KEY = 'cca-tema'
@@ -139,4 +154,6 @@ export const useMapStore = create<MapState>((set) => ({
     }),
   paginaNoEncontrada: false,
   setPaginaNoEncontrada: (valor) => set({ paginaNoEncontrada: valor }),
+  origenSiluetaRect: null,
+  setOrigenSiluetaRect: (rect) => set({ origenSiluetaRect: rect }),
 }))

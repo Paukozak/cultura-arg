@@ -1,0 +1,293 @@
+import {
+  animate,
+  motion,
+  usePresence,
+  useReducedMotion,
+  type AnimationPlaybackControls,
+} from 'motion/react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import {
+  DURACION_VIAJE_ENTRADA,
+  DURACION_SALIDA_VISTA,
+  EASE_ARCO_REZAGO,
+  EASE_ATERRIZAJE_Y,
+  EASE_SALIDA,
+  EASE_VIAJE,
+} from '../../lib/motion'
+import { useMapStore } from '../../store/mapStore'
+import { useMediaQuery } from '../../utils/useMediaQuery'
+import { bboxProvincia } from './bboxSilueta'
+import {
+  desplazamientoHacia,
+  type Desplazamiento,
+  type Rect,
+} from './rectProvinciaMapa'
+import { SiluetaProvincia } from './SiluetaProvincia'
+
+const ALTO_DESKTOP_PX = 56
+const ALTO_MOBIL_PX = 40
+
+// Por encima de la vista completa (z-40) y de su contenido, para que la
+// silueta se vea volar sobre todo, pero por debajo de los modales (z-50).
+const Z_SILUETA = 45
+
+const ASENTADA: Desplazamiento = { x: 0, y: 0, scale: 1 }
+
+// El viaje se reparte en tres capas anidadas (botón = X, `capaY` = Y,
+// `capaEscala` = escala con origen arriba a la izquierda) para que cada eje
+// tenga su propia curva y el recorrido sea un arco, no una recta. Como
+// translateX · translateY · scale == translate(x, y) scale(s), la posición
+// de partida y la asentada son idénticas a las de un único transform.
+const tX = (v: number) => `translateX(${v}px)`
+const tY = (v: number) => `translateY(${v}px)`
+const esc = (v: number) => `scale(${v})`
+
+/** Transición "shared element" entre el mapa nacional y la vista completa: la
+ * silueta de la provincia "viaja" desde el lugar donde estaba su ficha en el
+ * mapa (medido por NationalMap, ver `origenSiluetaRect` en mapStore) hasta el
+ * badge junto al título. Al cerrar no hay viaje de vuelta: se desvanece.
+ *
+ * A propósito NO se usa `layoutId` con el `<path>` del mapa: el mapa vive en
+ * el viewBox fijo de un `<svg>` pensado para el país entero y este badge en
+ * coordenadas normales del DOM — animar un layout entre dos sistemas de
+ * coordenadas tan distintos deforma la silueta a mitad de camino.
+ *
+ * Tampoco vive dentro del árbol de la vista completa: lo que viaja es un
+ * elemento `position: fixed` en un portal sobre `document.body`. Si fuera un
+ * hijo del header/overlay, heredaría su opacidad (se vería tenue mientras el
+ * fondo aparece) y su opacidad quedaría atada a la de él en la salida.
+ * En el header solo queda un hueco invisible
+ * (`placeholderRef`) que reserva el layout y da el rect de destino.
+ *
+ * El viaje es un `transform` (translate + scale, origen arriba a la izquierda)
+ * sobre un elemento ya dibujado en su rect final: entrada = de (origen) a la
+ * posición asentada. Va en arco: X, Y y la
+ * escala se animan en capas separadas, cada una con su curva (ver
+ * `EASE_ARCO_REZAGO`/`EASE_ATERRIZAJE_Y` en lib/motion.ts).
+ *
+ * Todo se anima con `animate(elemento, { transform | opacity })`, que Motion
+ * delega en la Web Animations API: `transform` y `opacity` corren en el
+ * compositor, fuera del hilo principal. Es a propósito: con valores animados
+ * desde JavaScript cada cuadro dependía del hilo principal, y el layout/
+ * pintado de la vista completa (una lista, un iframe de Google Maps, el mapa
+ * entero detrás) lo frenaba justo al arrancar — se sentía como un tirón.
+ *
+ * Es además un `<button>`: cierra la vista completa SIN deseleccionar la
+ * provincia, para volver al mapa de departamentos zoomeado.
+ */
+export function SiluetaViajera({
+  provinciaId,
+  nombreProvincia,
+  onVolver,
+}: {
+  provinciaId: string
+  nombreProvincia: string
+  onVolver: () => void
+}) {
+  const esMobil = useMediaQuery('(max-width: 767px)')
+  const reducirMovimiento = useReducedMotion()
+  const altoPx = esMobil ? ALTO_MOBIL_PX : ALTO_DESKTOP_PX
+  const aspect = useMemo(
+    () => bboxProvincia(provinciaId)?.aspect ?? 1,
+    [provinciaId],
+  )
+  const tamaño = useMemo(
+    () => ({ height: altoPx, width: altoPx * aspect }),
+    [altoPx, aspect],
+  )
+
+  const origen = useMapStore((s) => s.origenSiluetaRect)
+  const [presente, safeToRemove] = usePresence()
+
+  const placeholderRef = useRef<HTMLDivElement>(null)
+  // Rect del hueco del header, en coordenadas de viewport. `null` hasta que
+  // se mide (primer layout), y se mantiene al día ante resize para que la
+  // silueta, una vez asentada, siga pegada al header.
+  const [destino, setDestino] = useState<Rect | null>(null)
+
+  const botonRef = useRef<HTMLButtonElement>(null)
+  const capaYRef = useRef<HTMLDivElement>(null)
+  const capaEscalaRef = useRef<HTMLDivElement>(null)
+  const entrada = useRef<AnimationPlaybackControls[]>([])
+  const arranco = useRef(false)
+  // Desplazamiento de partida, fijado UNA vez al medir el destino (el mismo
+  // valor en cada render posterior), así React nunca vuelve a tocar
+  // `transform`/`opacity` y no pisa lo que dejaron las animaciones.
+  const [inicial, setInicial] = useState<Desplazamiento | null>(null)
+
+  useLayoutEffect(() => {
+    const el = placeholderRef.current
+    if (!el) return
+    const medir = () => {
+      const r = el.getBoundingClientRect()
+      if (r.width === 0 || r.height === 0) return
+      const rect = {
+        left: r.left,
+        top: r.top,
+        width: r.width,
+        height: r.height,
+      }
+      const viaja = !reducirMovimiento && origen?.id === provinciaId
+      setInicial(
+        (previo) =>
+          previo ?? (viaja ? desplazamientoHacia(origen, rect) : ASENTADA),
+      )
+      setDestino(rect)
+    }
+    medir()
+    const observer = new ResizeObserver(medir)
+    observer.observe(el)
+    window.addEventListener('resize', medir)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', medir)
+    }
+    // Se monta una vez por provincia (ver `key` en ProvinceFullView.tsx): el
+    // origen y `reducirMovimiento` que cuentan son los de ese momento.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Entrada: una sola vez, apenas el botón ya está en el DOM en su posición
+  // de partida (invisible).
+  useEffect(() => {
+    const el = botonRef.current
+    const capaY = capaYRef.current
+    const capaEscala = capaEscalaRef.current
+    if (!destino || !el || !capaY || !capaEscala) return
+    if (arranco.current || inicial === null) return
+    arranco.current = true
+    const viaja = inicial !== ASENTADA
+    const duration = DURACION_VIAJE_ENTRADA
+    // Opacidad corta: la silueta (color plano) se funde sobre la ficha del
+    // mapa (coroplético) en el primer tramo del viaje, en vez de aparecer de
+    // golpe encima.
+    entrada.current = [
+      animate(el, { opacity: [0, 1] }, { duration: 0.3, ease: EASE_SALIDA }),
+      ...(viaja
+        ? [
+            // X rezagada, Y líder (con un asomo de overshoot al aterrizar):
+            // juntas dibujan un arco.
+            animate(
+              el,
+              { transform: [tX(inicial.x), tX(0)] },
+              { duration, ease: EASE_ARCO_REZAGO },
+            ),
+            animate(
+              capaY,
+              { transform: [tY(inicial.y), tY(0)] },
+              { duration, ease: EASE_ATERRIZAJE_Y },
+            ),
+            animate(
+              capaEscala,
+              { transform: [esc(inicial.scale), esc(1)] },
+              { duration, ease: EASE_VIAJE },
+            ),
+          ]
+        : []),
+    ]
+  }, [destino, inicial])
+
+  // Salida: AnimatePresence mantiene montada la vista completa hasta que
+  // esto llame a `safeToRemove`. Se anima a mano (en vez de `exit=`) porque
+  // la silueta no cuelga del overlay (vive en un portal): sin esto se
+  // quedaría en pantalla. Sin efectos: se desvanece junto con el resto de la
+  // vista, quedándose donde esté (si la entrada seguía en vuelo, se congela
+  // en la posición actual).
+  useEffect(() => {
+    if (presente) return
+    const el = botonRef.current
+    const capaY = capaYRef.current
+    const capaEscala = capaEscalaRef.current
+    if (!el || !capaY || !capaEscala) {
+      safeToRemove?.()
+      return
+    }
+    const estiloBoton = getComputedStyle(el)
+    const transformX = estiloBoton.transform
+    const opacidadActual = estiloBoton.opacity
+    const transformY = getComputedStyle(capaY).transform
+    const transformEscala = getComputedStyle(capaEscala).transform
+    entrada.current.forEach((c) => c.cancel())
+    el.style.transform = transformX
+    el.style.opacity = opacidadActual
+    capaY.style.transform = transformY
+    capaEscala.style.transform = transformEscala
+    animate(
+      el,
+      { opacity: [Number(opacidadActual), 0] },
+      { duration: DURACION_SALIDA_VISTA, ease: EASE_SALIDA },
+    ).then(() => safeToRemove?.())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presente])
+
+  return (
+    <>
+      <div
+        ref={placeholderRef}
+        className="shrink-0"
+        style={tamaño}
+        aria-hidden="true"
+      />
+      {destino &&
+        inicial !== null &&
+        createPortal(
+          <button
+            ref={botonRef}
+            type="button"
+            onClick={onVolver}
+            disabled={!presente}
+            aria-label={
+              nombreProvincia
+                ? `Volver al mapa de ${nombreProvincia}`
+                : 'Volver al mapa'
+            }
+            title="Ver departamentos"
+            className="appearance-none rounded-md border-0 bg-transparent p-0"
+            style={{
+              position: 'fixed',
+              left: destino.left,
+              top: destino.top,
+              width: destino.width,
+              height: destino.height,
+              zIndex: Z_SILUETA,
+              transform: tX(inicial.x),
+              opacity: 0,
+              // La vista completa se está yendo: que un clic no la reabra ni
+              // dispare otro cierre a mitad de camino.
+              pointerEvents: presente ? 'auto' : 'none',
+            }}
+          >
+            <div
+              ref={capaYRef}
+              className="h-full w-full"
+              style={{ transform: tY(inicial.y) }}
+            >
+              <div
+                ref={capaEscalaRef}
+                className="h-full w-full"
+                style={{
+                  transformOrigin: 'top left',
+                  transform: esc(inicial.scale),
+                }}
+              >
+                {/* El hover/focus escala esta capa interna (no las que ya
+                    llevan el transform del viaje) para no pelearse con ellas. */}
+                <motion.span
+                  className="block h-full w-full"
+                  whileHover={{ scale: 1.06 }}
+                  whileFocus={{ scale: 1.06 }}
+                >
+                  <SiluetaProvincia
+                    provinciaId={provinciaId}
+                    className="h-full w-full"
+                  />
+                </motion.span>
+              </div>
+            </div>
+          </button>,
+          document.body,
+        )}
+    </>
+  )
+}

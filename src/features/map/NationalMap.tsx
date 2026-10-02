@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -18,6 +19,12 @@ import {
   type ProvinciaFeature,
 } from '../../data/provincias'
 import { useDepartamentos } from '../../data/useDepartamentos'
+import {
+  EASE_SALIDA_CSS,
+  EASE_VIAJE_CSS,
+  MS_FONDO_VISTA,
+  MS_SALIDA_VISTA,
+} from '../../lib/motion'
 import { useMapStore, type Capa } from '../../store/mapStore'
 import { useMediaQuery } from '../../utils/useMediaQuery'
 import {
@@ -192,6 +199,7 @@ export function NationalMap() {
   const provinciaResaltada = useMapStore((s) => s.provinciaResaltada)
   const provinciaSeleccionada = useMapStore((s) => s.provinciaSeleccionada)
   const seleccionarProvincia = useMapStore((s) => s.seleccionarProvincia)
+  const setOrigenSiluetaRect = useMapStore((s) => s.setOrigenSiluetaRect)
   const esMobil = useMediaQuery('(max-width: 767px)')
   // `abajo`: el tooltip no entra arriba del cursor (ver `tooltipVaDebajo`).
   const [hover, setHover] = useState<{
@@ -317,6 +325,7 @@ export function NationalMap() {
   )
 
   const svgRef = useRef<SVGSVGElement>(null)
+  const contenedorRef = useRef<HTMLDivElement>(null)
 
   // Cuadro real (en px) donde el SVG se dibuja — cambia de forma en mobile
   // cuando aparece/desaparece la hoja inferior (ver `coverFit` arriba). Solo
@@ -418,6 +427,70 @@ export function NationalMap() {
       setZoomAsentado(true)
     }
   }
+
+  // El mapa "se aleja" mientras la vista completa está abierta: se achica un
+  // poco y se atenúa, en vez de apagarse con un fade plano. Solo `scale` y
+  // `opacity` (corren en el compositor): un `filter` obligaría a re-rasterizar
+  // el mapa en cada cuadro. La vista completa lo tapa con un fondo opaco que se abre en círculo desde la provincia (ver
+  // `fondoVariants` en ProvinceFullView.tsx), así que esto se ve sobre todo
+  // en el borde de ese círculo, durante su entrada/salida — y evita que la
+  // ficha de la provincia se vea a pleno color junto a la silueta viajera
+  // (ver SiluetaViajera.tsx), como si hubiera dos copias superpuestas.
+  //
+  // Se aplica a mano sobre el elemento (suscripción al store, no un selector
+  // de React): leer `vistaCompleta` con `useMapStore(...)` re-renderizaba todo
+  // el mapa (cientos de paths SVG) justo al abrir/cerrar la vista, y ese
+  // render de ~90 ms congelaba el primer cuadro de la animación de la silueta.
+  // Usa la propiedad `scale` (no `transform`, que ya lleva el zoom) y la MISMA
+  // duración que el fondo de la vista completa (`DURACION_FONDO_VISTA` al
+  // abrir, `DURACION_SALIDA_VISTA` al cerrar; lib/motion.ts) — no `ZOOM_MS`
+  // (esa es del paneo del zoom).
+  useLayoutEffect(() => {
+    const aplicar = (abierta: boolean) => {
+      const el = contenedorRef.current
+      if (!el) return
+      const fondo = abierta
+        ? `${MS_FONDO_VISTA}ms ${EASE_VIAJE_CSS}`
+        : `${MS_SALIDA_VISTA}ms ${EASE_SALIDA_CSS}`
+      el.style.transition = `transform ${ZOOM_MS}ms ${ZOOM_EASING}, scale ${fondo}, opacity ${fondo}`
+      el.style.scale = abierta ? '0.97' : '1'
+      el.style.opacity = abierta ? '0.55' : '1'
+    }
+    aplicar(useMapStore.getState().vistaCompleta)
+    return useMapStore.subscribe((estado, previo) => {
+      if (estado.vistaCompleta !== previo.vistaCompleta) {
+        aplicar(estado.vistaCompleta)
+      }
+    })
+  }, [])
+
+  // Rectángulo real en pantalla del <path> de la provincia seleccionada —
+  // lo consume SiluetaViajera (ProvinceFullView.tsx) como punto de partida
+  // de la transición "shared element" hacia la vista completa. Se mide
+  // recién con el zoom ya asentado (no a mitad de la transición, donde el
+  // rect cambia en cada frame) y se vuelve a medir ante un resize mientras
+  // la provincia siga elegida, para que quede al día si la vista completa
+  // se abre después de cambiar el tamaño de la ventana.
+  useEffect(() => {
+    if (!provinciaSeleccionada || !zoomAsentado) return
+    const medir = () => {
+      const el = svgRef.current?.querySelector<SVGPathElement>(
+        `path[data-provincia="${provinciaSeleccionada}"]`,
+      )
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      setOrigenSiluetaRect({
+        id: provinciaSeleccionada,
+        left: r.left,
+        top: r.top,
+        width: r.width,
+        height: r.height,
+      })
+    }
+    medir()
+    window.addEventListener('resize', medir)
+    return () => window.removeEventListener('resize', medir)
+  }, [provinciaSeleccionada, zoomAsentado, setOrigenSiluetaRect])
 
   // Ojo: a propósito NO se usa `transform-origin` para anclar el zoom al
   // punto (cx, cy). Si el origen cambiara entre el estado zoomeado y el
@@ -743,12 +816,12 @@ export function NationalMap() {
 
   return (
     <div
+      ref={contenedorRef}
       className="relative h-full"
       style={{
         transform: zoom
           ? `translateY(-${headerHeight / 2}px)`
           : 'translateY(0px)',
-        transition: `transform ${ZOOM_MS}ms ${ZOOM_EASING}`,
       }}
     >
       <svg
