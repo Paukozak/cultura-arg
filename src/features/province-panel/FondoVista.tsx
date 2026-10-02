@@ -2,7 +2,7 @@ import {
   animate,
   usePresence,
   useReducedMotion,
-  type AnimationPlaybackControls,
+  type AnimationPlaybackControlsWithThen,
 } from 'motion/react'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import {
@@ -109,7 +109,7 @@ export function FondoVista({ provinciaId }: { provinciaId: string }) {
   const [presente, safeToRemove] = usePresence()
   const fondoRef = useRef<HTMLDivElement>(null)
   const coberturaRef = useRef<HTMLDivElement>(null)
-  const animacion = useRef<AnimationPlaybackControls | null>(null)
+  const animacion = useRef<AnimationPlaybackControlsWithThen | null>(null)
   const progreso = useRef(0)
 
   const [apertura] = useState<Apertura | null>(() =>
@@ -121,7 +121,7 @@ export function FondoVista({ provinciaId }: { provinciaId: string }) {
     if (!fondo) return
     animacion.current?.cancel()
     let cancelado = false
-    let controles: AnimationPlaybackControls
+    let controles: AnimationPlaybackControlsWithThen
 
     // Fundido: sin apertura, o sin a dónde volver al cerrar.
     const hayRetorno =
@@ -163,9 +163,12 @@ export function FondoVista({ provinciaId }: { provinciaId: string }) {
     animacion.current = controles
 
     if (!presente) {
-      Promise.all([controles]).then(() => {
+      const intentarRemover = () => {
         if (!cancelado) safeToRemove?.()
-      })
+      }
+      // Segundo callback: si la animación se cancela o se reemplaza (rechazo),
+      // igual removemos el elemento cuando el efecto no fue cancelado.
+      controles.then(intentarRemover, intentarRemover)
     }
     return () => {
       cancelado = true

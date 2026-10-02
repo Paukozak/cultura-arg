@@ -303,9 +303,12 @@ export function SiluetaViajera({
         ),
       ]
     }
-    Promise.all(entrada.current).then(() => {
+    const intentarRemover = () => {
       if (!cancelado) safeToRemove?.()
-    })
+    }
+    // Segundo callback: si alguna animación se cancela o se reemplaza (rechazo),
+    // igual removemos el elemento cuando el efecto no fue cancelado.
+    Promise.all(entrada.current).then(intentarRemover, intentarRemover)
     return () => {
       cancelado = true
     }
