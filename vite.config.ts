@@ -42,6 +42,11 @@ function fotosDestacadosPlugin(): Plugin {
 export default defineConfig({
   plugins: [react(), tailwindcss(), fotosDestacadosPlugin()],
   build: {
+    // El chunk `indice-busqueda` (~1MB, ~186kB con gzip) es el índice de datos
+    // del buscador: ya se carga con import() dinámico solo al buscar, así que
+    // el aviso por superar los 500kB es ruido. Se sube el límite justo por
+    // encima para que avise si aparece otro chunk grande.
+    chunkSizeWarningLimit: 1100,
     rollupOptions: {
       output: {
         // Separa las librerías grandes en sus propios chunks (cacheables

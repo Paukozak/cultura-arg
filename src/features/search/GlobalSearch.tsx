@@ -2,6 +2,7 @@ import { MapPin } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useMapStore } from '../../store/mapStore'
+import { useMediaQuery } from '../../utils/useMediaQuery'
 import {
   ICONOS_POR_CATEGORIA,
   ICONO_POR_DEFECTO,
@@ -15,6 +16,8 @@ import {
 const QUERY_MINIMA = 2
 
 export function GlobalSearch() {
+  // En mobile el input es angosto: el placeholder completo queda cortado.
+  const esMobil = useMediaQuery('(max-width: 767px)')
   const [query, setQuery] = useState('')
   const [abierto, setAbierto] = useState(false)
   const [indiceActivo, setIndiceActivo] = useState(0)
@@ -122,7 +125,11 @@ export function GlobalSearch() {
         }}
         onFocus={() => setAbierto(true)}
         onKeyDown={onKeyDown}
-        placeholder="Buscar provincia, departamento, localidad o espacio…"
+        placeholder={
+          esMobil
+            ? 'Buscar provincia, localidad…'
+            : 'Buscar provincia, departamento, localidad o espacio…'
+        }
         className="w-full rounded-full border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-accent"
         role="combobox"
         aria-autocomplete="list"
