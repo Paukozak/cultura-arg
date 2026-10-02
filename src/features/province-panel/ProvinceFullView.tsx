@@ -1,10 +1,5 @@
 import { ChevronDown, SlidersHorizontal } from 'lucide-react'
-import {
-  AnimatePresence,
-  motion,
-  useReducedMotion,
-  type Variants,
-} from 'motion/react'
+import { AnimatePresence, motion, type Variants } from 'motion/react'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { List, type RowComponentProps } from 'react-window'
 import { departamentosResumen } from '../../data/departamentos'
@@ -12,10 +7,8 @@ import { cargarEspacios, type Espacio } from '../../data/espacios'
 import { provinciasGeo } from '../../data/provincias'
 import {
   DELAY_ENTRADA_CONTENIDO,
-  DURACION_FONDO_VISTA,
-  DURACION_SALIDA_VISTA,
+  DURACION_SALIDA_CONTENIDO,
   EASE_SALIDA,
-  EASE_VIAJE,
 } from '../../lib/motion'
 import { useMapStore } from '../../store/mapStore'
 import {
@@ -37,87 +30,51 @@ import {
   ORDEN_LABEL,
   type Orden,
 } from './filtrarEspacios'
+import { FondoVista } from './FondoVista'
 import { GoogleMapsEmbed } from './GoogleMapsEmbed'
 import { IconoFlechaAtras } from './IconoFlechaAtras'
 import { SiluetaViajera } from './SiluetaViajera'
 
-// Coreografía de la vista completa (tiempos en lib/motion.ts). ENTRADA: el
-// fondo tapa el mapa y el panel mientras la silueta viaja por ENCIMA (ver
-// SiluetaViajera, vive en un portal); el contenido entra recién al final.
-// SALIDA: sin efectos, todo (fondo, contenido y silueta) se desvanece junto y
-// rápido, y el mapa vuelve a su estado.
+// Coreografía de la vista completa (tiempos en lib/motion.ts). ENTRADA: la
+// silueta de la provincia se abre hasta ocupar la pantalla y la vista se ve a
+// través de ella, con un contorno de color adelante (ver
+// FondoVista) mientras la silueta viaja por ENCIMA (ver SiluetaViajera, vive
+// en un portal); el contenido entra recién al final. SALIDA: el espejo — el
+// contenido se va primero y rápido, el fondo se contrae sobre la provincia en
+// el mapa y la silueta vuelve volando a su lugar.
 
-/** Fondo de la vista completa. Es un HERMANO del encabezado/cuerpo (ver el
- * JSX más abajo), no su padre: si envolviera al contenido, su opacidad se
- * multiplicaría con la de cada hijo y el contenido se vería tenue.
- *
- * Con un origen conocido (el rect de la provincia en el mapa), la ENTRADA no
- * es un fade: el fondo se abre como un círculo (`clip-path`) que crece desde
- * el centro de la provincia hasta cubrir la pantalla, conectado con la
- * silueta que viaja. La SALIDA es un fundido simple y corto (variante
- * `salida`). Sin origen (o con movimiento reducido) también la entrada es un
- * fundido.
- *
- * `oculto` es solo el estado inicial; la salida va en su propia variante
- * (`exit="salida"`) porque es más corta que la entrada. */
-function fondoVariants(centro: { x: number; y: number } | null): Variants {
-  const salida = {
-    opacity: 0,
-    transition: { duration: DURACION_SALIDA_VISTA, ease: EASE_SALIDA },
-  }
-  if (!centro) {
-    return {
-      oculto: { opacity: 0 },
-      visible: {
-        opacity: 1,
-        transition: { duration: DURACION_FONDO_VISTA, ease: EASE_VIAJE },
-      },
-      salida,
-    }
-  }
-  // Radio que alcanza la esquina más lejana desde el centro.
-  const radio = Math.hypot(
-    Math.max(centro.x, window.innerWidth - centro.x),
-    Math.max(centro.y, window.innerHeight - centro.y),
-  )
-  const en = `at ${centro.x}px ${centro.y}px`
-  return {
-    oculto: { clipPath: `circle(0px ${en})`, opacity: 1 },
-    visible: {
-      clipPath: `circle(${radio}px ${en})`,
-      opacity: 1,
-      transition: { duration: DURACION_FONDO_VISTA, ease: EASE_VIAJE },
-    },
-    salida,
-  }
-}
-
-/** Fundido + leve subida del contenido (botón "Volver", título, cuerpo).
- * Entra con el `delay` que le pase cada instancia (vía el prop `transition`)
- * y SALE rápido y sin delay: la transición de `salida` pisa al prop. */
+/** Fundido + leve subida del botón "Volver". Entra con el `delay` que le
+ * pase cada instancia (vía el prop `transition`) y SALE rápido y sin delay:
+ * la transición de `salida` pisa al prop. */
 const contenidoVariants: Variants = {
   oculto: { opacity: 0, y: 8 },
   visible: { opacity: 1, y: 0 },
-  salida: { opacity: 0, transition: { duration: DURACION_SALIDA_VISTA } },
+  salida: { opacity: 0, transition: { duration: DURACION_SALIDA_CONTENIDO } },
+}
+
+/** Cuerpo (filtros, lista y ficha): fundido + subida corta. */
+const cuerpoVariants: Variants = {
+  oculto: { opacity: 0, y: 12 },
+  visible: { opacity: 1, y: 0 },
+  salida: {
+    opacity: 0,
+    transition: { duration: DURACION_SALIDA_CONTENIDO },
+  },
 }
 
 /** Línea divisoria del encabezado: solo fundido (ver su uso en el JSX). */
 const lineaVariants: Variants = {
   oculto: { opacity: 0 },
   visible: { opacity: 1 },
-  salida: { opacity: 0, transition: { duration: DURACION_SALIDA_VISTA } },
+  salida: { opacity: 0, transition: { duration: DURACION_SALIDA_CONTENIDO } },
 }
 
-/** El título "nace" de la silueta: se destapa de izquierda a derecha mientras
- * se corre un poco. Entra con el `delay` de cada instancia y sale rápido. */
+/** El título "nace" de la silueta: se corre un poco hacia su lugar mientras
+ * se funde. Entra con el `delay` de cada instancia y sale rápido. */
 const tituloVariants: Variants = {
-  oculto: { opacity: 0, x: -14, clipPath: 'inset(-4px 100% -4px -4px)' },
-  visible: {
-    opacity: 1,
-    x: 0,
-    clipPath: 'inset(-4px -4px -4px -4px)',
-  },
-  salida: { opacity: 0, transition: { duration: DURACION_SALIDA_VISTA } },
+  oculto: { opacity: 0, x: -8 },
+  visible: { opacity: 1, x: 0 },
+  salida: { opacity: 0, transition: { duration: DURACION_SALIDA_CONTENIDO } },
 }
 
 /** Nombre de comuna/departamento por id (p. ej. "02007" -> "Comuna 1") — para
@@ -302,22 +259,6 @@ function ProvinceFullViewContent({
   // ya asignado por geocodificación real — ver `asignarComunasCaba`), que sí
   // distingue. El resto de las provincias sigue filtrando por localidad.
   const esCaba = provinciaId === '02'
-
-  // Centro de la provincia en el mapa, de donde se abre el fondo (ver
-  // `fondoVariants`). Se fija al montar: la vista se monta una vez por
-  // provincia (ver `key` abajo).
-  const reducirMovimiento = useReducedMotion()
-  const [variantsFondo] = useState(() => {
-    const origen = useMapStore.getState().origenSiluetaRect
-    return fondoVariants(
-      !reducirMovimiento && origen?.id === provinciaId
-        ? {
-            x: origen.left + origen.width / 2,
-            y: origen.top + origen.height / 2,
-          }
-        : null,
-    )
-  })
 
   const [estadoEspacios, setEstadoEspacios] = useState<
     | { provinciaId: string; tipo: 'listo'; espacios: Espacio[] }
@@ -607,15 +548,9 @@ function ProvinceFullViewContent({
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col">
-      {/* Fondo: ver el comentario junto a `fondoVistaCompletaVariants` —
-          hermano del resto, no su padre. */}
-      <motion.div
-        variants={variantsFondo}
-        initial="oculto"
-        animate="visible"
-        exit="salida"
-        className="absolute inset-0 -z-10 bg-neutral-950"
-      />
+      {/* Fondo: ver el comentario de `FondoVista` — hermano del resto, no su
+          padre. */}
+      <FondoVista provinciaId={provinciaId} />
 
       <header className="relative flex items-center gap-3 px-6 py-4">
         {/* Borde inferior: un elemento aparte (no `border-b` del header) para
@@ -628,7 +563,7 @@ function ProvinceFullViewContent({
           animate="visible"
           exit="salida"
           transition={{
-            duration: 0.35,
+            duration: 0.5,
             ease: EASE_SALIDA,
             delay: DELAY_ENTRADA_CONTENIDO,
           }}
@@ -693,7 +628,7 @@ function ProvinceFullViewContent({
         </div>
       ) : (
         <motion.div
-          variants={contenidoVariants}
+          variants={cuerpoVariants}
           initial="oculto"
           animate="visible"
           exit="salida"

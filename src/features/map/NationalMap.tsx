@@ -20,10 +20,9 @@ import {
 } from '../../data/provincias'
 import { useDepartamentos } from '../../data/useDepartamentos'
 import {
-  EASE_SALIDA_CSS,
   EASE_VIAJE_CSS,
   MS_FONDO_VISTA,
-  MS_SALIDA_VISTA,
+  MS_VUELTA_VISTA,
 } from '../../lib/motion'
 import { useMapStore, type Capa } from '../../store/mapStore'
 import { useMediaQuery } from '../../utils/useMediaQuery'
@@ -443,15 +442,13 @@ export function NationalMap() {
   // render de ~90 ms congelaba el primer cuadro de la animación de la silueta.
   // Usa la propiedad `scale` (no `transform`, que ya lleva el zoom) y la MISMA
   // duración que el fondo de la vista completa (`DURACION_FONDO_VISTA` al
-  // abrir, `DURACION_SALIDA_VISTA` al cerrar; lib/motion.ts) — no `ZOOM_MS`
+  // abrir, `DURACION_VUELTA_VISTA` al cerrar; lib/motion.ts) — no `ZOOM_MS`
   // (esa es del paneo del zoom).
   useLayoutEffect(() => {
     const aplicar = (abierta: boolean) => {
       const el = contenedorRef.current
       if (!el) return
-      const fondo = abierta
-        ? `${MS_FONDO_VISTA}ms ${EASE_VIAJE_CSS}`
-        : `${MS_SALIDA_VISTA}ms ${EASE_SALIDA_CSS}`
+      const fondo = `${abierta ? MS_FONDO_VISTA : MS_VUELTA_VISTA}ms ${EASE_VIAJE_CSS}`
       el.style.transition = `transform ${ZOOM_MS}ms ${ZOOM_EASING}, scale ${fondo}, opacity ${fondo}`
       el.style.scale = abierta ? '0.97' : '1'
       el.style.opacity = abierta ? '0.55' : '1'

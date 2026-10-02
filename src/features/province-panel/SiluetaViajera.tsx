@@ -8,12 +8,15 @@ import {
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  DURACION_VIAJE_ENTRADA,
   DURACION_SALIDA_VISTA,
+  DURACION_VIAJE_ENTRADA,
+  DURACION_VUELTA_VISTA,
   EASE_ARCO_REZAGO,
   EASE_ATERRIZAJE_Y,
   EASE_SALIDA,
   EASE_VIAJE,
+  EASE_VUELTA_X,
+  EASE_VUELTA_Y,
 } from '../../lib/motion'
 import { useMapStore } from '../../store/mapStore'
 import { useMediaQuery } from '../../utils/useMediaQuery'
@@ -46,7 +49,8 @@ const esc = (v: number) => `scale(${v})`
 /** Transición "shared element" entre el mapa nacional y la vista completa: la
  * silueta de la provincia "viaja" desde el lugar donde estaba su ficha en el
  * mapa (medido por NationalMap, ver `origenSiluetaRect` en mapStore) hasta el
- * badge junto al título. Al cerrar no hay viaje de vuelta: se desvanece.
+ * badge junto al título. Al cerrar hace el viaje inverso, de vuelta a la
+ * provincia en el mapa (ver el efecto de salida más abajo).
  *
  * A propósito NO se usa `layoutId` con el `<path>` del mapa: el mapa vive en
  * el viewBox fijo de un `<svg>` pensado para el país entero y este badge en
@@ -191,33 +195,120 @@ export function SiluetaViajera({
   // Salida: AnimatePresence mantiene montada la vista completa hasta que
   // esto llame a `safeToRemove`. Se anima a mano (en vez de `exit=`) porque
   // la silueta no cuelga del overlay (vive en un portal): sin esto se
-  // quedaría en pantalla. Sin efectos: se desvanece junto con el resto de la
-  // vista, quedándose donde esté (si la entrada seguía en vuelo, se congela
-  // en la posición actual).
+  // quedaría en pantalla.
+  //
+  // Es el espejo de la entrada: la silueta vuelve volando (en el arco
+  // inverso) hasta la provincia en el mapa y, ya encima de ella, se funde.
+  // Mientras tanto el fondo se contrae hacia ese mismo punto (ver
+  // FondoVista). Si no hay a dónde volver (movimiento reducido o provincia ya
+  // deseleccionada: el mapa se está alejando) solo se desvanece, donde esté.
+  // Si la entrada seguía en vuelo, arranca desde la posición actual.
+  //
+  // Reabrir a mitad de la salida (p. ej. "adelante" del navegador) vuelve a
+  // este efecto con `presente` en true: la silueta regresa a su lugar.
+  const saliendo = useRef(false)
   useEffect(() => {
-    if (presente) return
     const el = botonRef.current
     const capaY = capaYRef.current
     const capaEscala = capaEscalaRef.current
+    if (presente && !saliendo.current) return
     if (!el || !capaY || !capaEscala) {
-      safeToRemove?.()
+      if (!presente) safeToRemove?.()
       return
     }
+
+    // Congela la silueta donde esté ahora. Los valores van a estilo inline
+    // porque al cancelar una animación el elemento vuelve al estilo que le
+    // puso React (la posición de partida).
     const estiloBoton = getComputedStyle(el)
-    const transformX = estiloBoton.transform
-    const opacidadActual = estiloBoton.opacity
-    const transformY = getComputedStyle(capaY).transform
-    const transformEscala = getComputedStyle(capaEscala).transform
+    const x = new DOMMatrix(estiloBoton.transform).m41
+    const opacidad = Number(estiloBoton.opacity)
+    const y = new DOMMatrix(getComputedStyle(capaY).transform).m42
+    const escala = new DOMMatrix(getComputedStyle(capaEscala).transform).a
     entrada.current.forEach((c) => c.cancel())
-    el.style.transform = transformX
-    el.style.opacity = opacidadActual
-    capaY.style.transform = transformY
-    capaEscala.style.transform = transformEscala
-    animate(
-      el,
-      { opacity: [Number(opacidadActual), 0] },
-      { duration: DURACION_SALIDA_VISTA, ease: EASE_SALIDA },
-    ).then(() => safeToRemove?.())
+    el.style.transform = tX(x)
+    el.style.opacity = String(opacidad)
+    capaY.style.transform = tY(y)
+    capaEscala.style.transform = esc(escala)
+
+    let cancelado = false
+    if (presente) {
+      saliendo.current = false
+      entrada.current = [
+        animate(el, { opacity: [opacidad, 1] }, { duration: 0.3 }),
+        animate(
+          el,
+          { transform: [tX(x), tX(0)] },
+          { duration: 0.4, ease: EASE_SALIDA },
+        ),
+        animate(
+          capaY,
+          { transform: [tY(y), tY(0)] },
+          { duration: 0.4, ease: EASE_SALIDA },
+        ),
+        animate(
+          capaEscala,
+          { transform: [esc(escala), esc(1)] },
+          { duration: 0.4, ease: EASE_SALIDA },
+        ),
+      ]
+      return
+    }
+
+    saliendo.current = true
+    const estado = useMapStore.getState()
+    const mapa = estado.origenSiluetaRect
+    const vuelve =
+      !reducirMovimiento &&
+      destino !== null &&
+      estado.provinciaSeleccionada === provinciaId &&
+      mapa?.id === provinciaId
+    if (vuelve) {
+      const hacia = desplazamientoHacia(mapa, destino)
+      const duration = DURACION_VUELTA_VISTA
+      const fundido = 0.2
+      entrada.current = [
+        animate(
+          el,
+          { transform: [tX(x), tX(hacia.x)] },
+          { duration, ease: EASE_VUELTA_X },
+        ),
+        animate(
+          capaY,
+          { transform: [tY(y), tY(hacia.y)] },
+          { duration, ease: EASE_VUELTA_Y },
+        ),
+        animate(
+          capaEscala,
+          { transform: [esc(escala), esc(hacia.scale)] },
+          { duration, ease: EASE_VIAJE },
+        ),
+        // Aterriza y recién ahí se funde con la provincia real del mapa.
+        animate(
+          el,
+          { opacity: [opacidad, opacidad, 0] },
+          {
+            duration,
+            times: [0, 1 - fundido / duration, 1],
+            ease: EASE_SALIDA,
+          },
+        ),
+      ]
+    } else {
+      entrada.current = [
+        animate(
+          el,
+          { opacity: [opacidad, 0] },
+          { duration: DURACION_SALIDA_VISTA, ease: EASE_SALIDA },
+        ),
+      ]
+    }
+    Promise.all(entrada.current).then(() => {
+      if (!cancelado) safeToRemove?.()
+    })
+    return () => {
+      cancelado = true
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presente])
 

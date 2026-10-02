@@ -93,22 +93,29 @@ export function staggerContainer(opts?: {
 export const EASE_VIAJE: [number, number, number, number] = [0.45, 0, 0.15, 1]
 export const EASE_VIAJE_CSS = 'cubic-bezier(0.45, 0, 0.15, 1)'
 
-/** Coreografía de la vista completa (segundos). ENTRADA: el fondo se abre
- * desde la provincia mientras la silueta viaja por ENCIMA; el contenido entra
- * al final. SALIDA: sin efectos, todo se desvanece junto y rápido
- * (`DURACION_SALIDA_VISTA`) y el mapa vuelve a su estado. Todo lo que dependa
- * de estos tiempos (fondo, contenido, silueta, mapa en NationalMap) los toma
- * de acá para no desfasarse. */
+/** Coreografía de la vista completa (segundos). ENTRADA: la silueta de
+ * la provincia crece desde su lugar en el mapa hasta desbordar la pantalla y
+ * la vista se ve a través de ella, mientras la silueta viajera vuela por
+ * ENCIMA; el contenido entra al final. SALIDA:
+ * espejo de la entrada — el contenido se va primero
+ * (`DURACION_SALIDA_CONTENIDO`), la vista se encoge dentro de la silueta hasta
+ * calzar con la provincia del mapa y la silueta viajera vuelve a su lugar
+ * (`DURACION_VUELTA_VISTA`).
+ * Cuando no hay a dónde volver (provincia ya deseleccionada, movimiento
+ * reducido) queda un fundido corto (`DURACION_SALIDA_VISTA`). Todo lo que
+ * dependa de estos tiempos (fondo, contenido, silueta, mapa en NationalMap)
+ * los toma de acá para no desfasarse. */
 export const DURACION_FONDO_VISTA = 0.8
 export const DURACION_SALIDA_VISTA = 0.25
+export const DURACION_SALIDA_CONTENIDO = 0.18
+export const DURACION_VUELTA_VISTA = 0.62
 export const DELAY_ENTRADA_CONTENIDO = 0.5
 export const DURACION_VIAJE_ENTRADA = 1.05
 
 /** En ms y con la curva como string CSS: NationalMap no usa Motion (su
  * escala y opacidad son transiciones CSS en un estilo inline). */
 export const MS_FONDO_VISTA = DURACION_FONDO_VISTA * 1000
-export const MS_SALIDA_VISTA = DURACION_SALIDA_VISTA * 1000
-export const EASE_SALIDA_CSS = 'cubic-bezier(0.16, 1, 0.3, 1)'
+export const MS_VUELTA_VISTA = DURACION_VUELTA_VISTA * 1000
 
 /** El viaje de entrada de la silueta describe un ARCO en vez de una recta:
  * Y lidera (arranca rápido y aterriza con un overshoot mínimo, sin la cola
@@ -120,6 +127,13 @@ export const EASE_ARCO_REZAGO: [number, number, number, number] = [
 export const EASE_ATERRIZAJE_Y: [number, number, number, number] = [
   0.3, 0, 0.15, 1.05,
 ]
+
+/** Vuelta de la silueta al mapa: el arco de la entrada visto al revés — acá
+ * X es la que lidera e Y la que se rezaga (al invertir un recorrido, quien
+ * llegaba primero sale último). Sin overshoot: aterriza sobre la provincia
+ * real y se funde con ella. */
+export const EASE_VUELTA_X: [number, number, number, number] = [0.4, 0, 0.2, 1]
+export const EASE_VUELTA_Y: [number, number, number, number] = [0.55, 0, 0.3, 1]
 
 /** Ítem de una cascada: fundido + subida corta. */
 export const staggerItem: Variants = {
