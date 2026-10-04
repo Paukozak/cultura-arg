@@ -250,10 +250,12 @@ function unifyLocalidades(espacios) {
 // - Tierra del Fuego: el departamento "Río Grande" se dividió en 2017 (ley
 //   provincial 1186) para crear "Tolhuin" — Georef ya tiene 3 ids (Río
 //   Grande=94008, Tolhuin=94011, Ushuaia=94015) donde SInCA sigue usando 2
-//   (94007, 94014, el esquema previo a la división). No hay forma de saber,
-//   de los registros bajo el viejo 94007, cuáles caerían hoy en Tolhuin —
-//   se remapean todos a Río Grande (94008), el departamento del que
-//   Tolhuin se separó, en vez de inventar una distribución.
+//   (94007, 94014, el esquema previo a la división). Los registros bajo el
+//   viejo 94007 se remapean a Río Grande (94008), el departamento del que
+//   Tolhuin se separó, salvo los de la localidad Tolhuin (código de
+//   localidad 94007020, ver `LOCALIDAD_ID_LEGACY`), que van a Tolhuin
+//   (94011): el código de localidad sí distingue a la ciudad de Tolhuin
+//   de las de Río Grande (94007010).
 // - Buenos Aires: los 12 registros de Chascomús traen `06217`; el id real
 //   de Georef es `06218`.
 //
@@ -268,6 +270,12 @@ const DEPARTAMENTO_ID_LEGACY = {
   94007: '94008', // Río Grande (pre-división de Tolhuin)
   94014: '94015', // Ushuaia
   '06217': '06218', // Chascomús
+}
+
+// Excepciones a `DEPARTAMENTO_ID_LEGACY` por código de localidad completo
+// (8 dígitos), que se evalúan primero.
+const LOCALIDAD_ID_LEGACY = {
+  94007020: '94011', // Tolhuin (pre-división de Río Grande)
 }
 
 // --- Correcciones puntuales ---------------------------------------------------
@@ -815,7 +823,9 @@ async function loadEspacios() {
       // consistente entre categorías y no depende de tipeo/acentos.
       const departamentoIdCrudo = codLocPadded ? codLocPadded.slice(0, 5) : null
       const departamentoId = departamentoIdCrudo
-        ? (DEPARTAMENTO_ID_LEGACY[departamentoIdCrudo] ?? departamentoIdCrudo)
+        ? (LOCALIDAD_ID_LEGACY[codLocPadded] ??
+          DEPARTAMENTO_ID_LEGACY[departamentoIdCrudo] ??
+          departamentoIdCrudo)
         : null
       const anio = config.anio
         ? parseYear(row[config.anio.key], config.anio.format)
