@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { MS_ZOOM } from '../lib/motion'
 import { ComoSeHizo } from '../features/about/ComoSeHizo'
 import { Tutorial } from '../features/about/Tutorial'
 import { GlobalSearch } from '../features/search/GlobalSearch'
@@ -71,10 +72,23 @@ export function Header() {
         </div>
         {/* Con una provincia seleccionada, el foco ya es esa provincia (hoja
             inferior abierta con su "volver" propio) — el buscador global acá
-            queda como una fila más para nada, y ocultarla le devuelve esa
-            altura al mapa (`headerHeight`, medido por el ResizeObserver de
-            arriba, baja solo). */}
-        {!provinciaSeleccionada && <GlobalSearch />}
+            queda como una fila más para nada. Se oculta con opacidad en vez
+            de desmontarlo: desmontarlo achicaba el header (~50px) y movía el
+            mapa en pleno zoom (`headerHeight` entra en el cálculo del zoom y
+            del layout), y el mapa tiene que mantener su tamaño mientras el
+            `transform` anima. `inert`: oculto no recibe toques ni foco. */}
+        <div
+          inert={!!provinciaSeleccionada}
+          aria-hidden={!!provinciaSeleccionada}
+          // Al volver al mapa nacional el buscador reaparece recién cuando
+          // terminó el zoom de vuelta (delay = MS_ZOOM).
+          style={{
+            opacity: provinciaSeleccionada ? 0 : 1,
+            transition: `opacity 200ms ${provinciaSeleccionada ? 0 : MS_ZOOM}ms`,
+          }}
+        >
+          <GlobalSearch />
+        </div>
       </header>
     )
   }

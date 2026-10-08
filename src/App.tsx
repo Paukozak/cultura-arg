@@ -9,13 +9,11 @@ import { MapIntroMobil } from './features/map/MapIntroMobil'
 import { NationalMap } from './features/map/NationalMap'
 import { NotFoundPage } from './features/not-found/NotFoundPage'
 import { ProvincePanel } from './features/province-panel/ProvincePanel'
-import { altoPeekPx } from './features/province-panel/hojaLayout'
 import { SabiasQueLateral } from './features/province-panel/SabiasQueLateral'
 import { EASE_ZOOM_CSS, MS_ZOOM } from './lib/motion'
 import { useMapStore } from './store/mapStore'
 import { useHistorialPaneles } from './utils/useHistorialPaneles'
 import { useMediaQuery } from './utils/useMediaQuery'
-import { useWindowHeight } from './utils/useWindowHeight'
 
 // Ancho de los paneles laterales de desktop (ProvincePanel y MapInfoPanel:
 // `max-w-md`) — el mapa reserva este ancho a la derecha para que el panel
@@ -53,7 +51,6 @@ function ProvinceFullViewFallback() {
 
 function App() {
   const provinciaSeleccionada = useMapStore((s) => s.provinciaSeleccionada)
-  const headerHeight = useMapStore((s) => s.headerHeight)
   const paginaNoEncontrada = useMapStore((s) => s.paginaNoEncontrada)
   // El gesto de "atrás" (deslizar desde el borde en mobile, botón atrás del
   // navegador) cierra el panel de provincia o la vista completa en vez de
@@ -66,14 +63,6 @@ function App() {
   // pantallas anchas. Más angostas, el mapa se queda con el layout de antes
   // (solo el panel de la derecha).
   const hayIntro = useMediaQuery('(min-width: 1366px)')
-  const alturaVentana = useWindowHeight()
-  // Mismo cálculo que ProvincePanel.tsx (ver hojaLayout.ts): antes acá se
-  // reservaba un `48vh` fijo, un número más grande que lo que la hoja
-  // realmente asoma (48% de la ventana MENOS el header, no de la ventana
-  // entera) — la diferencia quedaba como un hueco muerto entre el mapa
-  // zoomeado y la hoja, con la provincia pegada arriba en vez de centrada
-  // en el espacio real disponible.
-  const altoHojaMobilPx = altoPeekPx(alturaVentana, headerHeight)
 
   // Sin provincia elegida, el mapa (a esta altura de viewBox ya usa casi
   // toda su caja, ver el comentario de `HEIGHT` en NationalMap.tsx) queda
@@ -142,24 +131,22 @@ function App() {
         // propósito (ver `overflow-visible` en NationalMap.tsx) y acá se
         // recorta contra los bordes de la pantalla y la línea del header — el
         // header (que va antes en el DOM) no queda tapado.
-        // El padding se anima con la MISMA duración y curva que el zoom del
-        // mapa (lib/motion.ts): con 300ms/`ease` contra 600ms del zoom, el
-        // contenedor terminaba de moverse a mitad del zoom y el mapa daba un
-        // tirón al cambiar de ritmo.
+        // En desktop el padding se anima con la MISMA duración y curva que el
+        // zoom del mapa (lib/motion.ts): con 300ms/`ease` contra 600ms del
+        // zoom, el contenedor terminaba de moverse a mitad del zoom y el mapa
+        // daba un tirón al cambiar de ritmo.
         className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-1 md:p-6"
         style={
           esMobil
-            ? {
-                // En mobile el panel es una hoja inferior (ver
-                // ProvincePanel.tsx), no un panel lateral — correr el mapa
-                // hacia la izquierda no tiene sentido acá; se lo corre
-                // hacia arriba para que el área visible por encima de la
-                // hoja sea donde el mapa se termina centrando.
-                paddingBottom: provinciaSeleccionada
-                  ? altoHojaMobilPx
-                  : undefined,
-                transition: `padding-bottom ${MS_ZOOM}ms ${EASE_ZOOM_CSS}`,
-              }
+            ? // En mobile el panel es una hoja inferior (ver ProvincePanel.tsx)
+              // que se superpone al mapa. El contenedor NO cambia de tamaño
+              // al elegir una provincia (ni padding animado ni fila de
+              // leyenda que se desmonta): si cambiara durante el zoom, el
+              // SVG se reescalaría por debajo del `transform` y el zoom
+              // retrocedería y se reorientaría a mitad de camino. En su lugar
+              // NationalMap calcula el zoom contra el área visible sobre la
+              // hoja (`altoHojaMobilPx`) y solo anima `transform`.
+              undefined
             : {
                 // Siempre hay un panel a la derecha en desktop: el de la
                 // provincia elegida o, sin ninguna, el de información de
@@ -185,25 +172,29 @@ function App() {
           // mapa ocupa lo que queda debajo (`min-h-0 flex-1`) — apilados,
           // no superpuestos como en desktop.
           <div className="flex h-full w-full max-w-3xl flex-col">
-            {!provinciaSeleccionada && (
-              <div
-                ref={legendRowRef}
-                className="flex shrink-0 items-start justify-between gap-2 px-3 pb-2 pt-2"
-              >
-                <LayerToggle />
-                <Legend />
-              </div>
-            )}
+            {/* Siempre montada (se oculta con opacidad, no se desmonta) para
+                que ocupe el mismo lugar con o sin provincia elegida y el
+                mapa no cambie de tamaño durante el zoom. `inert`: oculta no
+                debe recibir toques ni foco. */}
+            <div
+              ref={legendRowRef}
+              inert={!!provinciaSeleccionada}
+              aria-hidden={!!provinciaSeleccionada}
+              className="flex shrink-0 items-start justify-between gap-2 px-3 pb-2 pt-2"
+              // Se oculta al instante, pero al volver al mapa nacional reaparece recién
+              // cuando terminó el zoom de vuelta (delay = MS_ZOOM), no encima del mapa
+              // que todavía se está acomodando.
+              style={{
+                opacity: provinciaSeleccionada ? 0 : 1,
+                transition: `opacity 200ms ${provinciaSeleccionada ? 0 : MS_ZOOM}ms`,
+              }}
+            >
+              <LayerToggle />
+              <Legend />
+            </div>
             <div
               className="relative min-h-0 flex-1 pb-3"
-              style={
-                !provinciaSeleccionada
-                  ? {
-                      paddingBottom: 12 + legendRowHeight,
-                      transition: 'padding-bottom 200ms ease',
-                    }
-                  : undefined
-              }
+              style={{ paddingBottom: 12 + legendRowHeight }}
             >
               <NationalMap />
             </div>

@@ -28,6 +28,8 @@ import {
 } from '../../lib/motion'
 import { useMapStore, type Capa } from '../../store/mapStore'
 import { useMediaQuery } from '../../utils/useMediaQuery'
+import { useWindowHeight } from '../../utils/useWindowHeight'
+import { altoPeekPx } from '../province-panel/hojaLayout'
 import {
   apagarConFondo,
   buildColorScales,
@@ -111,8 +113,8 @@ const ZOOM_FILL_RATIO = 0.7
 // una constante fija (`headerHeight` del store, medido con ResizeObserver
 // en Header.tsx): en mobile pasa a dos filas y mide más que en desktop.
 const MAX_ZOOM_SCALE = 400
-// En mobile se corrige el mismatch de aspecto contra el cuadro real (ver
-// `coverFit` más abajo), así que el margen de sobra de ZOOM_FILL_RATIO ya no
+// En mobile el zoom se calcula contra el área libre real sobre la hoja (ver
+// `baseZoom` más abajo), así que el margen de sobra de ZOOM_FILL_RATIO ya no
 // tiene que absorber ese error de más — se puede acercar mucho más al 100%.
 const ZOOM_FILL_RATIO_MOBIL = 0.92
 // Corrimiento hacia abajo del centrado (ver `margenArribaExtra` en
@@ -151,27 +153,6 @@ function bboxZoom(
     MAX_ZOOM_SCALE,
   )
   return { cx, cy: cy - margenArribaExtra / scale, scale }
-}
-
-// El viewBox (WIDTH x HEIGHT) tiene una forma fija, pensada para la vista
-// país entera — pero el cuadro real donde se dibuja el SVG cambia de forma
-// en mobile apenas se abre una provincia (aparece la hoja inferior, que le
-// come alto). Como `preserveAspectRatio` (default) encaja el viewBox
-// COMPLETO dentro de ese cuadro sin recortarlo, un mismatch de aspecto deja
-// franjas vacías a los costados o arriba/abajo — y el `ZOOM_FILL_RATIO`,
-// calculado contra el viewBox y no contra el cuadro real, termina dejando
-// la provincia bastante más chica de lo que el cuadro real permitiría.
-// Esto calcula un WIDTH/HEIGHT "efectivo" (mismas unidades del viewBox) que
-// tiene la forma exacta del cuadro real — el opuesto de `preserveAspectRatio`
-// (que encoge para que el viewBox ENTRE en el cuadro, "contain"), acá se
-// agranda para que el cuadro ENTRE en el viewBox efectivo ("cover") — así
-// `bboxZoom` calcula el scale contra el espacio de verdad disponible.
-function coverFit(boxW: number, boxH: number, viewW: number, viewH: number) {
-  const boxAspecto = boxW / boxH
-  const viewAspecto = viewW / viewH
-  return boxAspecto > viewAspecto
-    ? { width: viewH * boxAspecto, height: viewH }
-    : { width: viewW, height: viewW / boxAspecto }
 }
 
 function formatNumero(n: number) {
@@ -324,22 +305,35 @@ export function NationalMap() {
   const svgRef = useRef<SVGSVGElement>(null)
   const contenedorRef = useRef<HTMLDivElement>(null)
 
-  // Cuadro real (en px) donde el SVG se dibuja — cambia de forma en mobile
-  // cuando aparece/desaparece la hoja inferior (ver `coverFit` arriba). Solo
+  // Cuadro real (en px) donde el SVG se dibuja — su forma en mobile no se
+  // parece al viewBox, y el zoom tiene que calcularse contra él. Solo
   // hace falta en mobile: en desktop el ancho/alto del viewBox ya se acerca
   // bastante a la forma real de `main` y no hubo reporte de sobra ahí.
-  const [boxSize, setBoxSize] = useState<{ w: number; h: number } | null>(null)
+  // `top`: borde superior del SVG en la pantalla — hace falta para saber dónde
+  // queda su centro respecto del área libre sobre la hoja (ver `baseZoom`).
+  const alturaVentana = useWindowHeight()
+  const [boxSize, setBoxSize] = useState<{
+    w: number
+    h: number
+    top: number
+  } | null>(null)
   useEffect(() => {
     if (!esMobil) return
     const el = svgRef.current
     if (!el) return
-    const observer = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect
-      if (width > 0 && height > 0) setBoxSize({ w: width, h: height })
-    })
+    const medir = () => {
+      const r = el.getBoundingClientRect()
+      if (r.width > 0 && r.height > 0) {
+        setBoxSize({ w: r.width, h: r.height, top: r.top })
+      }
+    }
+    const observer = new ResizeObserver(medir)
     observer.observe(el)
+    // `headerHeight`/`alturaVentana` mueven el SVG sin cambiarle el tamaño
+    // (el observer no avisa), así que también se vuelve a medir con ellos.
+    medir()
     return () => observer.disconnect()
-  }, [esMobil])
+  }, [esMobil, headerHeight, alturaVentana])
 
   // El nivel base de zoom (ajuste a la provincia entera) es una función pura
   // de la provincia seleccionada — no hace falta un efecto para calcularlo.
@@ -354,18 +348,39 @@ export function NationalMap() {
     // nacional — importante para que el zoom encuadre bien la provincia.
     const geometria = geometriaDetalle(provinciaSeleccionada) ?? feature
     if (esMobil && boxSize) {
-      const efectivo = coverFit(boxSize.w, boxSize.h, WIDTH, HEIGHT)
+      // El SVG mide siempre lo mismo (no cambia al elegir provincia, ver
+      // App.tsx), pero la hoja inferior tapa su parte de abajo. El área libre
+      // va desde el header hasta el borde superior de la hoja (mismos
+      // márgenes de `main`: 4px arriba, 4px + 12px de `pb-3` abajo), y la
+      // provincia se centra ahí en vez de en el centro del SVG. `k` son los
+      // px por unidad de viewBox con que `preserveAspectRatio` dibuja el SVG.
+      const k = Math.min(boxSize.w / WIDTH, boxSize.h / HEIGHT)
+      const areaTop = headerHeight + 4
+      const areaBottom =
+        alturaVentana - altoPeekPx(alturaVentana, headerHeight) - 16
+      const centroAreaY = (areaTop + areaBottom) / 2
+      const centroSvgY = boxSize.top + boxSize.h / 2
       return bboxZoom(
         geometria,
         path,
-        efectivo.width,
-        efectivo.height,
+        boxSize.w / k,
+        (areaBottom - areaTop) / k,
         ZOOM_FILL_RATIO_MOBIL,
-        HEIGHT * MARGEN_ARRIBA_MOBIL_RATIO,
+        // Corrimiento (en unidades de viewBox) del centro del área libre
+        // respecto del centro del SVG, más el margen de arriba de siempre.
+        (centroAreaY - centroSvgY) / k + HEIGHT * MARGEN_ARRIBA_MOBIL_RATIO,
       )
     }
     return bboxZoom(geometria, path, WIDTH, HEIGHT)
-  }, [provinciaSeleccionada, path, HEIGHT, esMobil, boxSize])
+  }, [
+    provinciaSeleccionada,
+    path,
+    HEIGHT,
+    esMobil,
+    boxSize,
+    headerHeight,
+    alturaVentana,
+  ])
 
   // Se resetea el tooltip de hover al cambiar de provincia ajustando el
   // estado durante el render (patrón "adjust state during rendering" de
@@ -814,9 +829,16 @@ export function NationalMap() {
       ref={contenedorRef}
       className="relative h-full"
       style={{
-        transform: zoom
-          ? `translateY(-${headerHeight / 2}px)`
-          : 'translateY(0px)',
+        // Solo desktop: ahí el centro de `main` queda medio header más abajo
+        // que el de la pantalla (ver el comentario de `MAX_ZOOM_SCALE`). En
+        // mobile el zoom ya se calcula contra el área libre real entre el
+        // header y la hoja (ver `baseZoom`), y esta corrección extra corría la
+        // provincia ~medio header hacia arriba, por debajo del header, que la
+        // tapaba.
+        transform:
+          zoom && !esMobil
+            ? `translateY(-${headerHeight / 2}px)`
+            : 'translateY(0px)',
       }}
     >
       <svg
