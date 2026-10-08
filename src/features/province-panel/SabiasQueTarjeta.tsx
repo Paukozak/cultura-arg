@@ -85,8 +85,11 @@ export function SabiasQueTarjeta({
                 <p className="hyphens-none text-lg font-bold leading-snug text-neutral-100">
                   {conResaltados(entrada.pregunta)}
                 </p>
-                <div className="my-3 h-0.5 w-10 rounded-full bg-accent" />
-                <p className="hyphens-none text-sm leading-relaxed text-neutral-300">
+                {/* En mobile (< md) sin línea de acento: el espacio entre
+                    pregunta y dato lo pone el `mt-2` del párrafo; desde md la
+                    línea (con su `my-3`) vuelve y el párrafo no suma margen. */}
+                <div className="my-3 hidden h-0.5 w-10 rounded-full bg-accent md:block" />
+                <p className="mt-2 hyphens-none text-sm leading-relaxed text-neutral-300 md:mt-0">
                   {entrada.dato}
                 </p>
               </div>
