@@ -466,6 +466,17 @@ function ProvincePanelShell({
   const y = useMotionValue(0)
   const alturaVentana = useWindowHeight()
 
+  // Con la hoja expandida en mobile la provincia queda tapada: se avisa para
+  // que la vista completa no haga volar una silueta desde un punto invisible
+  // (ver `hojaTapaOrigen` en mapStore). Se baja al desmontar para no dejar el
+  // aviso pegado en la próxima provincia.
+  const setHojaTapaOrigen = useMapStore((s) => s.setHojaTapaOrigen)
+  const hojaTapa = esMobil && expandida
+  useEffect(() => {
+    setHojaTapaOrigen(hojaTapa)
+    return () => setHojaTapaOrigen(false)
+  }, [hojaTapa, setHojaTapaOrigen])
+
   // Píxeles reales, no `calc()`: Framer Motion anima `y` interpolando
   // cuadro a cuadro entre el valor de `initial`/`animate` — con un plano
   // número (o un simple "N%") sabe hacerlo, pero con un string `calc(100% -

@@ -84,6 +84,13 @@ interface MapState {
     height: number
   } | null
   setOrigenSiluetaRect: (rect: MapState['origenSiluetaRect']) => void
+  /** En mobile, la hoja del panel está expandida y tapa casi todo el mapa: la
+   * provincia (origen de la silueta viajera) no se ve. Lo publica
+   * ProvincePanelShell (el estado de la hoja es local de ahí) y lo leen
+   * SiluetaViajera y FondoVista para abrir la vista completa con un fundido
+   * simple en vez de un viaje que arranca en un punto invisible. */
+  hojaTapaOrigen: boolean
+  setHojaTapaOrigen: (valor: boolean) => void
 }
 
 const TEMA_KEY = 'cca-tema'
@@ -156,4 +163,6 @@ export const useMapStore = create<MapState>((set) => ({
   setPaginaNoEncontrada: (valor) => set({ paginaNoEncontrada: valor }),
   origenSiluetaRect: null,
   setOrigenSiluetaRect: (rect) => set({ origenSiluetaRect: rect }),
+  hojaTapaOrigen: false,
+  setHojaTapaOrigen: (valor) => set({ hojaTapaOrigen: valor }),
 }))

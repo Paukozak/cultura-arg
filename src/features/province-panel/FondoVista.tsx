@@ -36,6 +36,9 @@ interface Apertura {
 function aperturaDe(provinciaId: string): Apertura | null {
   const origen = useMapStore.getState().origenSiluetaRect
   if (origen?.id !== provinciaId) return null
+  // Hoja expandida en mobile: la provincia está tapada, así que el círculo no
+  // puede abrirse desde ella. Sin apertura el fondo entra y sale con fundido.
+  if (useMapStore.getState().hojaTapaOrigen) return null
   const caja = bboxProvincia(provinciaId)
   if (!caja) return null
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${caja.viewBox}" preserveAspectRatio="none"><path d="${caja.d}"/></svg>`

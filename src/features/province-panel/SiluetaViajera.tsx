@@ -8,6 +8,7 @@ import {
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
+  DELAY_ENTRADA_CONTENIDO,
   DURACION_SALIDA_VISTA,
   DURACION_VIAJE_ENTRADA,
   DURACION_VUELTA_VISTA,
@@ -132,7 +133,12 @@ export function SiluetaViajera({
         width: r.width,
         height: r.height,
       }
-      const viaja = !reducirMovimiento && origen?.id === provinciaId
+      // Con la hoja expandida en mobile el origen está tapado: no viaja, solo
+      // aparece en su lugar (mismo criterio que FondoVista).
+      const viaja =
+        !reducirMovimiento &&
+        origen?.id === provinciaId &&
+        !useMapStore.getState().hojaTapaOrigen
       setInicial(
         (previo) =>
           previo ?? (viaja ? desplazamientoHacia(origen, rect) : ASENTADA),
@@ -167,7 +173,18 @@ export function SiluetaViajera({
     // mapa (coroplético) en el primer tramo del viaje, en vez de aparecer de
     // golpe encima.
     entrada.current = [
-      animate(el, { opacity: [0, 1] }, { duration: 0.3, ease: EASE_SALIDA }),
+      // Sin viaje (origen tapado por la hoja) no hay provincia de la que
+      // salir: la silueta entra junto con el resto del contenido, no antes,
+      // para que no se vea chiquita sola sobre el fondo que recién aparece.
+      animate(
+        el,
+        { opacity: [0, 1] },
+        {
+          duration: viaja ? 0.3 : 0.35,
+          delay: viaja ? 0 : DELAY_ENTRADA_CONTENIDO + 0.1,
+          ease: EASE_SALIDA,
+        },
+      ),
       ...(viaja
         ? [
             // X rezagada, Y líder (con un asomo de overshoot al aterrizar):
@@ -258,8 +275,11 @@ export function SiluetaViajera({
     saliendo.current = true
     const estado = useMapStore.getState()
     const mapa = estado.origenSiluetaRect
+    // Si la entrada no viajó (origen tapado por la hoja), la salida tampoco:
+    // no hay una provincia visible donde aterrizar.
     const vuelve =
       !reducirMovimiento &&
+      inicial !== ASENTADA &&
       destino !== null &&
       estado.provinciaSeleccionada === provinciaId &&
       mapa?.id === provinciaId
