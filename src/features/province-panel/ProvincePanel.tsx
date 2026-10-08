@@ -21,7 +21,11 @@ import { provinciasGeo } from '../../data/provincias'
 import { useEspacios } from '../../data/useEspacios'
 import { cn } from '../../lib/cn'
 import {
+  DELAY_ENTRADA_PANEL,
+  DURACION_ZOOM,
   EASE_SALIDA,
+  EASE_ZOOM,
+  PANEL_LATERAL_SALIDA,
   PANEL_LATERAL_TRANSITION,
   staggerItem,
 } from '../../lib/motion'
@@ -70,6 +74,17 @@ const TRANSICION_HOJA = {
   stiffness: 380,
   damping: 38,
   mass: 0.9,
+} as const
+
+// Primera entrada de la hoja de mobile: curva con duración (no el resorte de
+// arriba, que llega en ~350ms) para que suba al ritmo del zoom del mapa, con
+// el mismo escalonado que el panel lateral. Solo vale hasta que termina esa
+// primera animación (`entrando` en ProvincePanelShell): después expandir y
+// colapsar vuelven al resorte, que es lo que se siente bien con el dedo.
+const TRANSICION_HOJA_ENTRADA = {
+  duration: DURACION_ZOOM - 0.1,
+  delay: DELAY_ENTRADA_PANEL,
+  ease: EASE_ZOOM,
 } as const
 
 // Cuerpo del panel (todo lo que depende de la provincia elegida): fundido +
@@ -435,6 +450,8 @@ function ProvincePanelShell({
   const esMobil = useMediaQuery('(max-width: 767px)')
   const panelRef = useRef<HTMLDivElement>(null)
   const [expandida, setExpandida] = useState(false)
+  // true hasta que termina la primera animación de la hoja (su entrada).
+  const [entrando, setEntrando] = useState(true)
   const dragControls = useDragControls()
   // Con mouse (no con el dedo), al soltar un arrastre el navegador dispara
   // además un `click` sobre lo que quedó bajo el cursor — la agarradera o la
@@ -574,14 +591,27 @@ function ProvincePanelShell({
           ? { opacity: 1, y: expandida ? 0 : offsetPeekPx }
           : { opacity: 1, x: 0 }
       }
-      exit={esMobil ? { opacity: 0, y: '100%' } : { opacity: 0, x: '100%' }}
+      // La salida lleva su propia transición (sin el delay de la entrada) en
+      // ambos layouts: cerrar tiene que responder al instante.
+      exit={
+        esMobil
+          ? { opacity: 0, y: '100%', transition: PANEL_LATERAL_SALIDA }
+          : { opacity: 0, x: '100%', transition: PANEL_LATERAL_SALIDA }
+      }
+      onAnimationComplete={() => setEntrando(false)}
       // En mobile un resorte en vez de una curva de duración fija: entrar,
       // expandir y colapsar la hoja se sienten como el mismo gesto físico
       // continuo (así se mueven las hojas nativas de iOS/Android), en vez
       // de una animación mecánica de tiempo fijo. `damping` cerca del
       // crítico para esta `stiffness` (crítico ≈ 2·√stiffness): llega
       // rápido pero sin rebotar de más.
-      transition={esMobil ? TRANSICION_HOJA : PANEL_LATERAL_TRANSITION}
+      transition={
+        esMobil
+          ? entrando
+            ? TRANSICION_HOJA_ENTRADA
+            : TRANSICION_HOJA
+          : PANEL_LATERAL_TRANSITION
+      }
       // Desktop: panel angosto acoplado a la derecha, de la altura completa
       // por debajo del header (`top: headerHeight` en vez de `inset-y-0`:
       // no debe taparse por encima, ahí vive el buscador global — con

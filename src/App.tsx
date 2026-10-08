@@ -11,6 +11,7 @@ import { NotFoundPage } from './features/not-found/NotFoundPage'
 import { ProvincePanel } from './features/province-panel/ProvincePanel'
 import { altoPeekPx } from './features/province-panel/hojaLayout'
 import { SabiasQueLateral } from './features/province-panel/SabiasQueLateral'
+import { EASE_ZOOM_CSS, MS_ZOOM } from './lib/motion'
 import { useMapStore } from './store/mapStore'
 import { useHistorialPaneles } from './utils/useHistorialPaneles'
 import { useMediaQuery } from './utils/useMediaQuery'
@@ -141,6 +142,10 @@ function App() {
         // propósito (ver `overflow-visible` en NationalMap.tsx) y acá se
         // recorta contra los bordes de la pantalla y la línea del header — el
         // header (que va antes en el DOM) no queda tapado.
+        // El padding se anima con la MISMA duración y curva que el zoom del
+        // mapa (lib/motion.ts): con 300ms/`ease` contra 600ms del zoom, el
+        // contenedor terminaba de moverse a mitad del zoom y el mapa daba un
+        // tirón al cambiar de ritmo.
         className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-1 md:p-6"
         style={
           esMobil
@@ -153,7 +158,7 @@ function App() {
                 paddingBottom: provinciaSeleccionada
                   ? altoHojaMobilPx
                   : undefined,
-                transition: 'padding-bottom 300ms ease',
+                transition: `padding-bottom ${MS_ZOOM}ms ${EASE_ZOOM_CSS}`,
               }
             : {
                 // Siempre hay un panel a la derecha en desktop: el de la
@@ -167,7 +172,7 @@ function App() {
                   hayIntro && !provinciaSeleccionada
                     ? ANCHO_PANEL_PX + 24
                     : undefined,
-                transition: 'padding 300ms ease',
+                transition: `padding ${MS_ZOOM}ms ${EASE_ZOOM_CSS}`,
               }
         }
       >

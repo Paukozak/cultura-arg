@@ -59,8 +59,41 @@ export const panelLateralVariants: Variants = {
   visible: { opacity: 1, x: 0 },
 }
 
+/** Coreografía del click en una provincia (segundos): el mapa hace zoom con
+ * `EASE_ZOOM` durante `DURACION_ZOOM` y el panel entra un instante DESPUÉS
+ * (`DELAY_ENTRADA_PANEL`), no a la vez — así el ojo sigue primero el
+ * movimiento del mapa y el panel "llega" cuando éste ya está en camino. Zoom,
+ * padding del contenedor del mapa (App.tsx) y panel comparten curva y
+ * duración para que se lean como un solo movimiento, no tres con tiempos
+ * distintos que se pisan. */
+export const DURACION_ZOOM = 0.8
+export const MS_ZOOM = DURACION_ZOOM * 1000
+export const DELAY_ENTRADA_PANEL = 0.1
+
+/** Curva del zoom a una provincia (y del padding que lo acompaña): arranque
+ * gradual y una cola larga de frenado (90% del recorrido a los ~60% del
+ * tiempo, el resto es una llegada suave). Reemplaza al ease-in-out simétrico
+ * anterior (`0.65, 0, 0.35, 1`), que concentraba el movimiento en el medio y
+ * frenaba de golpe. Una ease-out tipo expo (`EASE_SALIDA`) se descartó: arranca
+ * a máxima velocidad (pico de ~6x la velocidad media) y en un zoom de varias
+ * escalas se siente como un salto; esta tiene un pico de ~3x, menor que el de
+ * la curva anterior incluso con el tiempo más largo. */
+export const EASE_ZOOM: [number, number, number, number] = [0.45, 0.2, 0.15, 1]
+export const EASE_ZOOM_CSS = 'cubic-bezier(0.45, 0.2, 0.15, 1)'
+
+/** Entrada del panel lateral (desktop): misma duración que el zoom menos el
+ * delay, así ambos terminan juntos. */
 export const PANEL_LATERAL_TRANSITION: Transition = {
-  duration: 0.55,
+  duration: DURACION_ZOOM - 0.1,
+  delay: DELAY_ENTRADA_PANEL,
+  ease: EASE_ZOOM,
+}
+
+/** Salida del panel lateral: sin delay (cerrar tiene que responder al
+ * instante) y más corta que la entrada — lo que se va no necesita la misma
+ * ceremonia que lo que llega. */
+export const PANEL_LATERAL_SALIDA: Transition = {
+  duration: 0.5,
   ease: EASE_SALIDA,
 }
 
@@ -84,8 +117,8 @@ export function staggerContainer(opts?: {
 }
 
 /** Curva ease-in-out (arranque y llegada suaves) para el viaje de la silueta
- * entre el mapa y la vista completa. Misma que `ZOOM_EASING` de NationalMap,
- * así el viaje se lee como continuación del zoom y no como otra animación.
+ * entre el mapa y la vista completa. Es un viaje distinto del zoom a la
+ * provincia (`EASE_ZOOM`): acá la silueta cruza la pantalla entera.
  * No se usa un resorte ni una ease-out pronunciada: en un recorrido de
  * pantalla completa un resorte tiene una cola larga (la silueta "se arrastra"
  * los últimos píxeles) y la ease-out arranca a toda velocidad y se siente

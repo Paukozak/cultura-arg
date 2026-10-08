@@ -21,8 +21,10 @@ import {
 import { useDepartamentos } from '../../data/useDepartamentos'
 import {
   EASE_VIAJE_CSS,
+  EASE_ZOOM_CSS,
   MS_FONDO_VISTA,
   MS_VUELTA_VISTA,
+  MS_ZOOM,
 } from '../../lib/motion'
 import { useMapStore, type Capa } from '../../store/mapStore'
 import { useMediaQuery } from '../../utils/useMediaQuery'
@@ -90,17 +92,13 @@ const TOQUE_TOLERANCIA_PX = 10
 // Zoom animado hacia la provincia clickeada (Etapa 6): al seleccionar una
 // provincia, todo el mapa se escala/traslada como una sola unidad hacia el
 // área real de esa provincia.
-const ZOOM_MS = 600
+// Duración y curva viven en lib/motion.ts (`MS_ZOOM`, `EASE_ZOOM_CSS`): las
+// comparten el padding del contenedor (App.tsx) y el panel, y tienen que
+// moverse juntos.
 // Entrada del mapa (ver `.provincia-cara`/`.provincia-lado` en index.css): las
 // provincias aparecen en una ola de norte a sur — la de más arriba arranca de
 // entrada y la de más abajo ENTRADA_ONDA_MS después.
 const ENTRADA_ONDA_MS = 650
-// Curva "ease-in-out" (acelera y decelera suave en ambas puntas) en vez del
-// "ease-out" pronunciado anterior, que arrancaba de golpe a máxima
-// velocidad — se notaba como un salto en el instante del click, sobre todo
-// zoomeando a provincias grandes. Simétrica a propósito: se usa igual para
-// entrar (click) y volver (deseleccionar).
-const ZOOM_EASING = 'cubic-bezier(0.65, 0, 0.35, 1)'
 const ZOOM_FILL_RATIO = 0.7
 
 // `main` (App.tsx) ocupa el alto del viewport menos el header y centra el
@@ -393,7 +391,7 @@ export function NationalMap() {
   // cambia de nivel — entrar o volver al mapa nacional —, hasta que el
   // propio evento `transitionend` del `transform` (ver `onTransitionEnd` en
   // el `<g>` de más abajo) avisa que la animación realmente terminó. Se usa
-  // el evento real en vez de un `setTimeout` de ZOOM_MS: un timer puede
+  // el evento real en vez de un `setTimeout` de MS_ZOOM: un timer puede
   // llegar a disparar en un momento distinto al que el `transform`
   // realmente termina de animar (el navegador reprograma la transición si
   // `zoomKey` cambia de nuevo antes de que venza, o el timer de una
@@ -442,14 +440,14 @@ export function NationalMap() {
   // render de ~90 ms congelaba el primer cuadro de la animación de la silueta.
   // Usa la propiedad `scale` (no `transform`, que ya lleva el zoom) y la MISMA
   // duración que el fondo de la vista completa (`DURACION_FONDO_VISTA` al
-  // abrir, `DURACION_VUELTA_VISTA` al cerrar; lib/motion.ts) — no `ZOOM_MS`
+  // abrir, `DURACION_VUELTA_VISTA` al cerrar; lib/motion.ts) — no `MS_ZOOM`
   // (esa es del paneo del zoom).
   useLayoutEffect(() => {
     const aplicar = (abierta: boolean) => {
       const el = contenedorRef.current
       if (!el) return
       const fondo = `${abierta ? MS_FONDO_VISTA : MS_VUELTA_VISTA}ms ${EASE_VIAJE_CSS}`
-      el.style.transition = `transform ${ZOOM_MS}ms ${ZOOM_EASING}, scale ${fondo}, opacity ${fondo}`
+      el.style.transition = `transform ${MS_ZOOM}ms ${EASE_ZOOM_CSS}, scale ${fondo}, opacity ${fondo}`
       el.style.scale = abierta ? '0.97' : '1'
       el.style.opacity = abierta ? '0.55' : '1'
     }
@@ -501,7 +499,7 @@ export function NationalMap() {
   const zoomGroupStyle: CSSProperties = zoom
     ? {
         transform: `translate(${WIDTH / 2 - zoom.scale * zoom.cx}px, ${HEIGHT / 2 - zoom.scale * zoom.cy}px) scale(${zoom.scale})`,
-        transition: `transform ${ZOOM_MS}ms ${ZOOM_EASING}`,
+        transition: `transform ${MS_ZOOM}ms ${EASE_ZOOM_CSS}`,
         // Adelanta la promoción a su propia capa de composición antes de
         // que arranque la transición, en vez de que el navegador la arme
         // recién al primer frame animado (evita un pequeño salto al inicio).
@@ -509,7 +507,7 @@ export function NationalMap() {
       }
     : {
         transform: 'translate(0px, 0px) scale(1)',
-        transition: `transform ${ZOOM_MS}ms ${ZOOM_EASING}`,
+        transition: `transform ${MS_ZOOM}ms ${EASE_ZOOM_CSS}`,
       }
 
   const handleEnter = (feature: ProvinciaFeature) => (e: MouseEvent) => {
