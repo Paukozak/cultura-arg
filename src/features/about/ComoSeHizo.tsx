@@ -154,6 +154,48 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
         </p>
       </Seccion>
 
+      <Seccion titulo="Qué se modificó de la base original">
+        <p>
+          Resumen de todos los tratamientos propios sobre los datos de SInCA
+          (datos.cultura.gob.ar), para que se pueda distinguir qué es dato
+          original y qué es corrección:
+        </p>
+        <ul className="flex flex-col gap-2 list-disc pl-4 marker:text-neutral-600">
+          <li>
+            No se descartó ningún registro: las 11 planillas suman{' '}
+            {TOTAL_ESPACIOS.toLocaleString('es-AR')} filas y la app muestra esas
+            mismas {TOTAL_ESPACIOS.toLocaleString('es-AR')}.
+          </li>
+          <li>
+            2 correcciones manuales de dato: un registro de CABA que en realidad
+            es de General San Martín, Buenos Aires (su propia localidad y
+            dirección lo delatan), y una biblioteca de Olavarría sin localidad,
+            completada por sus coordenadas.
+          </li>
+          <li>
+            114 registros con códigos de departamento de una nomenclatura
+            vencida reasignados al código vigente: 102 de Tierra del Fuego
+            (previos a la creación de Tolhuin, en 2017) y 12 de Chascomús.
+          </li>
+          <li>
+            El año 0 de Salas de Teatro se trata como dato faltante, no como año
+            real.
+          </li>
+          <li>
+            12 registros con la dirección o el nombre corregidos para que el
+            mapa de la ficha encuentre el lugar: en 10 la dirección de SInCA
+            tenía un número equivocado, una lista de calles o ninguna dirección,
+            y se reemplazó por la real; en 6 el nombre oficial no es el que usa
+            Google Maps y se busca con otro (4 de ellos coinciden con los
+            anteriores).
+          </li>
+          <li>
+            En 2 destacados se muestra un nombre distinto al de la fuente,
+            elegido a mano por la autora.
+          </li>
+        </ul>
+      </Seccion>
+
       <Seccion titulo="Criterio de elección de visualización">
         <p>
           Se eligió un mapa coroplético, permitiendo comparar la oferta cultural
