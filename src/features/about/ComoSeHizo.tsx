@@ -82,7 +82,7 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
           />
           <Fuente
             nombre="API Georef Argentina"
-            descripcion="Geometría de provincias, usada para el mapa y para descartar pines con coordenadas fuera de su provincia."
+            descripcion="Geometría de provincias, departamentos y comunas, usada para dibujar el mapa y para ubicar cada espacio en su comuna en CABA."
             href="https://datosgobar.github.io/georef-ar-api/"
           />
           <Fuente
@@ -220,6 +220,26 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
           Año y localidad no son los únicos con faltantes: web, mail, teléfono,
           gestión, subcategoría y departamento también tienen huecos, algunos
           grandes, en distinta medida por categoría.
+        </p>
+      </Seccion>
+
+      <Seccion titulo="Limitaciones de las coordenadas">
+        <p>
+          Cerca de 200 de los {TOTAL_ESPACIOS.toLocaleString('es-AR')} espacios
+          traen coordenadas que caen fuera de la provincia que el propio
+          registro declara. Cerca de 130 son de Buenos Aires, sobre todo
+          librerías, y varias comparten exactamente la misma coordenada aunque
+          sean de localidades distintas, algo que parece un valor de reemplazo
+          de la fuente y no un error puntual. No se corrigieron ni se
+          descartaron: sin la dirección real de cada uno no hay forma de
+          reubicarlos con certeza.
+        </p>
+        <p>
+          Esto no altera los conteos ni la densidad, porque la provincia y el
+          departamento de cada espacio salen del código de localidad y no de las
+          coordenadas. Sí puede afectar la ubicación en el mapa de la ficha de
+          un espacio, que se busca por nombre, dirección y localidad y recién
+          usa las coordenadas cuando falta la dirección.
         </p>
       </Seccion>
 
