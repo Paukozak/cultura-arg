@@ -1,5 +1,5 @@
 {
-  "_fuente": "Curaduría editorial manual, acordada con el usuario en conversación, verificada contra src/data/espacios/{provinciaId}.json (cada id referencia un registro real de SInCA; no se inventó ningún lugar). Reemplaza el criterio algorítmico original de la Etapa 4 (categoría con más presencia + año más antiguo).",
+  "_fuente": "Curaduría editorial manual, elegida a mano por la autora del proyecto, verificada contra src/data/espacios/{provinciaId}.json (cada id referencia un registro real de SInCA; no se inventó ningún lugar). Reemplaza el criterio algorítmico original de la Etapa 4 (categoría con más presencia + año más antiguo).",
   "porProvincia": {
     "10": [
       {

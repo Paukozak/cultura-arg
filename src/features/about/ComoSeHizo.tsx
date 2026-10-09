@@ -225,7 +225,8 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
 
       <Seccion titulo="Destacados de cada provincia">
         <p>
-          Se eligieron a mano, provincia por provincia. No reflejan un ranking
+          Los eligió a mano la autora del proyecto, provincia por provincia, sin
+          ayuda de IA ni de ningún criterio automático. No reflejan un ranking
           de importancia, sino una selección que intenta mostrar variedad de
           categorías y de partes del territorio.
         </p>
@@ -233,11 +234,33 @@ function ComoSeHizoContent({ onCerrar }: { onCerrar: () => void }) {
 
       <Seccion titulo="Asistencia de inteligencia artificial">
         <p>
-          El desarrollo se hizo con asistencia de Claude Code, bajo dirección y
-          revisión humana en cada etapa. La curaduría de destacados y las
-          decisiones de qué mostrar y cómo son editoriales, no generadas
-          automáticamente.
+          Herramienta usada: Claude Code (Anthropic), un asistente de
+          programación. No se usó ninguna otra herramienta de IA. Se empleó
+          únicamente como asistencia de código, bajo dirección y revisión
+          humana, y no para crear la visualización ni los datos.
         </p>
+        <ul className="flex flex-col gap-2 list-disc pl-4 marker:text-neutral-600">
+          <li>
+            <strong className="font-medium text-neutral-200">
+              Aplicación web.
+            </strong>{' '}
+            Escritura del código del mapa, los paneles, los filtros y el
+            buscador, y de los tests, a partir de un plan de trabajo por etapas
+            y de un diseño visual definidos por la autora, que revisó cada
+            entrega.
+          </li>
+          <li>
+            <strong className="font-medium text-neutral-200">
+              Pipeline de datos.
+            </strong>{' '}
+            Escritura de los scripts que descargan, normalizan, cruzan y
+            simplifican los datos de SInCA, Georef e INDEC. Los criterios de
+            limpieza (qué se corrige, qué se completa y qué se deja como
+            faltante) los fijó la autora; la IA los programó. Ninguna cifra ni
+            registro fue generado o inventado por IA: todo proviene de las
+            fuentes citadas arriba.
+          </li>
+        </ul>
       </Seccion>
     </ModalInfoContent>
   )

@@ -18,7 +18,7 @@ const CURADOS = destacadosCurados.porProvincia as Record<
 /**
  * Devuelve los espacios destacados de una provincia según la curaduría
  * editorial (ver src/data/destacados-curados.json): una lista fija de ids
- * reales de SInCA por provincia, acordada a mano con el usuario en vez de
+ * reales de SInCA por provincia, elegida a mano por la autora en vez de
  * derivarse de un criterio automático (categoría más presente + año más
  * antiguo, el enfoque original de esta etapa). Si un id curado ya no existe
  * en los datos de la provincia (por ejemplo tras una regeneración del
